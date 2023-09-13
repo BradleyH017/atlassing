@@ -39,7 +39,7 @@ print("Loaded libraries")
 # NOTE: For the rectum, this has been done in *probably* seperate runs of yascp, and imagine this is not ideal. 
 data = "../proc_data/2023_09_rectum/adata.h5ad"
 status="healthy"
-category="All_not_gt_subset"
+category=sys.argv[1]
 
 # Define global figure directory
 statpath = "rectum/" + status
