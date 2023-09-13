@@ -1,0 +1,36 @@
+Building DAG of jobs...
+Using shell: /usr/local/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job stats:
+job                 count
+----------------  -------
+preprocess_batch        1
+umap_param_sweep        1
+total                   2
+
+Select jobs to execute...
+
+[Wed Sep 13 16:28:54 2023]
+rule preprocess_batch:
+    input: ../atlassing_rectum_submit.sh
+    output: /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum/healthy/All_not_gt_subset/objects/adata_PCAd_scvid.h5ad
+    jobid: 1
+    reason: Missing output files: /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum/healthy/All_not_gt_subset/objects/adata_PCAd_scvid.h5ad; Updated input files: ../atlassing_rectum_submit.sh
+    resources: tmpdir=/tmp
+
+[Wed Sep 13 16:28:56 2023]
+Error in rule preprocess_batch:
+    jobid: 1
+    input: ../atlassing_rectum_submit.sh
+    output: /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum/healthy/All_not_gt_subset/objects/adata_PCAd_scvid.h5ad
+    shell:
+        
+        conda activate sc4
+        bsub -o ../logs/rectum_atlassing01-%J-output.log -e ../logs/rectum_atlassing01-%J-error.log -q long -J rectum_atlassing01 < ../atlassing_rectum_submit.sh
+        
+        (one of the commands exited with non-zero exit code; note that snakemake uses bash strict mode!)
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2023-09-13T162853.138436.snakemake.log

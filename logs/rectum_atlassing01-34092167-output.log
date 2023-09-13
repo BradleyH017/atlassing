@@ -17,4 +17,4 @@ The number of cells that remain after filtration is 472974
 Knee:  12
 Elbow:  12
 The number of PCs used for this analysis is 17
-Training:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   0%|          | 0/17 [00:00<?, ?it/s]
+Training:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   6%|▌         | 1/17 [1:26:36<23:05:43, 5196.47s/it]Epoch 1/17:   6%|▌         | 1/17 [1:26:36<23:05:43, 5196.47s/it, loss=7.52e+03, v_num=1]Epoch 2/17:   6%|▌         | 1/17 [1:26:36<23:05:43, 5196.47s/it, loss=7.52e+03, v_num=1]
