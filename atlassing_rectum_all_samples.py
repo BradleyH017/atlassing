@@ -37,8 +37,7 @@ print("Loaded libraries")
 
 # Define the datasets - only running rectum in this script, so don't need to worry about the datset name, disease status or category (am using all here)
 # NOTE: For the rectum, this has been done in *probably* seperate runs of yascp, and imagine this is not ideal. 
-data0="adata_rectum_original_samples_celltype.h5ad"
-data1="adata_rectum_extra_samples_celltype.h5ad"
+data = "../proc_data/2023_09_rectum/adata.h5ad"
 status="healthy"
 category="All_not_gt_subset"
 
@@ -68,14 +67,10 @@ sc.logging.print_header()
 sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
 
 # Load the data
-dat0 = ad.read_h5ad("../proc_data/" + data0)
-dat1 = ad.read_h5ad("../proc_data/" + data1)
-keep_col = np.intersect1d(dat0.obs.columns, dat1.obs.columns)
-keep_col_idx = dat1.obs.columns.isin(keep_col)
-dat1.obs = dat1.obs[dat1.obs.columns[keep_col_idx]]
-adata = ad.concat([dat0, dat1])
-adata
+adata = ad.read_h5ad(data)
 print("Loaded the data")
+# Rename the genotyping ID column so doesn't cause issues later
+adata.obs = adata.obs.rename({'Post_QC_Genotyping_ID_(Tobi_Edit)': 'Corrected_Genotyping_ID'}, axis='columns')
 
 ####################################
 ######### Cell filtration ##########
