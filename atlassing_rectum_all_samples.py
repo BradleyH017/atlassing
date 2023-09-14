@@ -508,21 +508,22 @@ sc.pl.embedding(
 sc.pp.neighbors(adata, n_neighbors=250, n_pcs=nPCs, use_rep="X_pca", key_added="pca_nn")
 sc.tl.umap(adata, neighbors_key="pca_nn")
 sc.pl.umap(adata, color = "label", save="_NN.png")
-adata.obs['id_run'] = adata.obs.id_run.astype('category')
-adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
-sc.pl.umap(adata, color = "id_run", save="_id_run_NN.png")
-sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png")
-# Now using batch effect corrected annotation
-sc.pp.neighbors(adata, n_neighbors=250, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
-sc.tl.umap(adata, neighbors_key ="scVI_nn")
-sc.pl.umap(adata, color = "label", save="_" + SCVI_LATENT_KEY + ".png")
-sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_" + SCVI_LATENT_KEY + ".png")
 
 # Save the ouput adata file
 if os.path.exists(objpath) == False:
     os.mkdir(objpath)
 
 adata.write(objpath + "/adata_PCAd_scvid.h5ad")
+
+#adata.obs['id_run'] = adata.obs.id_run.astype('category')
+adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
+#sc.pl.umap(adata, color = "id_run", save="_id_run_NN.png")
+sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png")
+# Now using batch effect corrected annotation
+sc.pp.neighbors(adata, n_neighbors=250, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
+sc.tl.umap(adata, neighbors_key ="scVI_nn")
+sc.pl.umap(adata, color = "label", save="_" + SCVI_LATENT_KEY + ".png")
+sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_" + SCVI_LATENT_KEY + ".png")
 
 # Save the scANVI matrix
 scanvi = pd.DataFrame(adata.obsm[SCVI_LATENT_KEY])
