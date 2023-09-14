@@ -72,6 +72,7 @@ print("Loaded the data")
 # Rename the genotyping ID column so doesn't cause issues later
 adata.obs = adata.obs.rename({'Post_QC_Genotyping_ID_(Tobi_Edit)': 'Corrected_Genotyping_ID'}, axis='columns')
 
+# Checking for intersection of pilot samples
 pilot = ["OTARscRNA13669848","OTARscRNA13214581","OTARscRNA13236940","OTARscRNA13265818","OTARscRNA13430429","OTARscRNA13430438","OTARscRNA13669841"]
 have = np.unique(adata.obs.convoluted_samplename)
 already = np.intersect1d(pilot, have)
@@ -238,7 +239,7 @@ adata=adata[adata.obs.mt_perc_less_50 == True] #325,318 cells
 print("The number of cells that remain after filtration is", adata.n_obs)
 
 # 4. Scrublet score - DO NOT HAVE THIS FOR THE RECTUM. WILL PROBABLY WANT TO SUBSET FOR THIS ONCE IT IS OBTAINED
-#print(adata.obs["scrublet__multiplet_scores"].max()) # 0.29
+#print(adata.obs["prob_doublet"].max()) # 0.29
 
 # 5. Label machine. What is the cut off for confidence ( don't have this in the rectum, also don't want to subset for this at this inital point. )
 #
