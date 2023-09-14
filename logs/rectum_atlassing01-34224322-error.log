@@ -360,4 +360,27 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 `Trainer.fit` stopped: `max_epochs=17` reached.
-Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [14:48<14:48, 888.04s/it]Computing neighbors: 100%|██████████| 2/2 [28:13<00:00, 839.48s/it]Computing neighbors: 100%|██████████| 2/2 [28:13<00:00, 846.95s/it]
+Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][AEmbeddings:   0%|[32m          [0m| 0/2 [2:06:04<?, ?it/s]
+Traceback (most recent call last):
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py", line 480, in <module>
+    bm.benchmark()
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/benchmark/_core.py", line 226, in benchmark
+    metric_value = getattr(MetricAnnDataAPI, metric_name)(ad, metric_fn)
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/benchmark/_core.py", line 84, in <lambda>
+    isolated_labels = lambda ad, fn: fn(ad.X, ad.obs[_LABELS], ad.obs[_BATCH])
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/_isolated_labels.py", line 47, in isolated_labels
+    score = _score_isolated_label(X, labels, label)
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/_isolated_labels.py", line 61, in _score_isolated_label
+    score = silhouette_label(X, mask.astype(np.float32))
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/_silhouette.py", line 25, in silhouette_label
+    asw = np.mean(silhouette_samples(X, labels, chunk_size=chunk_size))
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/utils/_silhouette.py", line 102, in silhouette_samples
+    results = _pairwise_distances_chunked(X, chunk_size=chunk_size, reduce_fn=reduce_fn)
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/utils/_silhouette.py", line 70, in _pairwise_distances_chunked
+    intra_cluster_dists, inter_cluster_dists = reduce_fn(cdist(X[start:end], X), start=start)
+KeyboardInterrupt
+
+                                                                                  [ATerminated

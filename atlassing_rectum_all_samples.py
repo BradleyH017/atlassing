@@ -228,7 +228,7 @@ plt.clf()
 # How many B Cell Plasma cells are lost with a cut off of 50%
 retained_bcp = adata.obs[(adata.obs.category == "B Cell plasma") & (adata.obs.pct_counts_gene_group__mito_transcript < 50)].shape[0]
 total_bcp = adata.obs[(adata.obs.category == "B Cell plasma")].shape[0]
-print("The number of lost B Cell plasma cells lost at a cut off of 50 MT% is {}({}%)".format(total_bcp-retained_bcp, 100*total_bcp-retained_bcp/total_bcp))
+print("The number of lost B Cell plasma cells lost at a cut off of 50 MT% is {}({}%)".format(total_bcp-retained_bcp, 100*(total_bcp-retained_bcp)/total_bcp))
 
 # Add to adata and cut off
 cutoff=50
@@ -301,6 +301,10 @@ for s in range(0, depth_count.shape[0]):
         depth_count.iloc[s,2] = "Red"
     else: 
          depth_count.iloc[s,2] = "Navy"
+    # Also annotate the samples with low number of cells - Are these sequenced very deeply?
+    if samp in bad_samps:
+        depth_count.iloc[s,2] = "Green"
+
 
 depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
 
@@ -328,7 +332,6 @@ plt.clf()
 
 ## Plot distribution of categories per bad sample (Commented out as giving some weird error when submitted and already generated)
 #bad_samps_proportions = bad_samps_proportions.drop('Total', axis=1)
-#bad_samps_proportions.set_index("sample")
 #plt.figure(figsize=(16, 12))
 #fig,ax = plt.subplots(figsize=(16,12))
 #bad_samps_proportions.plot(
@@ -344,7 +347,7 @@ plt.clf()
 #plt.clf()
 
 # Compare this with a random ten samples
-good_samps = cells_sample.sample(n = 11)
+good_samps = cells_sample.sample(n = len(bad_samps))
 good_samps =  good_samps['sample']
 good_samps_proportions = pd.DataFrame(columns=[cats], index=good_samps)
 good_samps_proportions = good_samps_proportions.assign(Total=0)
@@ -370,21 +373,12 @@ plt.ylabel('')
 plt.savefig(figpath + '/postQC_prop_cats_random_good_samples.png', bbox_inches='tight')
 plt.clf()
 
-# Remove those with such few cells
-adata = adata[~(adata.obs.convoluted_samplename.isin(bad_samps))]
+# DEBATABLE. DO we remove these samples with < 500 cells/sample and those with > 10k cells/sample?
+# Initially had removed these, but the cells from the low number of cell samples look okay - so will keep for atlassing and maybe remove for the eQTL analysis
+# For the samples with the very high number of cells / sample: Will keep these initially to see how they integrate, but may repeat and remove these late on
 # Save this
 adata.obs = adata.obs.drop("patient_number", axis=1)
 adata.write_h5ad(objpath + "/adata_cell_filt.h5ad")
-
-# What about those with very high numbers of cells? Investigate
-high_cell_samps = cells_sample[(cells_sample.Ncells > 1e4)]
-high_cell_samps = high_cell_samps["sample"]
-hdata = adata[adata.obs.convoluted_samplename.isin(high_cell_samps)]
-# May want to remove these from the adata object, until they have been further investigated
-remove_high_cell_samples = False
-if remove_high_cell_samples == True:
-    adata = adata[~(adata.obs.convoluted_samplename.isin(high_cell_samps))]
-
 
 # 6. Finally, filter for lowly expressed genes
 sc.pp.filter_genes(adata, min_cells=6)
