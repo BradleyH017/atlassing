@@ -72,6 +72,11 @@ print("Loaded the data")
 # Rename the genotyping ID column so doesn't cause issues later
 adata.obs = adata.obs.rename({'Post_QC_Genotyping_ID_(Tobi_Edit)': 'Corrected_Genotyping_ID'}, axis='columns')
 
+pilot = ["OTARscRNA13669848","OTARscRNA13214581","OTARscRNA13236940","OTARscRNA13265818","OTARscRNA13430429","OTARscRNA13430438","OTARscRNA13669841"]
+have = np.unique(adata.obs.convoluted_samplename)
+already = np.intersect1d(pilot, have)
+missing = np.setdiff1d(pilot, have)
+
 ####################################
 ######### Cell filtration ##########
 ####################################
