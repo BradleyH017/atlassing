@@ -359,3 +359,5 @@ GPU available: False, used: False
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
+`Trainer.fit` stopped: `max_epochs=17` reached.
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]
