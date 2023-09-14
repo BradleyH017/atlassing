@@ -505,8 +505,8 @@ sc.pl.embedding(
 # NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
 # Using non-corrected matrix
 # Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here)
-sc.pp.neighbors(adata, n_neighbors=250, n_pcs=nPCs, use_rep="X_pca", key_added="pca_nn")
-sc.tl.umap(adata, neighbors_key="pca_nn")
+sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep="X_pca", key_added="pca_nn")
+sc.tl.umap(adata, neighbors_key="pca_nn", min_dist=0.5, spread=0.5)
 sc.pl.umap(adata, color = "label", save="_NN.png")
 
 # Save the ouput adata file
@@ -520,8 +520,8 @@ adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
 #sc.pl.umap(adata, color = "id_run", save="_id_run_NN.png")
 sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png")
 # Now using batch effect corrected annotation
-sc.pp.neighbors(adata, n_neighbors=250, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
-sc.tl.umap(adata, neighbors_key ="scVI_nn")
+sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
+sc.tl.umap(adata, neighbors_key ="scVI_nn", min_dist=0.5, spread=0.5)
 sc.pl.umap(adata, color = "label", save="_" + SCVI_LATENT_KEY + ".png")
 sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_" + SCVI_LATENT_KEY + ".png")
 
