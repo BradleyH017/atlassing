@@ -376,12 +376,20 @@ plt.clf()
 # DEBATABLE. DO we remove these samples with < 500 cells/sample and those with > 10k cells/sample?
 # Initially had removed these, but the cells from the low number of cell samples look okay - so will keep for atlassing and maybe remove for the eQTL analysis
 # For the samples with the very high number of cells / sample: Will keep these initially to see how they integrate, but may repeat and remove these late on
+
+# Following some QC, decided to remove the high cell samples and repeat these
+adata = adata[~adata.obs.convoluted_samplename.isin(high_samps)]
+
 # Save this
 adata.obs = adata.obs.drop("patient_number", axis=1)
 adata.write_h5ad(objpath + "/adata_cell_filt.h5ad")
 
 # 6. Finally, filter for lowly expressed genes
 sc.pp.filter_genes(adata, min_cells=6)
+
+print("After removal of the high cell samples, dataset size is")
+print(adata.shape)
+
 
 ####################################
 ##### Expression normalisation #####

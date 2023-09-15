@@ -15,8 +15,8 @@ import scvi
 import sys
 import csv
 import datetime
-sys.path.append('/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/scRNAseq/CellRegMap')
-from cellregmap import run_association, run_interaction, estimate_betas
+#sys.path.append('/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/scRNAseq/CellRegMap')
+#from cellregmap import run_association, run_interaction, estimate_betas
 print("Loaded libraries")
 
 # Changedir

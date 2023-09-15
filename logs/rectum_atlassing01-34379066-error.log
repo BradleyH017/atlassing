@@ -360,4 +360,7 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 `Trainer.fit` stopped: `max_epochs=17` reached.
-Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [11:32<11:32, 692.08s/it]
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [11:32<11:32, 692.08s/it]Computing neighbors: 100%|██████████| 2/2 [22:43<00:00, 680.11s/it]Computing neighbors: 100%|██████████| 2/2 [22:43<00:00, 681.90s/it]
+Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
