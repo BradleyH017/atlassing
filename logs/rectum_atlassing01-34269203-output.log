@@ -17,4 +17,68 @@ The number of cells that remain after filtration is 472974
 Knee:  12
 Elbow:  12
 The number of PCs used for this analysis is 17
-Training:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it]Epoch 1/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it, loss=7.66e+03, v_num=1]Epoch 2/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it, loss=7.66e+03, v_num=1]Epoch 2/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.66e+03, v_num=1] Epoch 2/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.4e+03, v_num=1] Epoch 6/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.4e+03, v_num=1]Epoch 6/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.4e+03, v_num=1]Epoch 6/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.37e+03, v_num=1]Epoch 9/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.37e+03, v_num=1]
+Training:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   0%|          | 0/17 [00:00<?, ?it/s]Epoch 1/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it]Epoch 1/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it, loss=7.66e+03, v_num=1]Epoch 2/17:   6%|▌         | 1/17 [18:57<5:03:23, 1137.72s/it, loss=7.66e+03, v_num=1]Epoch 2/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.66e+03, v_num=1] Epoch 2/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  12%|█▏        | 2/17 [32:58<4:00:45, 963.02s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.52e+03, v_num=1]Epoch 3/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  18%|█▊        | 3/17 [52:07<4:04:32, 1048.01s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.33e+03, v_num=1]Epoch 4/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  24%|██▎       | 4/17 [1:07:28<3:36:09, 997.65s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.28e+03, v_num=1]Epoch 5/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.4e+03, v_num=1] Epoch 6/17:  29%|██▉       | 5/17 [1:21:37<3:08:51, 944.30s/it, loss=7.4e+03, v_num=1]Epoch 6/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.4e+03, v_num=1]Epoch 6/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  35%|███▌      | 6/17 [1:35:43<2:47:00, 910.95s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.29e+03, v_num=1]Epoch 7/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  41%|████      | 7/17 [1:49:54<2:28:31, 891.10s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.46e+03, v_num=1]Epoch 8/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.37e+03, v_num=1]Epoch 9/17:  47%|████▋     | 8/17 [2:04:02<2:11:36, 877.39s/it, loss=7.37e+03, v_num=1]Epoch 9/17:  53%|█████▎    | 9/17 [2:17:10<1:53:16, 849.59s/it, loss=7.37e+03, v_num=1]Epoch 9/17:  53%|█████▎    | 9/17 [2:17:10<1:53:16, 849.59s/it, loss=7.44e+03, v_num=1]Epoch 10/17:  53%|█████▎    | 9/17 [2:17:10<1:53:16, 849.59s/it, loss=7.44e+03, v_num=1]Epoch 10/17:  59%|█████▉    | 10/17 [2:30:30<1:37:20, 834.29s/it, loss=7.44e+03, v_num=1]Epoch 10/17:  59%|█████▉    | 10/17 [2:30:30<1:37:20, 834.29s/it, loss=7.41e+03, v_num=1]Epoch 11/17:  59%|█████▉    | 10/17 [2:30:30<1:37:20, 834.29s/it, loss=7.41e+03, v_num=1]Epoch 11/17:  65%|██████▍   | 11/17 [2:43:42<1:22:07, 821.19s/it, loss=7.41e+03, v_num=1]Epoch 11/17:  65%|██████▍   | 11/17 [2:43:42<1:22:07, 821.19s/it, loss=7.43e+03, v_num=1]Epoch 12/17:  65%|██████▍   | 11/17 [2:43:42<1:22:07, 821.19s/it, loss=7.43e+03, v_num=1]Epoch 12/17:  71%|███████   | 12/17 [2:56:45<1:07:28, 809.80s/it, loss=7.43e+03, v_num=1]Epoch 12/17:  71%|███████   | 12/17 [2:56:45<1:07:28, 809.80s/it, loss=7.46e+03, v_num=1]Epoch 13/17:  71%|███████   | 12/17 [2:56:45<1:07:28, 809.80s/it, loss=7.46e+03, v_num=1]Epoch 13/17:  76%|███████▋  | 13/17 [3:10:24<54:09, 812.38s/it, loss=7.46e+03, v_num=1]  Epoch 13/17:  76%|███████▋  | 13/17 [3:10:24<54:09, 812.38s/it, loss=7.54e+03, v_num=1]Epoch 14/17:  76%|███████▋  | 13/17 [3:10:24<54:09, 812.38s/it, loss=7.54e+03, v_num=1]Epoch 14/17:  82%|████████▏ | 14/17 [3:25:58<42:27, 849.17s/it, loss=7.54e+03, v_num=1]Epoch 14/17:  82%|████████▏ | 14/17 [3:25:58<42:27, 849.17s/it, loss=7.35e+03, v_num=1]Epoch 15/17:  82%|████████▏ | 14/17 [3:25:58<42:27, 849.17s/it, loss=7.35e+03, v_num=1]Epoch 15/17:  88%|████████▊ | 15/17 [3:40:45<28:41, 860.56s/it, loss=7.35e+03, v_num=1]Epoch 15/17:  88%|████████▊ | 15/17 [3:40:45<28:41, 860.56s/it, loss=7.31e+03, v_num=1]Epoch 16/17:  88%|████████▊ | 15/17 [3:40:45<28:41, 860.56s/it, loss=7.31e+03, v_num=1]Epoch 16/17:  94%|█████████▍| 16/17 [3:55:34<14:29, 869.10s/it, loss=7.31e+03, v_num=1]Epoch 16/17:  94%|█████████▍| 16/17 [3:55:34<14:29, 869.10s/it, loss=7.29e+03, v_num=1]Epoch 17/17:  94%|█████████▍| 16/17 [3:55:34<14:29, 869.10s/it, loss=7.29e+03, v_num=1]Epoch 17/17: 100%|██████████| 17/17 [4:10:15<00:00, 872.64s/it, loss=7.29e+03, v_num=1]Epoch 17/17: 100%|██████████| 17/17 [4:10:15<00:00, 872.64s/it, loss=7.63e+03, v_num=1]Epoch 17/17: 100%|██████████| 17/17 [4:10:15<00:00, 883.25s/it, loss=7.63e+03, v_num=1]
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@node-14-14>
+Subject: Job 34269203: <rectum_atlassing01> in cluster <farm5> Exited
+
+Job <rectum_atlassing01> was submitted from host <farm5-head2> by user <bh18> in cluster <farm5> at Thu Sep 14 15:28:35 2023
+Job was executed on host(s) <4*node-14-14>, in queue <long>, as user <bh18> in cluster <farm5> at Thu Sep 14 15:49:40 2023
+</nfs/users/nfs_b/bh18> was used as the home directory.
+</lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing> was used as the working directory.
+Started at Thu Sep 14 15:49:40 2023
+Terminated at Thu Sep 14 21:04:28 2023
+Results reported at Thu Sep 14 21:04:28 2023
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#! /bin/bash
+#BSUB -o logs/preprocessing-%J-output.log
+#BSUB -e logs/preprocessing-%J-error.log 
+#BSUB -q normal
+#BSUB -G team152
+#BSUB -n 4
+#BSUB -M 300000
+#BSUB -a "memlimit=True"
+#BSUB -R "select[mem>300000] rusage[mem=300000] span[hosts=1]"
+#BSUB -J 9
+
+# Define option
+cd /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis
+
+## FOR THE ATLASSING OF THE RECTUM (#BSUB -M 200000)
+# This is done on the 'All_not_gt_subset' data
+# Use the sc4 environment
+cd scripts/scRNAseq/Atlassing/
+python atlassing_rectum_all_samples.py "All_not_gt_subset"
+# bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q long -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
+
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   57774.90 sec.
+    Max Memory :                                 197320 MB
+    Average Memory :                             100473.89 MB
+    Total Requested Memory :                     300000.00 MB
+    Delta Memory :                               102680.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                27
+    Run time :                                   18888 sec.
+    Turnaround time :                            20153 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/rectum_atlassing01-34269203-error.log> for stderr output of this job.
+

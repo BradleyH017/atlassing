@@ -464,6 +464,12 @@ model.train()
 SCVI_LATENT_KEY = "X_scVI"
 adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
 
+# Save pre-benchmark
+if os.path.exists(objpath) == False:
+    os.mkdir(objpath)
+
+adata.write(objpath + "/adata_PCAd_scvid.h5ad")
+
 # 2. scANVI
 # Have not performed this on the rectum data as this requires a confident annotation of cells - which is not yet obtained.
 
