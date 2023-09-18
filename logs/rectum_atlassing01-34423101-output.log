@@ -1,0 +1,95 @@
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results
+['/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing', '/software/team152/bh18/conda_envs/sc4/lib/python39.zip', '/software/team152/bh18/conda_envs/sc4/lib/python3.9', '/software/team152/bh18/conda_envs/sc4/lib/python3.9/lib-dynload', '/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages']
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/numpy/__init__.py
+Loaded libraries
+scanpy==1.9.3 anndata==0.9.2 umap==0.5.3 numpy==1.24.4 scipy==1.11.1 pandas==1.5.3 scikit-learn==1.3.0 statsmodels==0.14.0 python-igraph==0.10.6 pynndescent==0.5.10
+Loaded the data
+[1.]
+[3388.]
+The number of cells initially included is 752404
+The number of cells with >1 count in  569404
+99.29372
+The MAD of the remaining cells is:14.356348037719727
+Using the median + 2.5*mad=63.07360553741455, leaving us with 514284 cells
+The number of lost B Cell plasma cells lost at a cut off of 50 MT% is 34080(36.757806180229736%)
+The number of cells that remain after filtration is 472974
+After removal of the high cell samples, dataset size is
+(433190, 28000)
+Knee:  14
+Elbow:  14
+The number of PCs used for this analysis is 19
+Training:   0%|          | 0/18 [00:00<?, ?it/s]Epoch 1/18:   0%|          | 0/18 [00:00<?, ?it/s]Epoch 1/18:   6%|▌         | 1/18 [13:57<3:57:09, 837.03s/it]Epoch 1/18:   6%|▌         | 1/18 [13:57<3:57:09, 837.03s/it, loss=8.01e+03, v_num=1]Epoch 2/18:   6%|▌         | 1/18 [13:57<3:57:09, 837.03s/it, loss=8.01e+03, v_num=1]Epoch 2/18:  11%|█         | 2/18 [27:15<3:37:06, 814.13s/it, loss=8.01e+03, v_num=1]Epoch 2/18:  11%|█         | 2/18 [27:15<3:37:06, 814.13s/it, loss=7.87e+03, v_num=1]Epoch 3/18:  11%|█         | 2/18 [27:15<3:37:06, 814.13s/it, loss=7.87e+03, v_num=1]Epoch 3/18:  17%|█▋        | 3/18 [40:29<3:21:18, 805.24s/it, loss=7.87e+03, v_num=1]Epoch 3/18:  17%|█▋        | 3/18 [40:29<3:21:18, 805.24s/it, loss=7.79e+03, v_num=1]Epoch 4/18:  17%|█▋        | 3/18 [40:29<3:21:18, 805.24s/it, loss=7.79e+03, v_num=1]Epoch 4/18:  22%|██▏       | 4/18 [53:52<3:07:41, 804.40s/it, loss=7.79e+03, v_num=1]Epoch 4/18:  22%|██▏       | 4/18 [53:52<3:07:41, 804.40s/it, loss=7.7e+03, v_num=1] Epoch 5/18:  22%|██▏       | 4/18 [53:52<3:07:41, 804.40s/it, loss=7.7e+03, v_num=1]Epoch 5/18:  28%|██▊       | 5/18 [1:07:13<2:53:59, 803.05s/it, loss=7.7e+03, v_num=1]Epoch 5/18:  28%|██▊       | 5/18 [1:07:13<2:53:59, 803.05s/it, loss=7.9e+03, v_num=1]Epoch 6/18:  28%|██▊       | 5/18 [1:07:13<2:53:59, 803.05s/it, loss=7.9e+03, v_num=1]Epoch 6/18:  33%|███▎      | 6/18 [1:20:43<2:41:04, 805.36s/it, loss=7.9e+03, v_num=1]Epoch 6/18:  33%|███▎      | 6/18 [1:20:43<2:41:04, 805.36s/it, loss=7.82e+03, v_num=1]Epoch 7/18:  33%|███▎      | 6/18 [1:20:43<2:41:04, 805.36s/it, loss=7.82e+03, v_num=1]Epoch 7/18:  39%|███▉      | 7/18 [1:34:21<2:28:24, 809.49s/it, loss=7.82e+03, v_num=1]Epoch 7/18:  39%|███▉      | 7/18 [1:34:21<2:28:24, 809.49s/it, loss=7.81e+03, v_num=1]Epoch 8/18:  39%|███▉      | 7/18 [1:34:21<2:28:24, 809.49s/it, loss=7.81e+03, v_num=1]Epoch 8/18:  44%|████▍     | 8/18 [1:47:40<2:14:21, 806.17s/it, loss=7.81e+03, v_num=1]Epoch 8/18:  44%|████▍     | 8/18 [1:47:40<2:14:21, 806.17s/it, loss=7.74e+03, v_num=1]Epoch 9/18:  44%|████▍     | 8/18 [1:47:40<2:14:21, 806.17s/it, loss=7.74e+03, v_num=1]Epoch 9/18:  50%|█████     | 9/18 [2:01:25<2:01:48, 812.01s/it, loss=7.74e+03, v_num=1]Epoch 9/18:  50%|█████     | 9/18 [2:01:25<2:01:48, 812.01s/it, loss=7.71e+03, v_num=1]Epoch 10/18:  50%|█████     | 9/18 [2:01:25<2:01:48, 812.01s/it, loss=7.71e+03, v_num=1]Epoch 10/18:  56%|█████▌    | 10/18 [2:14:15<1:46:33, 799.15s/it, loss=7.71e+03, v_num=1]Epoch 10/18:  56%|█████▌    | 10/18 [2:14:15<1:46:33, 799.15s/it, loss=7.76e+03, v_num=1]Epoch 11/18:  56%|█████▌    | 10/18 [2:14:15<1:46:33, 799.15s/it, loss=7.76e+03, v_num=1]Epoch 11/18:  61%|██████    | 11/18 [2:27:20<1:32:43, 794.81s/it, loss=7.76e+03, v_num=1]Epoch 11/18:  61%|██████    | 11/18 [2:27:20<1:32:43, 794.81s/it, loss=7.76e+03, v_num=1]Epoch 12/18:  61%|██████    | 11/18 [2:27:20<1:32:43, 794.81s/it, loss=7.76e+03, v_num=1]Epoch 12/18:  67%|██████▋   | 12/18 [2:40:50<1:19:55, 799.33s/it, loss=7.76e+03, v_num=1]Epoch 12/18:  67%|██████▋   | 12/18 [2:40:50<1:19:55, 799.33s/it, loss=7.79e+03, v_num=1]Epoch 13/18:  67%|██████▋   | 12/18 [2:40:50<1:19:55, 799.33s/it, loss=7.79e+03, v_num=1]Epoch 13/18:  72%|███████▏  | 13/18 [2:54:13<1:06:42, 800.41s/it, loss=7.79e+03, v_num=1]Epoch 13/18:  72%|███████▏  | 13/18 [2:54:13<1:06:42, 800.41s/it, loss=7.58e+03, v_num=1]Epoch 14/18:  72%|███████▏  | 13/18 [2:54:13<1:06:42, 800.41s/it, loss=7.58e+03, v_num=1]Epoch 14/18:  78%|███████▊  | 14/18 [3:07:49<53:40, 805.18s/it, loss=7.58e+03, v_num=1]  Epoch 14/18:  78%|███████▊  | 14/18 [3:07:49<53:40, 805.18s/it, loss=7.67e+03, v_num=1]Epoch 15/18:  78%|███████▊  | 14/18 [3:07:49<53:40, 805.18s/it, loss=7.67e+03, v_num=1]Epoch 15/18:  83%|████████▎ | 15/18 [3:21:14<40:15, 805.18s/it, loss=7.67e+03, v_num=1]Epoch 15/18:  83%|████████▎ | 15/18 [3:21:14<40:15, 805.18s/it, loss=7.51e+03, v_num=1]Epoch 16/18:  83%|████████▎ | 15/18 [3:21:14<40:15, 805.18s/it, loss=7.51e+03, v_num=1]Epoch 16/18:  89%|████████▉ | 16/18 [3:34:43<26:52, 806.38s/it, loss=7.51e+03, v_num=1]Epoch 16/18:  89%|████████▉ | 16/18 [3:34:43<26:52, 806.38s/it, loss=7.74e+03, v_num=1]Epoch 17/18:  89%|████████▉ | 16/18 [3:34:43<26:52, 806.38s/it, loss=7.74e+03, v_num=1]Epoch 17/18:  94%|█████████▍| 17/18 [3:48:11<13:26, 806.74s/it, loss=7.74e+03, v_num=1]Epoch 17/18:  94%|█████████▍| 17/18 [3:48:11<13:26, 806.74s/it, loss=7.74e+03, v_num=1]Epoch 18/18:  94%|█████████▍| 17/18 [3:48:11<13:26, 806.74s/it, loss=7.74e+03, v_num=1]Epoch 18/18: 100%|██████████| 18/18 [4:01:49<00:00, 810.15s/it, loss=7.74e+03, v_num=1]Epoch 18/18: 100%|██████████| 18/18 [4:01:49<00:00, 810.15s/it, loss=7.55e+03, v_num=1]Epoch 18/18: 100%|██████████| 18/18 [4:01:49<00:00, 806.08s/it, loss=7.55e+03, v_num=1]
+              Isolated labels  ...            Total
+Embedding                      ...                 
+X_pca                0.615403  ...         0.497932
+X_scVI               0.512201  ...         0.476905
+Metric Type  Bio conservation  ...  Aggregate score
+
+[3 rows x 13 columns]
+The method with the greatest overall score is: 
+['X_pca']
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@node-12-8-4>
+Subject: Job 34423101: <rectum_atlassing01> in cluster <farm5> Exited
+
+Job <rectum_atlassing01> was submitted from host <farm5-head2> by user <bh18> in cluster <farm5> at Fri Sep 15 16:56:39 2023
+Job was executed on host(s) <4*node-12-8-4>, in queue <long>, as user <bh18> in cluster <farm5> at Fri Sep 15 16:56:40 2023
+</nfs/users/nfs_b/bh18> was used as the home directory.
+</lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing> was used as the working directory.
+Started at Fri Sep 15 16:56:40 2023
+Terminated at Sat Sep 16 09:07:31 2023
+Results reported at Sat Sep 16 09:07:31 2023
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#! /bin/bash
+#BSUB -o logs/preprocessing-%J-output.log
+#BSUB -e logs/preprocessing-%J-error.log 
+#BSUB -q normal
+#BSUB -G team152
+#BSUB -n 4
+#BSUB -M 300000
+#BSUB -a "memlimit=True"
+#BSUB -R "select[mem>300000] rusage[mem=300000] span[hosts=1]"
+#BSUB -J 9
+
+# Define option
+cd /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis
+
+## FOR THE ATLASSING OF THE RECTUM (#BSUB -M 200000)
+# This is done on the 'All_not_gt_subset' data
+# Use the sc4 environment
+cd scripts/scRNAseq/Atlassing/
+python atlassing_rectum_all_samples.py "All_not_gt_subset"
+# bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q long -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
+
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   136956.22 sec.
+    Max Memory :                                 153903 MB
+    Average Memory :                             120108.80 MB
+    Total Requested Memory :                     300000.00 MB
+    Delta Memory :                               146097.00 MB
+    Max Swap :                                   -
+    Max Processes :                              5
+    Max Threads :                                43
+    Run time :                                   58251 sec.
+    Turnaround time :                            58252 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/rectum_atlassing01-34423101-error.log> for stderr output of this job.
+

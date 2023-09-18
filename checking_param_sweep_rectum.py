@@ -36,7 +36,14 @@ status="healthy"
 category="All_not_gt_subset"
 param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
 
-# Check if this NN file has already been created on this data
+# include the 11 high cell samples?
+inc_high_cell_samps = True
+if inc_high_cell_samps == True:
+    nn_file=param_sweep_path + "/inc_11_high_cell_samps/NN_{}_scanvi.adata".format(n)
+else:
+    nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
+
+# Load NN file
 nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
 adata = ad.read_h5ad(nn_file)
 
@@ -51,6 +58,25 @@ sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_ca
 sc.pl.umap(adata, color="label",frameon=True, save="_post_batch_post_sweep_keras.png")
 sc.pl.umap(adata, color="bead_lot",frameon=True, save="_post_batch_post_sweep_bead_lot.png")
 sc.pl.umap(adata, color="gem_lot",frameon=True, save="_post_batch_post_sweep_gem_lot.png")
+sc.pl.umap(adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_samples.png", palette=list(mp.colors.CSS4_COLORS.values()))
+
+# Plot umap with dimensions
+umap = pd.DataFrame(adata.obsm['X_umap'])
+umap.columns = ["UMAP_1", "UMAP_2"]
+umap['Sample'] = adata.obs.convoluted_samplename.values
+plt.figure(figsize=(8, 6))
+scatter = plt.scatter(umap['UMAP_1'], umap['UMAP_2'], s=0.1, c=np.arange(len(umap['Sample'])), cmap='Set1')
+x_ticks = np.arange(min(umap['UMAP_1']),max(umap['UMAP_1']), 0.3)
+plt.xticks(x_ticks)
+y_ticks = np.arange(min(umap['UMAP_2']),max(umap['UMAP_2']), 0.3)
+plt.yticks(y_ticks)
+plt.xlabel('UMAP_1')
+plt.ylabel('UMAP_2')
+plt.tick_params(axis='both', labelsize=3)
+plt.colorbar(scatter, label='Sample')
+plt.savefig(data_name + "/" + status + "/" + category + "/figures/umap_post_batch_post_sweep_sample_ticks.png", dpi=300, bbox_inches='tight')
+plt.clf()
+
 
 # Plot within category
 cats = np.unique(adata.obs.category)
@@ -75,6 +101,37 @@ def check_intersection(value):
 
 # Create a new column 'intersects' using the apply method
 adata.obs['high_cell_samp'] = adata.obs['convoluted_samplename'].apply(lambda x: check_intersection(x))
+
+# Plot the high cell samples labelled by their ID
+def fill_column(row):
+    if row['high_cell_samp'] == 'yes':
+        return row['convoluted_samplename']
+    else:
+        return 'Not high sample'  # You can also specify a different default value if needed
+
+# Create a new column 'NewColumn' based on the conditions
+adata.obs['high_cell_samp_label'] = adata.obs.apply(fill_column, axis=1)
+# Plot these
+sc.pl.umap(adata, color="high_cell_samp_label", frameon=True, save="_post_batch_post_sweep_high_samples.png")
+
+# Subset adata for problem region to try and identify the non-integrating samples
+umap_x_min = 0.4
+umap_x_max = 1
+umap_y_min = 3.48
+umap_y_max = 3.7
+# Create a boolean mask based on the UMAP coordinates
+umap_mask = (
+    (adata.obsm['X_umap'][:, 0] >= umap_x_min) & (adata.obsm['X_umap'][:, 0] <= umap_x_max) &
+    (adata.obsm['X_umap'][:, 1] >= umap_y_min) & (adata.obsm['X_umap'][:, 1] <= umap_y_max)
+)
+# Subset the AnnData object based on the mask
+subset_adata = adata[umap_mask]
+# Plot, coloured by sample
+sc.pl.umap(subset_adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_subset_coords1_samples.png")
+
+# Have a look at the potentially bad samples (inc. high cell number samples)
+
+
 
 # Have a look at the high cell samples seperately and seperately within a couple categories
 high = adata[adata.obs.high_cell_samp == "yes"]

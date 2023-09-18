@@ -364,3 +364,69 @@ HPU available: False, using: 0 HPUs
 Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
 Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
 Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [4:03:10<36:28:31, 14590.15s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [4:03:10<36:28:31, 14590.15s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [4:05:57<13:34:09, 6106.18s/it, Bio conservation: nmi_ari_cluster_labels_kmeans] [A
+Metrics:  20%|[34m██        [0m| 2/10 [4:05:57<13:34:09, 6106.18s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [8:00:36<18:57:07, 9746.73s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [8:00:36<18:57:07, 9746.73s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [8:00:48<9:50:22, 5903.70s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [8:00:48<9:50:22, 5903.70s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [8:18:27<5:46:21, 4156.39s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [8:18:27<5:46:21, 4156.39s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [8:18:41<3:03:11, 2747.96s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [8:18:41<3:03:11, 2747.96s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [8:21:44<1:35:28, 1909.48s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [8:21:44<1:35:28, 1909.48s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [8:21:45<43:24, 1302.06s/it, Batch correction: graph_connectivity]  [A
+Metrics:  80%|[34m████████  [0m| 8/10 [8:21:45<43:24, 1302.06s/it, Batch correction: pcr_comparison]    [A
+Metrics:  90%|[34m█████████ [0m| 9/10 [8:21:57<14:58, 898.82s/it, Batch correction: pcr_comparison] [AEmbeddings:  50%|[32m█████     [0m| 1/2 [8:21:57<8:21:57, 30117.88s/it]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+                                                                                            [A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [20:01<3:00:16, 1201.79s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [20:01<3:00:16, 1201.79s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [21:49<1:14:25, 558.20s/it, Bio conservation: nmi_ari_cluster_labels_kmeans] [A
+Metrics:  20%|[34m██        [0m| 2/10 [21:49<1:14:25, 558.20s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [43:24<1:44:23, 894.80s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [43:24<1:44:23, 894.80s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [43:32<54:28, 544.68s/it, Bio conservation: clisi_knn]  [A
+Metrics:  40%|[34m████      [0m| 4/10 [43:32<54:28, 544.68s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [44:38<30:59, 371.92s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [44:38<30:59, 371.92s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [44:46<16:32, 248.24s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [44:46<16:32, 248.24s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [47:58<11:29, 229.73s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [47:58<11:29, 229.73s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [47:59<05:14, 157.05s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [47:59<05:14, 157.05s/it, Batch correction: pcr_comparison]    [A/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/_pcr_comparison.py:49: UserWarning: PCR comparison score is negative, meaning variance contribution increased after integration. Setting to 0.
+  warnings.warn(
+
+Metrics:  90%|[34m█████████ [0m| 9/10 [48:11<01:51, 111.57s/it, Batch correction: pcr_comparison][AEmbeddings: 100%|[32m██████████[0m| 2/2 [9:10:09<00:00, 14102.15s/it]  Embeddings: 100%|[32m██████████[0m| 2/2 [9:10:09<00:00, 16504.51s/it]
+
+                                                                                          [A/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+the obs value 'convoluted_samplename' has more than 103 categories. Uniform 'grey' color will be used for all categories.
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/X_scVI_MDE.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+computing neighbors
+    finished: added to `.uns['pca_nn']`
+    `.obsp['pca_nn_distances']`, distances for each pair of neighbors
+    `.obsp['pca_nn_connectivities']`, weighted adjacency matrix (0:24:01)
+computing UMAP
+    finished: added
+    'X_umap', UMAP coordinates (adata.obsm) (0:24:38)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/umap_NN.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+Traceback (most recent call last):
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py", line 525, in <module>
+    
+  File "/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/pandas/core/generic.py", line 5902, in __getattr__
+    return object.__getattribute__(self, name)
+AttributeError: 'DataFrame' object has no attribute 'id_run'
