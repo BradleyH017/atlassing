@@ -16,6 +16,6 @@ cd /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis
 # This is done on the 'All_not_gt_subset' data
 # Use the sc4 environment
 cd scripts/scRNAseq/Atlassing/
-python atlassing_rectum_all_samples.py "All_not_gt_subset"
+python atlassing_rectum_all_samples.py
 # bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q long -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
 
