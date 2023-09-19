@@ -36,10 +36,9 @@ import scipy.stats as st
 print("Loaded libraries")
 
 # Define the datasets - only running rectum in this script, so don't need to worry about the datset name, disease status or category (am using all here)
-# NOTE: For the rectum, this has been done in *probably* seperate runs of yascp, and imagine this is not ideal. 
 data = "../proc_data/2023_09_rectum/adata.h5ad"
 status="healthy"
-category=sys.argv[1]
+category="All_not_gt_subset"
 
 # Define global figure directory
 statpath = "rectum/" + status
@@ -78,6 +77,13 @@ have = np.unique(adata.obs.convoluted_samplename)
 already = np.intersect1d(pilot, have)
 missing = np.setdiff1d(pilot, have)
 
+# Before analaysis, remove the bad samples
+# These were found to not integrate well using scVI
+# These also had a majority of cells with low number of genes detected per cell. Raising this threshold made it difficult to determine where a line could be set to remove these non-integrating cells, and immune cells.
+# So instead, decision was made to remove the cells from these samples entirely
+bad_samps = np.loadtxt(catpath + "/bad_samples_to_remove.txt", dtype=str)
+adata = adata[~(adata.obs.convoluted_samplename.isin(bad_samps))]
+
 ####################################
 ######### Cell filtration ##########
 ####################################
@@ -97,13 +103,13 @@ adata.obs.index = cells
 print(min(adata.obs[["total_counts"]].values))
 import statistics
 print(statistics.median(adata.obs[["total_counts"]].values))
-# Cut off at 500 
+# Cut off at 200 
 tot_count = adata.obs["total_counts"]
-good_tot_count = tot_count > 500
+good_tot_count = tot_count > 200
 # Plot this
 sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts'],
              jitter=0.4, multi_panel=True, save=True)
-adata.obs["tot_count_gt_500"] = good_tot_count
+adata.obs["tot_count_gt_200"] = good_tot_count
 
 # Plot per cell category
 cats = np.unique(adata.obs.category)
@@ -117,13 +123,12 @@ for c in cats:
 
 plt.legend()
 plt.xlabel('log10(nUMI)')
-plt.axvline(x = np.log10(500), color = 'red', linestyle = '--', alpha = 0.5)
+plt.axvline(x = np.log10(200), color = 'red', linestyle = '--', alpha = 0.5)
 plt.savefig(figpath + '/nUMI_per_category.png', bbox_inches='tight')
 plt.clf()
 
 # Subset this
-adata = adata[adata.obs.tot_count_gt_500 == True]
-
+adata = adata[adata.obs.tot_count_gt_200 == True]
 
 # 2. N gene expressed
 print("The number of cells initially included is", adata.n_obs)
@@ -238,8 +243,8 @@ adata.obs["mt_perc_less_50"] = mt_perc_ls50
 adata=adata[adata.obs.mt_perc_less_50 == True] #325,318 cells
 print("The number of cells that remain after filtration is", adata.n_obs)
 
-# 4. Scrublet score - DO NOT HAVE THIS FOR THE RECTUM. WILL PROBABLY WANT TO SUBSET FOR THIS ONCE IT IS OBTAINED
-#print(adata.obs["prob_doublet"].max()) # 0.29
+# 4. Probabilityof doublet. This has already been filtered by the yascp pipeline
+print(adata.obs["prob_doublet"].max()) # 0.29
 
 # 5. Label machine. What is the cut off for confidence ( don't have this in the rectum, also don't want to subset for this at this inital point. )
 #
@@ -346,7 +351,7 @@ plt.clf()
 #plt.savefig(figpath + '/postQC_prop_cats_bad_samples.png', bbox_inches='tight')
 #plt.clf()
 
-# Compare this with a random ten samples
+# Compare this with a random set of samples
 good_samps = cells_sample.sample(n = len(bad_samps))
 good_samps =  good_samps['sample']
 good_samps_proportions = pd.DataFrame(columns=[cats], index=good_samps)
@@ -532,7 +537,7 @@ adata.write(objpath + "/adata_PCAd_scvid.h5ad")
 #adata.obs['id_run'] = adata.obs.id_run.astype('category')
 adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
 #sc.pl.umap(adata, color = "id_run", save="_id_run_NN.png")
-sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png")
+sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png", palette=list(mp.colors.CSS4_COLORS.values()))
 # Now using batch effect corrected annotation
 sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
 sc.tl.umap(adata, neighbors_key ="scVI_nn", min_dist=0.5, spread=0.5)
