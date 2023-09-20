@@ -98,6 +98,9 @@ cells = adata.obs.index
 adata.obs = adata.obs.merge(label_labelmachine, how="left")
 adata.obs.index = cells
 
+# Subset for the healthy samples only. This will mean that 3 samples are lost (2 UC ["5892STDY8966203", "5892STDY8966204"] and one CD [OTARscRNA9294505])
+adata = adata[adata.status == "healthy"]
+
 # Now do some preliminary preprocessing
 # 1. What is the minimum UMI?
 print(min(adata.obs[["total_counts"]].values))
@@ -410,8 +413,22 @@ sc.pp.normalize_total(adata, target_sum=1e4)
 # Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
 sc.pp.log1p(adata)
 
+# Looks like there are large clumps of cells defined by very high MT%, as opposed to their predicted category from the TI keras annotation (albeit not perfect)
+# This seems to dramatically affect the B cell plasma cells
+# In addition, IG, RP and MT genes were removed in the TI atlas HVG selection
+# RP% doesn't seem to be a problem (plotting pct_counts_gene_group__ribo_protein on umap)
+# Initially, 136/228 IG genes are identified as highly variable "IG[HKL]V|IG[KL]J|IG[KL]C|IGH[ADEGM] 
+# Doesn't look like IG% or RP% is heavily influencing embedding
+# But there are lots of IG genes in the HVG and only one RP
+# Will regress out the effect of MT% before scaling, and make sure none of these genes are left in the analysis for batch correction etc
+
 # identify highly variable genes and scale these ahead of PCA
 sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=2000)
+
+# Replace if they are IG
+
+# Regress
+sc.pp.regress_out(adata, ['pct_counts_gene_group__mito_transcript'])
 
 # Scale
 sc.pp.scale(adata, max_value=10)

@@ -38,7 +38,7 @@ category="All_not_gt_subset"
 param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
 
 # include the 11 high cell samples?
-inc_high_cell_samps = True
+inc_high_cell_samps = False
 if inc_high_cell_samps == True:
     nn_file=param_sweep_path + "/inc_11_high_cell_samps/NN_{}_scanvi.adata".format(n)
 else:
@@ -49,6 +49,10 @@ adata = ad.read_h5ad(nn_file)
 
 # Recompute UMAP with percieved optimum conditions
 sc.tl.umap(adata, min_dist=min_dist, spread=spread, neighbors_key ="scVI_nn")
+# Save post UMAP
+import re
+umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
+adata.write_h5ad(umap_file)
 
 # Define fig out dir
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
@@ -59,9 +63,118 @@ sc.pl.umap(adata, color="label",frameon=True, save="_post_batch_post_sweep_keras
 sc.pl.umap(adata, color="bead_lot",frameon=True, save="_post_batch_post_sweep_bead_lot.png")
 sc.pl.umap(adata, color="gem_lot",frameon=True, save="_post_batch_post_sweep_gem_lot.png")
 sc.pl.umap(adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_samples.png", palette=list(mp.colors.CSS4_COLORS.values()))
+adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
+sc.pl.umap(adata, color="Keras:predicted_celltype_probability", frameon=True, save="_post_batch_post_sweep_keras_conf.png")
+# Plot RP%
+sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_sweep_rpperc.png")
+# Calculate IG% and plot
+adata.var[adata.var.gene_symbols.str.contains("IG[HKL]V|IG[KL]J|IG[KL]C|IGH[ADEGM]")]
+totsum = adata.layers['counts'].sum(axis=1)
+is_ig = adata.var.gene_symbols.str.contains("IG[HKL]V|IG[KL]J|IG[KL]C|IGH[ADEGM]")
+temp_counts = adata.layers['counts']
+igcounts = temp_counts[:,is_ig.values]
+igsum = igcounts.sum(axis=1)
+ig_perc = np.array(igsum)/np.array(totsum)
+adata.obs['ig_perc'] = ig_perc
+sc.pl.umap(adata, color="ig_perc", frameon=True, save="_post_batch_post_sweep_igperc.png")
+
+
+# Still looks like one samples isn't integrating very well
+# Plot with axis and find this one
+umap = pd.DataFrame(adata.obsm['X_umap'])
+umap.columns = ["UMAP_1", "UMAP_2"]
+umap['Sample'] = adata.obs.convoluted_samplename.values
+plt.figure(figsize=(8, 6))
+scatter = plt.scatter(umap['UMAP_1'], umap['UMAP_2'], s=0.1)
+x_ticks = np.arange(min(umap['UMAP_1']),max(umap['UMAP_1']), 0.3)
+plt.xticks(x_ticks)
+y_ticks = np.arange(min(umap['UMAP_2']),max(umap['UMAP_2']), 0.3)
+plt.yticks(y_ticks)
+plt.xlabel('UMAP_1')
+plt.ylabel('UMAP_2')
+plt.tick_params(axis='both', labelsize=3)
+plt.savefig(data_name + "/" + status + "/" + category + "/figures/umap_post_batch_post_sweep_sample_ticks.png", dpi=300, bbox_inches='tight')
+plt.clf()
+
+# Plot this non-integrating sample
+umap_x_min = 4.35
+umap_x_max = 5.25
+umap_y_min = 6.38
+umap_y_max = 7.28
+# Create a boolean mask based on the UMAP coordinates
+umap_mask = (
+    (adata.obsm['X_umap'][:, 0] >= umap_x_min) & (adata.obsm['X_umap'][:, 0] <= umap_x_max) &
+    (adata.obsm['X_umap'][:, 1] >= umap_y_min) & (adata.obsm['X_umap'][:, 1] <= umap_y_max)
+)
+# Subset the AnnData object based on the mask
+subset_adata = adata[umap_mask]
+# Plot, coloured by sample
+sc.pl.umap(subset_adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_subset_coords1_samples.png", palette = 'Set3')
+candidates = ["OTARscRNA13781777", "OTARscRNA13781786"]
+subset_adata.obs['candidate_bad'] = adata.obs['convoluted_samplename'].apply(lambda x: x if x in candidates else 'No')
+# Plot these ones only 
+sc.pl.umap(subset_adata, color="candidate_bad", frameon=True, save="_post_batch_post_sweep_subset_coords1_samples_cols.png")
+problem_sample = "OTARscRNA13781777"
+# Plot UMAP of all samples, with this one highlighted
+adata.obs['prob_bad'] = adata.obs['convoluted_samplename'].apply(lambda x: x if x in problem_sample else 'No')
+sc.pl.umap(adata, color="c", frameon=True, save="_post_batch_post_sweep_bad.png")
+
+
+# Looks like this sample has very few cells, and mostly immune - check this
+np.unique(adata.obs.prob_bad, return_counts=True)
+cats = np.unique(adata.obs.category)
+count_cat = pd.DataFrame(np.unique(adata.obs[adata.obs.convoluted_samplename == problem_sample].category, return_counts=True)).T
+count_cat.columns = ['label', 'freq']
+plt.figure(figsize=(8, 6))
+plt.pie(count_cat.freq, labels = count_cat.label, autopct='%.0f%%')
+plt.savefig(data_name + "/" + status + "/" + category + "/figures/umap_post_batch_post_sweep_bad_samples_prop.png", dpi=300, bbox_inches='tight')
+
+# Check a random for categories
+random_samps = np.random.choice(np.unique(adata.obs.convoluted_samplename), 3)
+for index,s in enumerate(random_samps):
+    count_cat = pd.DataFrame(np.unique(adata.obs[adata.obs.convoluted_samplename == s].category, return_counts=True)).T
+    count_cat.columns = ['label', 'freq']
+    plt.figure(figsize=(8, 6))
+    plt.pie(count_cat.freq, labels = count_cat.label, autopct='%.0f%%')
+    plt.savefig(data_name + "/" + status + "/" + category + "/figures/umap_post_batch_post_sweep_random_good_samples_prop" + str(index) + ".png", dpi=300, bbox_inches='tight')
+
+
+
+# Plot within category
+cats = np.unique(adata.obs.category)
+for c in cats:
+    print(c)
+    temp = adata[adata.obs.category == c]
+    sc.pl.umap(temp, color="label", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras.png")
+
 
 # Also plot ngenes, n reads
 sc.pl.umap(adata, color="ngenes_per_cell", frameon=True, save="_post_batch_post_sweep_ngenes.png")
+# And total counts
+sc.pl.umap(adata, color="total_counts", frameon=True, save="_post_batch_post_sweep_ncounts.png")
+# And MT%
+sc.pl.umap(adata, color="pct_counts_gene_group__mito_protein", frameon=True, save="_post_batch_post_sweep_mtperc.png")
+
+# Check categories, coloured by MT%
+cats = np.unique(adata.obs.category)
+def mad(data):
+    return np.median(np.abs(data - np.median(data)))
+
+for c in cats:
+    print(c)
+    temp = adata[adata.obs.category == c]
+    sc.pl.umap(temp, color="pct_counts_gene_group__mito_protein", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mtperc.png")
+    # Print the median + 2.5*the median absolute deviation for each celltype
+    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
+    print("For {}, the median={} and the median+2.5*MAD={}".format(c, np.median(mt_perc), median_plus_2pt5_mad))
+
+# Is there a significant proportion of MT%, RP% and HLA% in the HVGs?
+hvg = adata.var[adata.var.highly_variable == True]
+mt_perc = hvg[hvg['gene_symbols'].str.contains("MT-")].shape[0]/hvg.shape[0]
+
+
+
 samp_data = np.unique(adata.obs.convoluted_samplename, return_counts=True)
 cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
 high_samps = np.array(cells_sample.loc[cells_sample.Ncells > 10000, "sample"])
