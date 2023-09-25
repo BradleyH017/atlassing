@@ -82,7 +82,12 @@ missing = np.setdiff1d(pilot, have)
 # These also had a majority of cells with low number of genes detected per cell. Raising this threshold made it difficult to determine where a line could be set to remove these non-integrating cells, and immune cells.
 # So instead, decision was made to remove the cells from these samples entirely
 bad_samps = np.loadtxt(catpath + "/bad_samples_to_remove.txt", dtype=str)
+# After integration with just this set, had some additional samples that were not integrating well. 
+# These were also those with low ngenes/cell detected. Density = 0.0006
+# Repeating this, removing these samples 
+additional_bad_samps = np.array(['OTARscRNA10652911', 'OTARscRNA13669850', 'OTARscRNA13781777','OTARscRNA9997698'])
 adata = adata[~(adata.obs.convoluted_samplename.isin(bad_samps))]
+adata = adata[~(adata.obs.convoluted_samplename.isin(additional_bad_samps))]
 
 ####################################
 ######### Cell filtration ##########
@@ -98,8 +103,8 @@ cells = adata.obs.index
 adata.obs = adata.obs.merge(label_labelmachine, how="left")
 adata.obs.index = cells
 
-# Subset for the healthy samples only. This will mean that 3 samples are lost (2 UC ["5892STDY8966203", "5892STDY8966204"] and one CD [OTARscRNA9294505])
-adata = adata[adata.status == "healthy"]
+# Subset for the desired samples only. If healthy, this will mean that 3 samples are lost (2 UC ["5892STDY8966203", "5892STDY8966204"] and one CD [OTARscRNA9294505])
+adata = adata[adata.obs.disease_status == status]
 
 # Now do some preliminary preprocessing
 # 1. What is the minimum UMI?
@@ -423,12 +428,17 @@ sc.pp.log1p(adata)
 # Will regress out the effect of MT% before scaling, and make sure none of these genes are left in the analysis for batch correction etc
 
 # identify highly variable genes and scale these ahead of PCA
-sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=2000)
+sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=2000, batch_key='convoluted_samplename')
 
-# Replace if they are IG
-
-# Regress
-sc.pp.regress_out(adata, ['pct_counts_gene_group__mito_transcript'])
+# Check for intersection of IG, MT and RP genes in the HVGs
+print("IG")
+print(np.unique(adata.var[adata.var.gene_symbols.str.contains("IG[HKL]V|IG[KL]J|IG[KL]C|IGH[ADEGM]")].highly_variable, return_counts=True))
+print("MT")
+print(np.unique(adata.var[adata.var.gene_symbols.str.contains("^MT-")].highly_variable, return_counts=True))
+print("RP")
+print(np.unique(adata.var[adata.var.gene_symbols.str.contains("^RP")].highly_variable, return_counts=True))
+# MT or RP genes are not present in the HVGs, Lots of IG genes are.
+# However on UMAPs in previous attempts, these don't seem to be causing a problem. So will leave them in.
 
 # Scale
 sc.pp.scale(adata, max_value=10)
@@ -488,7 +498,8 @@ adata.write(objpath + "/adata_PCAd.h5ad")
 ####################################
 
 # 1. scVI
-scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
+# Correcting for MT% (If not done, this seems to be very high in regions of the data where there is overlapping cell categories)
+scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id", continuous_covariate_keys=["pct_counts_gene_group__mito_transcript"])
 model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
 model.train()
 SCVI_LATENT_KEY = "X_scVI"
