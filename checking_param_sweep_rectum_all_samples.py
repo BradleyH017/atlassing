@@ -16,6 +16,7 @@ import sys
 import csv
 import datetime
 import seaborn as sns
+import re
 #sys.path.append('/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/scRNAseq/CellRegMap')
 #from cellregmap import run_association, run_interaction, estimate_betas
 print("Loaded libraries")
@@ -50,7 +51,6 @@ adata = ad.read_h5ad(nn_file)
 # Recompute UMAP with percieved optimum conditions
 sc.tl.umap(adata, min_dist=min_dist, spread=spread, neighbors_key ="scVI_nn")
 # Save post UMAP
-import re
 umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
 adata.write_h5ad(umap_file)
 
@@ -174,11 +174,11 @@ hvg = adata.var[adata.var.highly_variable == True]
 mt_perc = hvg[hvg['gene_symbols'].str.contains("MT-")].shape[0]/hvg.shape[0]
 
 
-
+# Have a look at the ngenes / cell / sample
 samp_data = np.unique(adata.obs.convoluted_samplename, return_counts=True)
 cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
 high_samps = np.array(cells_sample.loc[cells_sample.Ncells > 10000, "sample"])
-bad_samps = "5892STDY9997881"
+bad_samps = problem_sample
 depth_count = pd.DataFrame(index = np.unique(adata.obs.convoluted_samplename), columns=["Mean_nCounts", "nCells", "High_cell_sample", "ngenes_per_cell", "sample"])
 for s in range(0, depth_count.shape[0]):
     samp = depth_count.index[s]
@@ -213,7 +213,7 @@ for index,s in enumerate(samps):
     if index == 0:
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
-    if s in np.hstack((np.array(bad_samps, dtype="object"), high_samps)):
+    if s in np.hstack((np.array(bad_samps, dtype="object"), bad_samps)):
         sns.distplot(data, hist=False, rug=True, label=s, kde_kws={'linewidth': 2.5})
     else:
         sns.distplot(data, hist=False, rug=True, color='black')
@@ -230,8 +230,9 @@ plt.savefig(data_name + "/" + status + "/" + category + "/figures/post_batch_gen
 plt.clf()
 
 # Have a look at the ones with very high low ngenes/cell
-# cut off at 0.0008
-cutoff=0.0008
+# cut off at 0.0008 (initially, removed the very high cell number, bad quality samples)
+# Now looking like 0.0006 may capture additional, badly integrating samples
+cutoff=0.0006
 potbadsamps = depth_count[depth_count.max_density > cutoff]
 potbadsamps = np.array(potbadsamps.index)
 for index,s in enumerate(samps):
@@ -254,8 +255,33 @@ plt.savefig(data_name + "/" + status + "/" + category + "/figures/post_batch_gen
 plt.clf()
 
 # Plot these on UMAP
-adata.obs['potential_bad_sample'] = adata.obs['convoluted_samplename'].apply(lambda x: 'Yes' if x in potbadsamps else 'No')
+adata.obs['potential_bad_sample'] = adata.obs['convoluted_samplename'].apply(lambda x: x if x in potbadsamps else 'No')
 sc.pl.umap(adata, color="potential_bad_sample",frameon=True, save="_post_batch_post_sweep_low_n_gene_cell_samples.png")
+
+# Check the ncells/sample, some of these look like they have very few cells
+depth_count[depth_count.index.isin(potbadsamps)]
+
+# Plot the other potential bad samples in the Mean genes detect/cell
+for s in range(0, depth_count.shape[0]):
+    samp = depth_count.index[s]
+    if samp in high_samps:
+        depth_count.iloc[s,2] = "Red"
+        depth_count.iloc[s,4] = samp
+    else: 
+         depth_count.iloc[s,2] = "Navy"
+    # Also annotate the samples with low number of cells - Are these sequenced very deeply?
+    if samp in potbadsamps:
+        depth_count.iloc[s,2] = "Green"
+        depth_count.iloc[s,4] = samp
+
+# Plot again
+plt.figure(figsize=(8, 6))
+plt.scatter(depth_count["Mean_nCounts"], depth_count["ngenes_per_cell"],  c=depth_count["High_cell_sample"], alpha=0.7)
+plt.xlabel('Mean counts / cell')
+plt.ylabel('Mean genes detected / cell')
+plt.savefig(data_name + "/" + status + "/" + category + "/figures/post_batch_post_sweep_counts_cells_genes_cells_labels_potbad.png", bbox_inches='tight')
+plt.clf()
+
 
 # Determining new cut off
 depth_count[["cross_density"]] = 0
