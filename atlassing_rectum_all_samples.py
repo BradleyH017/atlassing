@@ -33,6 +33,7 @@ from limix.qc import quantile_gaussianize
 import matplotlib.pyplot as plt
 import math
 import scipy.stats as st
+import re
 print("Loaded libraries")
 
 # Define the datasets - only running rectum in this script, so don't need to worry about the datset name, disease status or category (am using all here)
@@ -393,6 +394,46 @@ plt.clf()
 # Following some QC, decided to remove the high cell samples and repeat these
 adata = adata[~adata.obs.convoluted_samplename.isin(high_samps)]
 
+# Finally, see considerable intermixing within categories down the line.
+# This seems to be occuring between categories, particularly when MT% is high. Interestingly, this is less often the case between epithelial cells with either other 
+# Epithelial cells or Immune cells, but instead seems to be occuring between cells labelled as an immune cell category, being placed with epithelial cells. 
+# It is possible this is occuring because these are very bad quality immune cells (outlying high MT%), being placed with epithelial cells because these tend to have an 
+# inherently high MT%. 
+# For this reason, am deciding to define relative cut offs for the percentage of MT gene expression within some resolution of the data
+# As we don't want to do this in a way that does not allow admixing within some resolution of the data that may vary between the TI and rectum, will define these 
+# relative cut offs within lineages of the data. 
+# This will include grouping: 
+# 'Stem', 'Enterocyte'and 'Secretory' into 'Epithelial' 
+# 'B cell', 'B cell plasma', 'T cell' and 'Myeloid' into 'Immune'
+# 'Mesenchymal' into 'Mesenchymal'
+# Then defining a relative cut off for these (median + 2.5*MAD), and applying this threshold if it is less than 50% (otherwise will use 50%)
+# Add the lineage information to the adata object
+lin_df = pd.DataFrame({'category': cats, 'lineage': ""}) 
+lin_df['lineage'] = np.where(lin_df['category'].isin(['B Cell', 'B Cell plasma', 'T Cell', 'Myeloid']), 'Immune', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category'].isin(['Stem cells', 'Secretory', 'Enterocyte']), 'Epithelial', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category']== 'Mesenchymal', 'Mesenchymal', lin_df['lineage'])
+# Merge onto adata
+adata.obs.index = adata.obs.index.astype(str)
+cells = adata.obs.index
+adata.obs = adata.obs.merge(lin_df, on='category', how="left")
+adata.obs.index = cells
+
+#  For each lineage, define the relative cut off and subset a temporary object for these cells
+adata_list = []
+lins = np.unique(lin_df.lineage)
+for index,c in enumerate(lins):
+    print(c)
+    temp = adata[adata.obs.lineage == c]
+    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
+    print(median_plus_2pt5_mad)
+    if median_plus_2pt5_mad < 50:
+        temp = temp[temp.obs.pct_counts_gene_group__mito_transcript < median_plus_2pt5_mad]
+    adata_list.append(temp)
+
+# Put back together and overwrite the original adata object
+adata = ad.concat(adata_list)
+
 # Save this
 adata.obs = adata.obs.drop("patient_number", axis=1)
 adata.write_h5ad(objpath + "/adata_cell_filt.h5ad")
@@ -499,7 +540,7 @@ adata.write(objpath + "/adata_PCAd.h5ad")
 
 # 1. scVI
 # Correcting for MT% (If not done, this seems to be very high in regions of the data where there is overlapping cell categories)
-scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id", continuous_covariate_keys=["pct_counts_gene_group__mito_transcript"])
+scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
 model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
 model.train()
 SCVI_LATENT_KEY = "X_scVI"
@@ -561,6 +602,28 @@ if os.path.exists(objpath) == False:
     os.mkdir(objpath)
 
 adata.write(objpath + "/adata_PCAd_scvid.h5ad")
+
+# Pre-emptively compute the NN embedding using 350 neighbours and custom min_dist and spread parameters
+# Used to do this after parameter sweep, but these paramaters usually looked pretty good
+knee = pd.read_csv("rectum/" + status + "/" + category + "/knee.txt")
+knee = float(knee.columns[0])
+knee=int(knee)
+nPCs=knee+5
+print(nPCs)
+# Compute NN
+n="350"
+n=int(n)
+SCVI_LATENT_KEY = "X_scVI"
+sc.pp.neighbors(adata, n_neighbors=n, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
+param_sweep_path = "rectum/" + status + "/" + category + "/objects/adata_objs_param_sweep"
+nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
+adata.write_h5ad(nn_file)
+# Compute UMAP 
+sc.tl.umap(adata, min_dist=0.5, spread=0.5, neighbors_key ="scVI_nn")
+# Save 
+umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
+adata.write_h5ad(umap_file)
+
 
 #adata.obs['id_run'] = adata.obs.id_run.astype('category')
 adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
