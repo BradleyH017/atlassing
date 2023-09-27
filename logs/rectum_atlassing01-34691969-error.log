@@ -1,0 +1,432 @@
+Global seed set to 0
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/flax/struct.py:132: FutureWarning: jax.tree_util.register_keypaths is deprecated, and will be removed in a future release. Please use `register_pytree_with_keys()` instead.
+  jax.tree_util.register_keypaths(data_clz, keypaths)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/flax/struct.py:132: FutureWarning: jax.tree_util.register_keypaths is deprecated, and will be removed in a future release. Please use `register_pytree_with_keys()` instead.
+  jax.tree_util.register_keypaths(data_clz, keypaths)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/umap/distances.py:1063: NumbaDeprecationWarning: [1mThe 'nopython' keyword argument was not supplied to the 'numba.jit' decorator. The implicit default value for this argument is currently False, but it will be changed to True in Numba 0.59.0. See https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-of-object-mode-fall-back-behaviour-when-using-jit for details.[0m
+  @numba.jit()
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/umap/distances.py:1071: NumbaDeprecationWarning: [1mThe 'nopython' keyword argument was not supplied to the 'numba.jit' decorator. The implicit default value for this argument is currently False, but it will be changed to True in Numba 0.59.0. See https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-of-object-mode-fall-back-behaviour-when-using-jit for details.[0m
+  @numba.jit()
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/umap/distances.py:1086: NumbaDeprecationWarning: [1mThe 'nopython' keyword argument was not supplied to the 'numba.jit' decorator. The implicit default value for this argument is currently False, but it will be changed to True in Numba 0.59.0. See https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-of-object-mode-fall-back-behaviour-when-using-jit for details.[0m
+  @numba.jit()
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/umap/umap_.py:660: NumbaDeprecationWarning: [1mThe 'nopython' keyword argument was not supplied to the 'numba.jit' decorator. The implicit default value for this argument is currently False, but it will be changed to True in Numba 0.59.0. See https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-of-object-mode-fall-back-behaviour-when-using-jit for details.[0m
+  @numba.jit()
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/anndata/_core/anndata.py:788: UserWarning: 
+AnnData expects .obs.index to contain strings, but got values like:
+    [0, 1, 2, 3, 4]
+
+    Inferred to be: integer
+
+  value_idx = self._prep_dim_index(value.index, attr)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/seaborn/axisgrid.py:118: UserWarning: The figure layout has changed to tight
+  self._figure.tight_layout(*args, **kwargs)
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/violin.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:122: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:144: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `histplot` (an axes-level function for histograms).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(np.log10(ncounts_gt1))
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:156: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:165: ImplicitModificationWarning: Trying to modify attribute `.obs` of view, initializing view as actual.
+  adata.obs["express_gt100"] = express_gt100
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/seaborn/axisgrid.py:118: UserWarning: The figure layout has changed to tight
+  self._figure.tight_layout(*args, **kwargs)
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/violin_mt_perc.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:224: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `kdeplot` (an axes-level function for kernel density plots).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(data, hist=False, rug=True, label=c)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:242: ImplicitModificationWarning: Trying to modify attribute `.obs` of view, initializing view as actual.
+  adata.obs["mt_perc_less_50"] = mt_perc_ls50
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:258: UserWarning: 
+
+`distplot` is a deprecated function and will be removed in seaborn v0.14.0.
+
+Please adapt your code to use either `displot` (a figure-level function with
+similar flexibility) or `histplot` (an axes-level function for histograms).
+
+For a guide to updating your code to use the new functions, please see
+https://gist.github.com/mwaskom/de44147ed2974457ad6372750bbe5751
+
+  sns.distplot(cells_sample.Ncells)
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:281: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  temp['convoluted_samplename'] = temp['convoluted_samplename'].astype("string")
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:282: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  temp['convoluted_samplename'] = temp['convoluted_samplename'].astype("category")
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py:297: ImplicitModificationWarning: Trying to modify attribute `.obs` of view, initializing view as actual.
+  adata.obs["ngenes_per_cell"] = ncounts_gt1
+filtered out 5560 genes that are detected in less than 6 cells
+normalizing counts per cell
+    finished (0:00:05)
+If you pass `n_top_genes`, all cutoffs are ignored.
+extracting highly variable genes
+    finished (0:00:11)
+--> added
+    'highly_variable', boolean vector (adata.var)
+    'means', float vector (adata.var)
+    'dispersions', float vector (adata.var)
+    'dispersions_norm', float vector (adata.var)
+... as `zero_center=True`, sparse input is densified and may lead to large memory consumption
+computing PCA
+    on highly variable genes
+    with n_comps=50
+    finished (0:01:31)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap', 'norm' will be ignored
+  cax = scatter(
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/pcaTrue.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/pca_variance_ratio.png
+No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+`Trainer.fit` stopped: `max_epochs=20` reached.
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [09:50<09:50, 590.89s/it]Computing neighbors: 100%|██████████| 2/2 [19:17<00:00, 576.44s/it]Computing neighbors: 100%|██████████| 2/2 [19:17<00:00, 578.61s/it]
+Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [3:57:57<35:41:41, 14277.95s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [3:57:57<35:41:41, 14277.95s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [4:00:34<13:16:10, 5971.29s/it, Bio conservation: nmi_ari_cluster_labels_kmeans] [A
+Metrics:  20%|[34m██        [0m| 2/10 [4:00:34<13:16:10, 5971.29s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [7:34:50<17:43:25, 9115.11s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [7:34:50<17:43:25, 9115.11s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [7:35:00<9:12:02, 5520.47s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [7:35:00<9:12:02, 5520.47s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [7:51:13<5:23:22, 3880.56s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [7:51:13<5:23:22, 3880.56s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [7:51:23<2:50:57, 2564.39s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [7:51:23<2:50:57, 2564.39s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [7:55:02<1:29:53, 1797.88s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [7:55:02<1:29:53, 1797.88s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [7:55:03<40:51, 1225.90s/it, Batch correction: graph_connectivity]  [A
+Metrics:  80%|[34m████████  [0m| 8/10 [7:55:03<40:51, 1225.90s/it, Batch correction: pcr_comparison]    [A
+Metrics:  90%|[34m█████████ [0m| 9/10 [7:55:17<14:06, 846.85s/it, Batch correction: pcr_comparison] [AEmbeddings:  50%|[32m█████     [0m| 1/2 [7:55:17<7:55:17, 28517.40s/it]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+                                                                                            [A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [19:24<2:54:38, 1164.33s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [19:24<2:54:38, 1164.33s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [21:06<1:11:56, 539.59s/it, Bio conservation: nmi_ari_cluster_labels_kmeans] [A
+Metrics:  20%|[34m██        [0m| 2/10 [21:06<1:11:56, 539.59s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [40:55<1:37:31, 835.98s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [40:55<1:37:31, 835.98s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [41:02<50:51, 508.64s/it, Bio conservation: clisi_knn]  [A
+Metrics:  40%|[34m████      [0m| 4/10 [41:02<50:51, 508.64s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [42:14<29:16, 351.27s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [42:14<29:16, 351.27s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [42:21<15:37, 234.26s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [42:21<15:37, 234.26s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [45:59<11:26, 228.93s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [45:59<11:26, 228.93s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [46:00<05:12, 156.41s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [46:00<05:12, 156.41s/it, Batch correction: pcr_comparison]    [A/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scib_metrics/_pcr_comparison.py:49: UserWarning: PCR comparison score is negative, meaning variance contribution increased after integration. Setting to 0.
+  warnings.warn(
+
+Metrics:  90%|[34m█████████ [0m| 9/10 [46:12<01:51, 111.25s/it, Batch correction: pcr_comparison][AEmbeddings: 100%|[32m██████████[0m| 2/2 [8:41:29<00:00, 13373.35s/it]  Embeddings: 100%|[32m██████████[0m| 2/2 [8:41:29<00:00, 15644.96s/it]
+
+                                                                                          [A/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+the obs value 'convoluted_samplename' has more than 103 categories. Uniform 'grey' color will be used for all categories.
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/X_scVI_MDE.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+computing neighbors
+    finished: added to `.uns['pca_nn']`
+    `.obsp['pca_nn_distances']`, distances for each pair of neighbors
+    `.obsp['pca_nn_connectivities']`, weighted adjacency matrix (0:19:49)
+computing UMAP
+    finished: added
+    'X_umap', UMAP coordinates (adata.obsm) (0:31:47)
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_tools/scatterplots.py:392: UserWarning: No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored
+  cax = scatter(
+WARNING: saving figure to file rectum/healthy/All_not_gt_subset/figures/umap_NN.png
+/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/scanpy/plotting/_utils.py:314: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+  pl.show()
+Traceback (most recent call last):
+  File "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/atlassing_rectum_all_samples.py", line 538, in <module>
+    adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
+  File "/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/pandas/core/generic.py", line 5902, in __getattr__
+    return object.__getattribute__(self, name)
+AttributeError: 'DataFrame' object has no attribute 'id_run'

@@ -1,0 +1,154 @@
+5
+The option for NN is
+300
+Running python script
+Loaded libraries
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing
+/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results
+The number of NN for this analysis is 300
+NN file does not exist so loading the PCAd file
+Loaded
+17
+Computed NN
+Saved NN file
+Computing UMAP for Min_dist=0.1, spread=0.1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.1, spread=0.5
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.1, spread=1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.1, spread=2
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.1, spread=3
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.3, spread=0.1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.3, spread=0.5
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.3, spread=1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.3, spread=2
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.3, spread=3
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.5, spread=0.1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.5, spread=0.5
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.5, spread=1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.5, spread=2
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=0.5, spread=3
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=1, spread=0.1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=1, spread=0.5
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=1, spread=1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=1, spread=2
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=1, spread=3
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=2, spread=0.1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=2, spread=0.5
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=2, spread=1
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=2, spread=2
+Computed UMAP
+Plotted UMAP
+Computing UMAP for Min_dist=2, spread=3
+Computed UMAP
+Plotted UMAP
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@node-12-3-2>
+Subject: Job 35180390[5]: <rectum_param_sweep[1-9]> in cluster <farm5> Done
+
+Job <rectum_param_sweep[1-9]> was submitted from host <farm5-head2> by user <bh18> in cluster <farm5> at Tue Sep 26 16:00:34 2023
+Job was executed on host(s) <4*node-12-3-2>, in queue <long>, as user <bh18> in cluster <farm5> at Wed Sep 27 00:24:52 2023
+</nfs/users/nfs_b/bh18> was used as the home directory.
+</lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing> was used as the working directory.
+Started at Wed Sep 27 00:24:52 2023
+Terminated at Wed Sep 27 10:22:03 2023
+Results reported at Wed Sep 27 10:22:03 2023
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#! /bin/bash
+#BSUB -o logs/preprocessing-%J-output.log
+#BSUB -e logs/preprocessing-%J-error.log 
+#BSUB -q normal
+#BSUB -G team152
+#BSUB -n 4
+#BSUB -M 300000
+#BSUB -a "memlimit=True"
+#BSUB -R "select[mem>300000] rusage[mem=300000] span[hosts=1]"
+#BSUB -J 9
+
+# Define option
+cd /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing
+echo $LSB_JOBINDEX
+
+# For the sweep of parameters
+NN_list=../../../params_lists/NN_opt.txt
+NN_opt=$(head $NN_list -n ${LSB_JOBINDEX} | tail -n 1)
+echo "The option for NN is"
+echo $NN_opt
+echo "Running python script"
+python rectum_embedding_param_sweep.py $NN_opt
+#bsub -o logs/preprocessing-%J-%I-output.log -e logs/preprocessing-%J-%I-error.log -q long -J "rectum_param_sweep[1-9]" < param_sweep_submit.sh 
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   45185.30 sec.
+    Max Memory :                                 103650 MB
+    Average Memory :                             101861.57 MB
+    Total Requested Memory :                     300000.00 MB
+    Delta Memory :                               196350.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                24
+    Run time :                                   35831 sec.
+    Turnaround time :                            66089 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/preprocessing-35180390-5-error.log> for stderr output of this job.
+

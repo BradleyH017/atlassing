@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "atlassing_rectum_all_samples.py", line 20, in <module>
+    import pandas as pd
+ImportError: No module named pandas
