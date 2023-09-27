@@ -153,7 +153,7 @@ sc.pl.umap(adata, color="ngenes_per_cell", frameon=True, save="_post_batch_post_
 # And total counts
 sc.pl.umap(adata, color="total_counts", frameon=True, save="_post_batch_post_sweep_ncounts.png")
 # And MT%
-sc.pl.umap(adata, color="pct_counts_gene_group__mito_protein", frameon=True, save="_post_batch_post_sweep_mtperc.png")
+sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, save="_post_batch_post_sweep_mtperc.png")
 
 # Check categories, coloured by MT%
 cats = np.unique(adata.obs.category)
@@ -163,15 +163,91 @@ def mad(data):
 for c in cats:
     print(c)
     temp = adata[adata.obs.category == c]
-    sc.pl.umap(temp, color="pct_counts_gene_group__mito_protein", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mtperc.png")
+    sc.pl.umap(temp, color="pct_counts_gene_group__mito_transcript", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mtperc.png")
     # Print the median + 2.5*the median absolute deviation for each celltype
-    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
-    median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
-    print("For {}, the median={} and the median+2.5*MAD={}".format(c, np.median(mt_perc), median_plus_2pt5_mad))
+    #mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    #median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
+    #print("For {}, the median={} and the median+2.5*MAD={}".format(c, np.median(mt_perc), median_plus_2pt5_mad))
+
 
 # Is there a significant proportion of MT%, RP% and HLA% in the HVGs?
 hvg = adata.var[adata.var.highly_variable == True]
 mt_perc = hvg[hvg['gene_symbols'].str.contains("MT-")].shape[0]/hvg.shape[0]
+
+# If we grouped cells into their lineages, what would relative cut off for MT perc be?
+lin_df = pd.DataFrame({'category': cats, 'lineage': ""}) 
+lin_df['lineage'] = np.where(lin_df['category'].isin(['B Cell', 'B Cell plasma', 'T Cell', 'Myeloid']), 'Immune', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category'].isin(['Stem cells', 'Secretory', 'Enterocyte']), 'Epithelial', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category']== 'Mesenchymal', 'Mesenchymal', lin_df['lineage'])
+# Merge onto adata
+adata.obs.index = adata.obs.index.astype(str)
+cells = adata.obs.index
+adata.obs = adata.obs.merge(lin_df, on='category', how="left")
+adata.obs.index = cells
+
+# Plot this on umap
+sc.pl.umap(adata, color="lineage",frameon=True, save="_post_batch_post_sweep_lineage.png")
+
+
+# Plot the MT% per category, adding a line for the relative cut off
+for index,c in enumerate(cats):
+    print(c)
+    temp = adata[adata.obs.category == c]
+    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
+    print(median_plus_2pt5_mad)
+    if index == 0:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+    sns.distplot(mt_perc, hist=False, rug=True, label=c)
+    if median_plus_2pt5_mad < 50:
+        plt.axvline(median_plus_2pt5_mad, color=sns.color_palette()[cats.tolist().index(c)], linestyle='--')
+    else:
+        plt.axvline(50, color=sns.color_palette()[cats.tolist().index(c)], linestyle='--')
+
+
+plt.legend()
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(data_name + "/" + status + "/" + category + "/figures" + '/postQC_relative_mt_perc_per_cat.png', bbox_inches='tight')
+plt.clf()
+
+# Now do this per lineage
+lins = np.unique(lin_df.lineage)
+for index,c in enumerate(lins):
+    print(c)
+    temp = adata[adata.obs.lineage == c]
+    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
+    print(median_plus_2pt5_mad)
+    if index == 0:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+    sns.distplot(mt_perc, hist=False, rug=True, label=c)
+    if median_plus_2pt5_mad < 50:
+        plt.axvline(median_plus_2pt5_mad, color=sns.color_palette()[lins.tolist().index(c)], linestyle='--')
+    else:
+        plt.axvline(50, color=sns.color_palette()[cats.tolist().index(c)], linestyle='--')
+    nlost = len(mt_perc[mt_perc > median_plus_2pt5_mad])
+    print("The number of cells lost in the {} lineage if we use this cut off would be {}".format(c, nlost))
+
+
+plt.legend()
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(data_name + "/" + status + "/" + category + "/figures" + '/postQC_relative_mt_perc_per_lineage.png', bbox_inches='tight')
+plt.clf()
+
+
+# It is possible that the mixing is occuring between populations that are of low confidence (compared with the TI)
+# Plot this divided by category
+for c in cats:
+    print(c)
+    temp = adata[adata.obs.category == c]
+    sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras_conf.png")
+
+
+
 
 
 # Have a look at the ngenes / cell / sample

@@ -4,9 +4,9 @@
 #BSUB -q normal
 #BSUB -G team152
 #BSUB -n 4
-#BSUB -M 300000
+#BSUB -M 200000
 #BSUB -a "memlimit=True"
-#BSUB -R "select[mem>300000] rusage[mem=300000] span[hosts=1]"
+#BSUB -R "select[mem>200000] rusage[mem=200000] span[hosts=1]"
 #BSUB -J 9
 
 # Define option
