@@ -418,21 +418,34 @@ cells = adata.obs.index
 adata.obs = adata.obs.merge(lin_df, on='category', how="left")
 adata.obs.index = cells
 
-#  For each lineage, define the relative cut off and subset a temporary object for these cells
-adata_list = []
+#  For each lineage, define the relative cut off and subset these cells
+# Create a condition mask for the filter
 lins = np.unique(lin_df.lineage)
+print(adata.shape)
+# Define modification function. This will change the 'keep' column if cells fall above threshold for MT% defined within lineage
+adata.obs['keep'] = 'T'
+def relative_mt_per_lineage(row):
+    if row['lineage'] == lineage and row['pct_counts_gene_group__mito_transcript'] > relative_threshold:
+        return 'F'  # Modify the value
+    else:
+        return row['keep']  # Keep the value unchanged
+
+
 for index,c in enumerate(lins):
     print(c)
     temp = adata[adata.obs.lineage == c]
     mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
     median_plus_2pt5_mad = np.median(mt_perc) + 2.5*(mad(mt_perc))
     print(median_plus_2pt5_mad)
-    if median_plus_2pt5_mad < 50:
-        temp = temp[temp.obs.pct_counts_gene_group__mito_transcript < median_plus_2pt5_mad]
-    adata_list.append(temp)
+    # Define options
+    lineage = c
+    relative_threshold = median_plus_2pt5_mad
+    # Apply the function to change values in 'new_column' based on criteria
+    adata.obs['keep'] = adata.obs.apply(relative_mt_per_lineage, axis=1)
+    print(adata.shape)
 
-# Put back together and overwrite the original adata object
-adata = ad.concat(adata_list)
+# Now filter based on these cut offs
+adata = adata[adata.obs.keep == 'T']
 
 # Save this
 adata.obs = adata.obs.drop("patient_number", axis=1)
