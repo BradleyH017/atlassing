@@ -33,8 +33,8 @@ tabdir = catpath + "/tables"
 objpath = catpath + "/objects"
 sc.settings.figdir=figpath
 
-# Load in the rectum object (post processing)
-adata = ad.read_h5ad(objpath + "/adata_PCAd_scvid.h5ad")
+# Load in the rectum object (post processing)data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
+adata = ad.read_h5ad(objpath + "/adata_objs_param_sweep/NN_350_scanvi_umap.adata")
 samples = np.unique(adata.obs.experiment_id)
 import re
 def remove_char(lst, char):
@@ -44,23 +44,18 @@ samples = remove_char(samples,"__donor")
 
 
 # Load in the confidence for each cell from every sample (https://saturncloud.io/blog/efficiently-appending-to-a-dataframe-within-a-for-loop-in-python/)
-dir0 = "../../yascp_analysis/rectum/results/celltype/keras_celltype/"
-dir1 = "../../yascp_analysis/rectum/extra_samples/celltype/keras_celltype/"
-
+dir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_analysis/2023_08_07/rectum/results/celltype/keras_celltype"
 data = []
 for i in range(0,len(samples)):
     print(samples[i])
-    if samples[i] in os.listdir(dir0):
-        temp = ad.read_h5ad(dir0 + "/" + samples[i] + "/" + samples[i] + "___cellbender_fpr0pt1-scrublet-ti_freeze003_prediction-predictions.h5ad")
-    else:
-        temp = ad.read_h5ad(dir1 + "/" + samples[i] + "/" + samples[i] + "___cellbender_fpr0pt1-scrublet-ti_freeze003_prediction-predictions.h5ad")
+    temp = ad.read_h5ad(dir + "/" + samples[i] + "/" + samples[i] + "___cellbender_fpr0pt1-scrublet-ti_freeze003_prediction-predictions.h5ad")
     want = temp.obs.columns.str.contains("probability__")
     temp_probs = temp.obs.loc[:,want]
     data.append(temp_probs)
     del temp, temp_probs
 
 keras = pd.concat(data, ignore_index=False)
-# Subset for those passing QC
+# Subset for those passing QC from the 'atlassing_rectum_all_samples.py' script
 keras = keras[keras.index.isin(adata.obs.index)]
 
 # For each cell, reduce to the first, second and third most confident hits
@@ -74,6 +69,10 @@ for c in keras.index:
     ktop3.loc[c,"second_confidence"] = temp[1]
     ktop3.loc[c,"third"] = temp.index[2]
     ktop3.loc[c,"third_confidence"] = temp[2]
+
+# Save the ktop3
+ktop3.to_csv(tabdir + "/keras_top3_postcellfilter.csv")
+
 
 # Plot the proportion of the second versus the first annotation, within category and annotated by cell-type
 compfigpath = figpath + "/anno_conf"
