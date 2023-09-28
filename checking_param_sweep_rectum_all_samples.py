@@ -65,6 +65,25 @@ sc.pl.umap(adata, color="gem_lot",frameon=True, save="_post_batch_post_sweep_gem
 sc.pl.umap(adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_samples.png", palette=list(mp.colors.CSS4_COLORS.values()))
 adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
 sc.pl.umap(adata, color="Keras:predicted_celltype_probability", frameon=True, save="_post_batch_post_sweep_keras_conf.png")
+sc.pl.umap(adata, color="lineage", frameon=True, save="_post_batch_post_sweep_lineage.png")
+
+# also CellTypist annotation
+sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
+sc.pl.umap(adata, color="Celltypist:Immune_All_High:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_high_majority.png")
+
+# Append the CellTypist annotation from the intestine (see CellTypist_rectum.py script)
+statpath = data_name + "/" + status
+catpath = statpath + "/" + category
+figpath = catpath + "/figures"
+tabdir = catpath + "/tables"
+intestinal_annot = pd.read_csv(tabdir + "/CellTypist_labels.csv", index_col=0)
+intestinal_annot = intestinal_annot.add_prefix('CellTypist:Intestinal_Elmentaite:')
+adata.obs.index = adata.obs.index.astype(str)
+cells = adata.obs.index
+adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True, how='left')
+sc.pl.umap(adata, color="CellTypist:Intestinal_Elmentaite:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestinal_elmentaite_majority.png")
+
+
 # Plot RP%
 sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_sweep_rpperc.png")
 # Calculate IG% and plot
@@ -77,6 +96,15 @@ igsum = igcounts.sum(axis=1)
 ig_perc = np.array(igsum)/np.array(totsum)
 adata.obs['ig_perc'] = ig_perc
 sc.pl.umap(adata, color="ig_perc", frameon=True, save="_post_batch_post_sweep_igperc.png")
+
+
+# Plot within category, coloured by keras confidence
+cats = np.unique(adata.obs.category)
+for c in cats:
+    print(c)
+    temp = adata[adata.obs.category == c]
+    sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras_conf.png")
+
 
 
 # Still looks like one samples isn't integrating very well
