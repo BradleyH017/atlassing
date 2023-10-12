@@ -53,6 +53,7 @@ sc.pp.log1p(adata)
 models.models_description()
 
 # Choose the model we want to employ
+# Immune High and Immune Low has already been ran within the yascp pipeline
 model = models.Model.load(model = 'Cells_Intestinal_Tract.pkl')
 
 # Replace the gene names with the gene symbols
@@ -71,12 +72,20 @@ adata.var.index = adata.var.gene_symbols
 # Run the model
 predictions = celltypist.annotate(adata, model = 'Cells_Intestinal_Tract.pkl', majority_voting = True)
 
-# Transford the anndata object to include these annotations
+# Transform the anndata object to include these annotations
 adata = predictions.to_adata()
 
 # Perform dotplot
 celltypist.dotplot(predictions, use_as_reference = 'label', use_as_prediction = 'majority_voting', save=True)
 
+# Plot annotations
+#sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
+#sc.pl.umap(adata, color="majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestine_high_majority.png")
+
+# Save object
+adata.write_h5ad(objpath + "/adata_cell_filt_celltypist_intestinal.h5ad")
+
 # Save prediction
 to_save = predictions.predicted_labels
 to_save.to_csv(tabdir + "/CellTypist_labels.csv")
+
