@@ -38,8 +38,10 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
+import keras
 from keras.models import Sequential
 from keras.layers import Dense
+from sklearn import preprocessing
 from keras.wrappers.scikit_learn import KerasClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
@@ -59,22 +61,12 @@ param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_o
 nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
 umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
 adata = ad.read_h5ad(umap_file)
+all_high_qc = adata
 # NN on scVI-corrected components have already been computed for this
 
-# Downsample the adata (This machine learning approach won't be scalable with ~350k cells that we have)
-# Subset to include half of the data
-seed_value = 17
-np.random.seed(seed_value)
-all_high_qc = adata
-sc.pp.subsample(adata, 0.5)
-
-# Decide proportion to subset data with
-proportion_to_subset = 2/3
-
 ###########################################################
-######## Clustering of parameter optimisation data ########
+################# Clustering all data #####################
 ###########################################################
-# This is done to provide an initial set of annotations that can be used to optimise parameters against
 
 # Perform leiden clustering across a range of resolutions
 resolution = "0.5"
@@ -92,6 +84,19 @@ if os.path.exists(outdir) == False:
     os.mkdir(outdir)
 
 res.to_csv(outdir + "leiden_" + resolution + ".csv")
+
+###########################################################
+####### Downsample clustered data for grid search #########
+###########################################################
+
+# Downsample the adata (This grid search won't be possible with ~350k cells that we have)
+# Subset to include half of the data
+seed_value = 17
+np.random.seed(seed_value)
+sc.pp.subsample(adata, 0.5)
+
+# Decide proportion to subset data with
+proportion_to_subset = 2/3
 
 ###########################################################
 ############# Prep param optimisation data ################
@@ -112,6 +117,8 @@ adata.layers['X_std'] = X_std
 # Now build model to predict the expression of the remaining cells from the 
 X = adata.layers['X_std']
 y = res[['leiden_' + resolution]]
+cellmask = res.col.isin(adata.obs.index).values
+y = y.iloc[cellmask,:]
 
 # One hot encode y (the cell type classes) - like making a design matrix without intercept, encoding categorical variables as numerical
 # encode class values as integers
@@ -121,8 +128,8 @@ Y_encoded = Y_encoded.reshape(-1, 1)  # Reshape for one-hot encoding
 onehot_encoder = OneHotEncoder(sparse=False)
 Y_onehot = onehot_encoder.fit_transform(Y_encoded)
 
-# Divide the 50% parameter optimisation training set into a further training and test set
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y_onehot, test_size=proportion_to_subset, random_state=seed_value)
+# Divide the 50% parameter optimisation training set into a further training and test set. As proportions are determined based on the size of the test set, make sure this is 1- the desired proportion of the training
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y_onehot, test_size=(1-proportion_to_subset), random_state=seed_value)
 
 
 ###########################################################
@@ -181,8 +188,11 @@ param_grid = {
     'epochs': [10],#, 20]
 }
 
+# Define nsplits for cross validation
+n_splits = 5
+
 # 3. Perform grid search using GridSearchCV
-grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=5)
+grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=n_splits)
 grid_result = grid.fit(X_train, Y_train)
 
 # Print the best parameters and their corresponding accuracy
@@ -192,6 +202,9 @@ print(f"Best: {grid_result.best_score_:.4f} using {grid_result.best_params_}")
 Y_pred = grid_result.predict(X_test)
 accuracy = accuracy_score(np.argmax(Y_test, axis=1), Y_pred)
 print(f"Test Accuracy: {accuracy:.4f}")
+
+# Extract the desired parameters for the model at this resolution of clustering
+best_params = grid_result.best_params_
 
 ###########################################################
 #### Now apply this model to the rest of the data #########
@@ -207,60 +220,88 @@ scaler = preprocessing.StandardScaler(
         with_std=True
 )
 X_std = scaler.fit_transform(np.asarray(X))
+adata.layers['X_std'] = X_std
 
+# Re-format the Y outcome
+X = adata.layers['X_std']
+y = res[['leiden_' + resolution]]
+label_encoder = LabelEncoder()
+Y_encoded = label_encoder.fit_transform(y)
+Y_encoded = Y_encoded.reshape(-1, 1)  # Reshape for one-hot encoding
+onehot_encoder = OneHotEncoder(sparse=False)
+Y_onehot = onehot_encoder.fit_transform(Y_encoded)
 
-### Divide into 2/3 training 1/3 test
+# Divide into 2/3 training and 1/3 test
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y_onehot, test_size=(1-proportion_to_subset), random_state=seed_value)
 
+# Use the keras best params to define the overall model
+for key, value in best_params.items():
+    locals()[key] = value
 
+def create_model(optimizer=optimizer, activation=activation, epochs = epochs, loss=loss,
+                 sparsity_l1_activity=sparsity_l1_activity, sparsity_l2_activity=sparsity_l2_activity,
+                 sparsity_l1_kernel=sparsity_l1_kernel, sparsity_l2_kernel=sparsity_l2_kernel,
+                 sparsity_l1_bias=sparsity_l1_bias, sparsity_l2_bias=sparsity_l2_bias):
+    model = Sequential()
+    model.add(Dense(units=Y_train.shape[1], input_dim=X_train.shape[1], activation=activation,
+                    kernel_regularizer='l1_l2', bias_regularizer='l1_l2', activity_regularizer='l1_l2',
+                    kernel_constraint='UnitNorm', use_bias=True))
+    # Define metrics to have a look at 
+    mets = [
+            loss,
+            keras.metrics.CategoricalAccuracy(name='categorical_accuracy'),
+            keras.metrics.TruePositives(name='tp'),
+            keras.metrics.FalsePositives(name='fp'),
+            keras.metrics.TrueNegatives(name='tn'),
+            keras.metrics.FalseNegatives(name='fn'),
+            keras.metrics.Precision(name='precision'),
+            keras.metrics.Recall(name='recall'),
+            keras.metrics.AUC(name='auc'),
+            keras.metrics.BinaryAccuracy(name='accuracy')
+        ]
+    model.compile(metrics=mets)
+    return model
 
-all_annot = grid_result.predict(X_std)
+model = KerasClassifier(build_fn=create_model, verbose=0)
+history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test))
 
+# HERE ###########
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 3. Plot the outcomes of the parameter optimisation at this resolution (This chunk is from https://github.com/andersonlab/sc_nextflow/blob/master/pipelines/0025-qc_cluster/bin/0057-scanpy_cluster_validate_resolution-keras.py)
-# Make a classifier report
-classes = np.unique(grid_result.predict(X_test))
+classes = model.predict(X_test)
+encoder = preprocessing.LabelEncoder()
+encoder.fit(y)
 y_test_pred = encoder.inverse_transform(classes)
 y_test_proba = model.predict_proba(X_test)
-model_report = class_report(
-    y_test,
-    y_test_pred,
-    encoder.classes_,
-    y_test_proba
-)
-# Add the number of cells in each class (index) in the
-# (a) full dataset and (b) training dataset.
-categories, counts = np.unique(y, return_counts=True)
-cat_counts = dict(zip(categories, counts))
-model_report['n_cells_full_dataset'] = model_report.index.map(cat_counts)
-categories, counts = np.unique(y_train, return_counts=True)
-cat_counts = dict(zip(categories, counts))
-model_report['n_cells_training_dataset'] = model_report.index.map(
-cat_counts
-)
 
-# Get a matrix of predictions on the test set
-y_prob_df = pd.DataFrame(
-y_test_proba,
-columns=['class__{}'.format(i) for i in encoder.classes_]
-)
-y_prob_df['cell_label_predicted'] = y_test_pred
-y_prob_df['cell_label_true'] = y_test
-for i in ['cell_label_predicted', 'cell_label_true']:
-    y_prob_df[i] = 'class__' + y_prob_df[i].astype(str)
 
-score = model.evaluate(X_test, Y_test_onehot, verbose=0)
-print('Test score:', score[0])
-print('Test accuracy:', score[1])
+
+###### FROM LELAND
+# Fit the specific model and save the results
+model, model_report, y_prob_df, history = fit_model_keras(
+            model_function=classification_model,
+            encoder=encoder,
+            X_std=X_std,
+            y=y,
+            sparsity_l1=sparsity_l1,
+            sparsity_l2=0.0,
+            n_epochs=n_epochs,
+            batch_size=batch_size,
+            train_size_fraction=train_size_fraction)
+
+
+# Check accuracy on the test set
+
+
+
+# Extract summary data and plot
+
+
+
+
+
+
+
+
+
+
+
