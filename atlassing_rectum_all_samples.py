@@ -444,8 +444,11 @@ for index,c in enumerate(lins):
     adata.obs['keep'] = adata.obs.apply(relative_mt_per_lineage, axis=1)
     print(adata.shape)
 
-# Now filter based on these cut offs
-adata = adata[adata.obs.keep == 'T']
+# Optional: Now filter based on these cut offs
+filter_relative_mt_thresh = False
+if filter_relative_mt_thresh == True:
+    adata = adata[adata.obs.keep == 'T']
+
 
 # Save this
 adata.obs = adata.obs.drop("patient_number", axis=1)
