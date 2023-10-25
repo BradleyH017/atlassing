@@ -73,8 +73,13 @@ for c in keras.index:
 # Save the ktop3
 ktop3.to_csv(tabdir + "/keras_top3_postcellfilter.csv")
 
+# Derive category info
+add_cat = adata.obs[["label", "category"]]
+add_cat = add_cat.reset_index()
+add_cat = add_cat[["label", "category"]]
+add_cat = add_cat.drop_duplicates()
 
-# Plot the proportion of the second versus the first annotation, within category and annotated by cell-type
+# Define paths
 compfigpath = figpath + "/anno_conf"
 kerasconf = compfigpath + "/keras"
 ctconf = compfigpath + "/celltypist"
@@ -87,6 +92,30 @@ if os.path.exists(kerasconf) == False:
 if os.path.exists(ctconf) == False:
     os.mkdir(ctconf)
 
+# Plot the distribution of keras for all and for individual categories
+cats_all = np.unique(adata.obs.category)
+cats_all = np.append(cats_all, "All_cells")
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats_all:
+    if c != "All_cells":
+        idx = adata.obs.category == c
+        dat = ktop3.first_confidence[idx]
+        sns.distplot(dat, hist=False, rug=True, label=c)
+    else:
+        dat = ktop3.first_confidence
+        sns.distplot(dat, hist=False, rug=True, label=c, color="black")
+
+plt.legend()
+ax.set(xlim=(0, 1))
+plt.title(c)
+plt.xlabel('Distribution of annotation confidence')
+plt.savefig(kerasconf + '/keras_top_confidence_distribution.png', bbox_inches='tight')
+plt.clf()
+
+
+
+# Plot the proportion of the second versus the first annotation, within category and annotated by cell-type
 cats = np.unique(adata.obs.category)
 for c in cats:
     labels = np.unique(adata.obs[adata.obs.category == c].label)
@@ -103,6 +132,49 @@ for c in cats:
     plt.savefig(kerasconf + '/' + c + '_keras_second_over_first.png', bbox_inches='tight')
     plt.clf()
 
+# Identify the x-axis location of the most common confidence
+labs = np.unique(adata.obs.label)
+common_conf = pd.DataFrame({"label": labs, "ncells": 0, "common_conf": np.nan})
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for index,l in enumerate(labs):
+    idx = adata.obs.label == l
+    data = ktop3.first_confidence[idx] - ktop3.second_confidence[idx]
+    common_conf.iloc[index,1] = data.shape[0]
+    sns.distplot(data, hist=False, rug=True, color='black')
+    sns.kdeplot(data, shade=True)
+    ax = plt.gca()
+    # Find the x-value corresponding to the peak
+    try:
+        kde_xdata = ax.get_lines()[index].get_xdata()
+        peak_x = kde_xdata[ax.get_lines()[index].get_ydata().argmax()]
+        common_conf.iloc[index,2] = peak_x
+    except Exception as e:
+        print(f"An error occurred for {l}: {e}")
+
+plt.xlabel('1st - 2nd annotation confidence')
+plt.savefig(kerasconf + '/all_keras_second_over_first.png', bbox_inches='tight')
+plt.clf()
+
+# Print those with poor annotation ( < 0.5)
+common_conf[common_conf.common_conf < 0.5]
+
+# Plot these, coloured within category and highlighting bad
+common_conf['plot_label'] = common_conf.apply(lambda row: row['label'] if row['common_conf'] < 0.5 else None, axis=1)
+subset_df = common_conf[common_conf.common_conf < 0.5]
+
+plt.figure(figsize=(16, 12))
+for c in cats:
+    sns.scatterplot(data=common_conf[common_conf.category == c], x='ncells', y='common_conf', s=100, edgecolor='k')
+
+for i, row in subset_df.iterrows():
+    plt.text(row['ncells'], row['common_conf'], row['plot_label'],rotation=90, fontsize=10, ha='left', va='bottom', color='black')
+
+plt.legend(cats)
+plt.xlabel('Number of cells',fontsize=14)
+plt.ylabel('Common confidence', fontsize=14)
+plt.savefig(kerasconf + '/first_less_second_conf_vs_ncells.png', bbox_inches='tight')
+plt.clf()
 
 # Violin plot of the confidence for each group
 ktop3[["first"]] = ktop3[["first"]].astype("category")
@@ -123,9 +195,12 @@ for c in cats:
 
 
 # Plotting the calls of second cells versus the first - Is there a common pattern?
-fs = ktop3.groupby(['first', 'second']).size().reset_index(name='frequency')
+# Limit this to when the confidence of the first annotation is < 0.5 and second is > 0.25
+ktop3_int = ktop3[ktop3.first_confidence < 0.5]
+ktop3_int = ktop3_int[ktop3_int.second_confidence > 0.25]
+fs = ktop3_int.groupby(['first', 'second']).size().reset_index(name='frequency')
 fs['prop'] = 0
-catnum = np.unique(ktop3['first'], return_counts = True)
+catnum = np.unique(ktop3_int['first'], return_counts = True)
 for i in range(0, fs.shape[0]):
     fcat = fs['first'][i]
     catidx = np.where(catnum[0] == fcat)
@@ -140,10 +215,11 @@ for i in range(0, df_square.shape[0]):
     for j in range(0, df_square.shape[0]):
         if i == j:
             df_square.iloc[i,j] = np.nan
+
 # Plot
 plt.figure(figsize=(30, 20))
 sns.heatmap(df_square, annot=False, cmap='viridis', cbar=False, square=True)
-plt.setp(g.ax_heatmap.get_xticklabels(), rotation=60);
+plt.setp(ax.set_xticklabels(), rotation=60);
 plt.savefig(kerasconf + '/keras_first_second_corr.png', bbox_inches='tight', dpi=300)
 plt.clf
 
@@ -167,7 +243,7 @@ from plotnine import (
     element_blank
 )
 # Order groups according to category
-temp = ktop3[["first", "second"]]
+temp = ktop3_int[["first", "second"]]
 conv = adata.obs[["label__machine", "category"]]
 conv = conv.reset_index()
 conv = conv[["label__machine", "category"]]
