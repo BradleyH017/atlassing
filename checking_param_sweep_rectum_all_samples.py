@@ -17,6 +17,7 @@ import csv
 import datetime
 import seaborn as sns
 import re
+import scipy.stats as st
 #sys.path.append('/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/conda_envs/scRNAseq/CellRegMap')
 #from cellregmap import run_association, run_interaction, estimate_betas
 print("Loaded libraries")
@@ -56,6 +57,7 @@ adata.write_h5ad(umap_file)
 
 # Define fig out dir
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
+figpath = data_name + "/" + status + "/" + category + "/figures"
 
 # Plot categories, labels, samples
 sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_category.png")
@@ -98,13 +100,427 @@ adata.obs['ig_perc'] = ig_perc
 sc.pl.umap(adata, color="ig_perc", frameon=True, save="_post_batch_post_sweep_igperc.png")
 
 
-# Plot within category, coloured by keras confidence
+# Plot within category, coloured by keras confidence, label, MTperc
 cats = np.unique(adata.obs.category)
 for c in cats:
     print(c)
     temp = adata[adata.obs.category == c]
     sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras_conf.png")
+    sc.pl.umap(temp, color="label", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_label.png")
+    sc.pl.umap(temp, color="pct_counts_gene_group__mito_transcript", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mt_perc.png")
 
+#####################################################
+######## Exploration of B cell plasma cells #########
+#####################################################
+
+
+# have a look at the MT% per B cell plasma cell type
+temp = adata[adata.obs.category == "B Cell plasma"]
+sns.set_palette('tab10')
+labs=np.unique(adata.obs.label)
+labs = [item for item in labs if "plasma IgA" in item]
+mt_per_cat = pd.DataFrame({"label": labs, "95L": 0, "mean": 0, "95U": 0})
+for index, c in enumerate(labs):
+    data = temp.obs[temp.obs.label == c].pct_counts_gene_group__mito_transcript
+    lims = st.t.interval(confidence=0.95, df=len(data)-1, loc=np.mean(data), scale=st.sem(data)) 
+    mean = sum(data)/len(data)
+    mt_per_cat.loc[mt_per_cat.label == c, "95L"] = lims[0]
+    mt_per_cat.loc[mt_per_cat.label == c, "mean"] = mean
+    mt_per_cat.loc[mt_per_cat.label == c, "95U"] = lims[1]
+    if index == 0:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+    sns.distplot(data, hist=False, rug=True, label=c)
+
+plt.legend()
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(figpath + '/mt_perc_50pct_per_Bcellplasma_label_postQC.png', bbox_inches='tight')
+plt.clf()
+
+# if we plot the B cell plasma cells with high MT%
+temp.obs['B_cell_plasma_low_MT'] = (temp.obs['label'] == "B cell plasma IgA (3)") & (temp.obs['pct_counts_gene_group__mito_transcript'] < 10)
+temp.obs['B_cell_plasma_low_MT'] = temp.obs['B_cell_plasma_low_MT'].astype('category')
+temp.obs['is_B_cell_plasma3'] = (temp.obs['label'] == "B cell plasma IgA (3)")
+temp.obs['is_B_cell_plasma3'] = temp.obs['is_B_cell_plasma3'].astype('category')
+sc.pl.umap(temp, color="is_B_cell_plasma3", frameon=False , save="_" + c + "_post_batch_post_sweep_is_B_cell_plasma.png")
+sc.pl.umap(temp, color="B_cell_plasma_low_MT", frameon=False , save="_" + c + "_post_batch_post_sweep_B_cell_plasma_low_MT.png")
+
+# Have a look at the next-best guess for these cells - perhaps their confidence is close
+# Plot keras first-second confidence (y) versus MT% (x), coloured by the category of their second annotation
+dir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_analysis/2023_08_07/rectum/results/celltype/keras_celltype"
+data = []
+samples = np.unique(adata.obs.convoluted_samplename)
+for i in range(0,len(samples)):
+    print(samples[i])
+    temp = ad.read_h5ad(dir + "/" + samples[i] + "/" + samples[i] + "___cellbender_fpr0pt1-scrublet-ti_freeze003_prediction-predictions.h5ad")
+    want = temp.obs.columns.str.contains("probability__")
+    temp_probs = temp.obs.loc[:,want]
+    data.append(temp_probs)
+    del temp, temp_probs
+
+keras = pd.concat(data, ignore_index=False)
+keras = keras[keras.index.isin(adata.obs.index)]
+
+# Extract the first and second-best annotations
+def find_most_confident(row):
+    sorted_row = row.sort_values(ascending=False)
+    most_confident = sorted_row.index[0]
+    second_most_confident = sorted_row.index[1]
+    confidence = sorted_row[0]
+    second_confidence = sorted_row[1]
+    return most_confident, confidence, second_most_confident, second_confidence
+
+keras_top2 = keras.apply(find_most_confident, axis=1, result_type='expand')
+keras_top2.columns = ['Most_Confident_Cell', 'Confidence1', 'Second_Most_Confident_Cell', 'Confidence2']
+
+# Add the category of these
+keras_top2['Most_Confident_Cell'] = keras_top2['Most_Confident_Cell'].apply(lambda x: x.replace('probability__', ''))
+keras_top2['Second_Most_Confident_Cell'] = keras_top2['Second_Most_Confident_Cell'].apply(lambda x: x.replace('probability__', ''))
+add_category = adata.obs[["label__machine", "category"]]
+add_category = add_category.reset_index()
+add_category = add_category[["label__machine", "category"]]
+add_category = add_category.drop_duplicates()
+add_category.rename(columns={'label__machine': 'Most_Confident_Cell', 'category': 'Most_Confident_Cell_category'}, inplace=True)
+keras_top2 = keras_top2.reset_index()
+keras_top2 = keras_top2.merge(add_category, on="Most_Confident_Cell")
+add_category.rename(columns={'Most_Confident_Cell': 'Second_Most_Confident_Cell', 'Most_Confident_Cell_category': 'Second_Most_Confident_Cell_category'}, inplace=True)
+keras_top2 = keras_top2.merge(add_category, on="Second_Most_Confident_Cell")
+keras_top2['Same_category'] = keras_top2['Most_Confident_Cell_category'] == keras_top2['Second_Most_Confident_Cell_category']
+keras_top2['Same_category'] = keras_top2['Same_category'].astype('category')
+keras_top2['First_confidence-Second_confidence'] = keras_top2['Confidence1'] - keras_top2['Confidence2']
+keras_top2['First_over_Second_confidence'] = np.log10(keras_top2['Confidence1'] / keras_top2['Confidence2'])
+
+# Add lineage
+cats = np.unique(adata.obs.category)
+lin_df = pd.DataFrame({'category': cats, 'lineage': ""}) 
+lin_df['lineage'] = np.where(lin_df['category'].isin(['B Cell', 'B Cell plasma', 'T Cell', 'Myeloid']), 'Immune', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category'].isin(['Stem cells', 'Secretory', 'Enterocyte']), 'Epithelial', lin_df['lineage'])
+lin_df['lineage'] = np.where(lin_df['category']== 'Mesenchymal', 'Mesenchymal', lin_df['lineage'])
+lin_df.rename(columns={'category': 'Most_Confident_Cell_category', 'lineage': 'Most_Confident_Cell_lineage'}, inplace=True)
+keras_top2 = keras_top2.merge(lin_df, on="Most_Confident_Cell_category")
+lin_df.rename(columns={'Most_Confident_Cell_category': 'Second_Most_Confident_Cell_category', 'Most_Confident_Cell_lineage': 'Second_Most_Confident_Cell_lineage'}, inplace=True)
+keras_top2 = keras_top2.merge(lin_df, on="Second_Most_Confident_Cell_category")
+keras_top2.set_index('index', inplace=True)
+keras_top2['Same_lineage'] = keras_top2['Most_Confident_Cell_lineage'] == keras_top2['Second_Most_Confident_Cell_lineage']
+keras_top2['Same_lineage'] = keras_top2['Same_lineage'].astype('category')
+
+
+# Have a look at the difference of IgA (3) B cell plasma cells in confident set and the next best guess
+keras_top2_qc_bcp_3 = keras_top2[keras_top2['Most_Confident_Cell'] == 'B_cell_plasma_IgA_CD38plusplusplus']
+keras_top2_qc_bcp_3.set_index('index', inplace=True)
+# Make a plot comparing the MT% and keras confidence for this cell type
+test = adata.obs[adata.obs.label == "B cell plasma IgA (3)"]
+test = test.merge(keras_top2_qc_bcp_3, left_index=True, right_index=True)
+
+# Plot
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats:
+    testfilt = test[test['Second_Most_Confident_Cell_category'] == c]
+    plt.scatter(testfilt['pct_counts_gene_group__mito_transcript'], testfilt['First_over_Second_confidence'], alpha=1, s=20)
+
+plt.title('B cell plasma IgA (3) cells - coloured by category of 2nd annotation')
+plt.legend(cats, bbox_to_anchor=(1.0, 1.0))
+plt.xlabel('MT%')
+plt.ylabel('log10(Confidence of top keras annotation / second)')
+plt.savefig(figpath + '/mt_perc_keras_conf_BCP_3.png', bbox_inches='tight')
+plt.clf()
+
+# Plot distribution of second annotation category with respect to MT%
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats:
+    testfilt = test[test['Second_Most_Confident_Cell_category'] == c]
+    sns.distplot(testfilt['pct_counts_gene_group__mito_transcript'], hist=False, rug=True, label=c)
+
+plt.title('B cell plasma IgA (3) cells - coloured by category of 2nd annotation')
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(figpath + '/mt_perc_keras_conf_BCP_3_dist.png', bbox_inches='tight')
+plt.clf()
+
+# Summarise the lineage confidence of these cells and plot
+keras = keras.T
+keras = keras.reset_index()
+keras = keras.rename(columns = {'index': 'label__machine'})
+keras['label__machine'] = keras['label__machine'].apply(lambda x: x.replace('probability__', ''))
+add_category.rename(columns = {'Second_Most_Confident_Cell': 'label__machine', 'Second_Most_Confident_Cell_category': 'category'}, inplace = True)
+keras = keras.merge(add_category, on='label__machine')
+lin_df.rename(columns = {'Second_Most_Confident_Cell_category' : 'category', 'Second_Most_Confident_Cell_lineage': 'lineage'}, inplace=True)
+keras = keras.merge(lin_df, on='category')
+keras.set_index('label__machine', inplace=True)
+keras_per_lin = keras.groupby('lineage').sum()
+keras_per_lin.drop('category', axis=1, inplace=True)
+keras_per_lin = keras_per_lin.T
+# How many cells have a majority per-lineage confidence that is large
+cutoff=float(0.8)
+max_vals = keras_per_lin[['Epithelial', 'Immune', 'Mesenchymal']].max(axis=1)
+keras_per_lin['lin_max_gt_' + str(cutoff)] = max_vals > cutoff
+
+# Plot the distribution of these
+keras_per_lin['Max_Category'] = keras_per_lin[['Epithelial', 'Immune', 'Mesenchymal']].apply(lambda x: x.idxmax(), axis=1)
+lins = np.unique(keras_per_lin.Max_Category)
+# Plot distribution of second annotation category with respect to MT%
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    testfilt = keras_per_lin[keras_per_lin['Max_Category'] == l]
+    sns.distplot(testfilt[l], hist=False, rug=True, label=l)
+
+plt.title('Distribution of Keras confidence per lineage - All cells')
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+#plt.axvline(float(cutoff), color='red', linestyle='dotted', label='Vertical Line')
+ax.set(xlim=(0, 1))
+plt.xlabel('Combined keras confidence per lineage')
+plt.savefig(figpath + '/keras_conf_per_lineage_dist.png', bbox_inches='tight')
+plt.clf()
+
+# Plot distribution of B cell plasma cells
+bcp_per_lin = keras_per_lin[keras_per_lin.index.isin(keras_top2_qc_bcp_3.index)]
+test = test.merge(bcp_per_lin, left_index=True, right_index=True)
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    testfilt = bcp_per_lin[bcp_per_lin['Max_Category'] == l]
+    sns.distplot(testfilt[l],  hist=False, rug=True, label=l)
+
+plt.title('B cell plasma IgA (3) cells lineage confidence')
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+ax.set(xlim=(0, 1))
+plt.xlabel('Summed probability of major lineage')
+plt.savefig(figpath + '/keras_conf_BCP_3_lineage.png', bbox_inches='tight')
+plt.clf()
+
+# Plot this data on a umap
+adata.obs = adata.obs.merge(keras_per_lin, left_index=True, right_index=True)
+for l in lins:
+    sc.pl.umap(adata, color=l, frameon=False , save="_" + c + "_post_batch_post_sweep_" + l + "_probability.png")
+
+# Plot all (and B plasma cells only) by their next-best guess category and lineage
+adata.obs = adata.obs.merge(keras_top2, left_index=True, right_index=True)
+sc.pl.umap(adata, color="Second_Most_Confident_Cell_category", frameon=False , save="_post_batch_post_Second_Most_Confident_Cell_category.png")
+sc.pl.umap(adata, color="Second_Most_Confident_Cell_lineage", frameon=False , save="_post_batch_post_Second_Most_Confident_Cell_lineage.png")
+sc.pl.umap(adata, color="Most_Confident_Cell_category", frameon=False , save="_post_batch_post_Most_Confident_Cell_category.png")
+sc.pl.umap(adata, color="Most_Confident_Cell_lineage", frameon=False , save="_post_batch_post_Most_Confident_Cell_lineage.png")
+
+
+# Make a plot for the loss of different cell types/cut off
+sequence = [i * 0.1 for i in range(11)]
+lin_cuts = pd.DataFrame({"cutoff": sequence, "nEpithelial":0,  "percEpithelial": 0, "nImmune": 0, "percImmune": 0, "nMesenchymal": 0, "percMesenchymal": 0})
+for l in lins:
+    temp = adata.obs[adata.obs.Max_Category == l]
+    norig = temp.shape[0]
+    for c in lin_cuts['cutoff'].values:
+        nremain = temp[temp[l] < c].shape[0]
+        lin_cuts.loc[lin_cuts.cutoff == c,'n' + l] = norig - nremain
+        lin_cuts.loc[lin_cuts.cutoff == c,'perc' + l] = 100-100*(nremain/norig)
+
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    plt.plot(lin_cuts.cutoff, lin_cuts['perc' + l])
+
+plt.legend(lins, bbox_to_anchor=(1.0, 1.0))
+plt.title('Loss of cells based on lineage confidence')
+plt.xlabel('Probability cut off')
+plt.ylabel('Retained (%)')
+plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/lin_perc_cutoffs.png', bbox_inches='tight')
+plt.clf()
+
+# Do Plot frequencies
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    plt.plot(lin_cuts.cutoff, lin_cuts['n' + l])
+
+plt.legend(lins, bbox_to_anchor=(1.0, 1.0))
+plt.title('Loss of cells based on lineage confidence')
+plt.xlabel('Probability cut off')
+plt.ylabel('Retained (Absolute number)')
+plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/lin_perc_cutoffs_freqs.png', bbox_inches='tight')
+plt.clf()
+
+
+# Plot a UMAP without these cells, coloured by cell
+lin_conf_cutoff = 0.7
+max_vals = adata.obs[['Epithelial', 'Immune', 'Mesenchymal']].max(axis=1)
+adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] = max_vals > cutoff
+adata_high_filt = adata[adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] == True]
+sc.pl.umap(adata_high_filt, color='category', frameon=False , save="_post_batch_post_sweep_post_lin_filt_label.png")
+
+# Within category
+for c in cats:
+    temp_high = adata_high_filt[adata_high_filt.obs.category == c]
+    sc.pl.umap(temp_high, color='label', frameon=False , title=c, save="_" + c + "_post_batch_post_sweep_post_lin_filt_label.png")
+
+# This doesn't seem to have done too much in terms of addressing these cells
+# So will have a look at using a higher cut off as a last ditch atempt for the lineage probability approach
+lin_conf_cutoff = 0.95
+adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] = max_vals > lin_conf_cutoff
+adata_high_filt = adata[adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] == True]
+sc.pl.umap(adata_high_filt, color='category', frameon=False , save="_post_batch_post_sweep_post_lin_filt" + str(lin_conf_cutoff) + "_label.png")
+for c in cats:
+    temp_high = adata_high_filt[adata_high_filt.obs.category == c]
+    sc.pl.umap(temp_high, color='label', frameon=False , title=c, save="_" + c + "_post_batch_post_sweep_post_lin_filt_" + str(lin_conf_cutoff) + "_label.png")
+
+#### Scoring cells based on first vs second conf
+def calculate_confidence_score(row):
+    if row['Confidence1'] >= 0.9:
+        return 'Very_high'
+    elif 0.5 <= row['Confidence1'] and row['Same_lineage'] == True:
+        return 'High'
+    elif 0.5 <= row['Confidence1'] and row['Same_lineage'] == False:
+        return 'Medium'
+    elif row['Confidence1'] < 0.5 and row['Same_lineage'] == False:
+        return 'Low'
+    else:
+        return 'Very_low'
+
+# Apply the function to create the 'confidence_score' column
+adata.obs['confidence_score'] = adata.obs.apply(calculate_confidence_score, axis=1)
+adata.obs['confidence_score'] = pd.Categorical(adata.obs['confidence_score'], categories=["Very_high", "High", "Medium", "Low", "Very_low"], ordered=True)
+sc.pl.umap(adata, color='confidence_score', frameon=False , save="_post_batch_post_sweep_confidence_score.png")
+
+# Plot this per category
+for c in cats:
+    tempadata = adata[adata.obs.category == c]
+    sc.pl.umap(tempadata, color='confidence_score', frameon=False , title=c, save="_" + c + "_post_batch_post_sweep_post_confidence_score.png")
+
+notlow = adata[adata.obs.confidence_score.isin(["Very_high", "High", "Medium"])]
+sc.pl.umap(notlow, color='confidence_score', frameon=False , save="_post_batch_post_sweep_confidence_score_notlow.png")
+for c in cats:
+    tempadata = notlow[notlow.obs.category == c]
+
+# Have a look at performing some lineage based cut off on the basis of MT%
+def relative_mt_per_lineage(row):
+    if row['lineage'] == lineage and row['pct_counts_gene_group__mito_transcript'] > relative_threshold:
+        return 'F'  # Modify the value
+    else:
+        return row['keep']  # Keep the value unchanged
+
+# Count the ndeviations
+tempdata = []
+for index,c in enumerate(lins):
+    print(c)
+    temp = adata[adata.obs.lineage == c]
+    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
+    absolute_diff = np.abs(mt_perc - np.median(mt_perc))
+    mad = np.median(absolute_diff)
+    nmads = (absolute_diff)/mad
+    # Apply the function to change values in 'new_column' based on criteria
+    temp.obs['mt_perc_nmads'] = nmads
+    tempdata.append(temp)
+
+adata = ad.concat(tempdata)
+
+# Plot the distribution of MADs for each lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    temp = adata[adata.obs.lineage == l]
+    sns.distplot(temp.obs['mt_perc_nmads'], hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Median absolute deviations of MT% per lineage')
+plt.xlabel('Median absolute deviation')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/lin_mt_per_mads.png', bbox_inches='tight')
+plt.clf()
+
+# Have a look per category
+for c in cats:
+    temp = adata[adata.obs.category == c]
+    sc.pl.umap(temp, color='mt_perc_nmads', frameon=False , title=c, save="_" + c + "_post_batch_post_sweep_mt_perc_nmads.png")
+
+# Plot MT% 
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats:
+    temp = adata[adata.obs.category == c]
+    sns.distplot(temp.obs['pct_counts_gene_group__mito_transcript'], hist=False, rug=True, label=c)
+
+plt.legend()
+plt.title('MT% post QC')
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(figpath + '/postqc_mtperc_per_cat.png', bbox_inches='tight')
+plt.clf()
+
+# Fit a gaussian mixture model to this data
+from scipy import stats
+from sklearn.mixture import GaussianMixture
+from scipy.stats import norm
+from sympy import symbols, Eq, solve
+from sklearn.preprocessing import StandardScaler
+from scipy.optimize import fsolve
+from scipy.optimize import brentq
+for c in cats:
+    # Extract data
+    data = adata.obs[adata.obs.category == c].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
+    # Scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+    # 1. Fit a GMM with multiple initializations
+    gmm = GaussianMixture(n_components=2, n_init=10).fit(scaled_data.reshape(-1, 1))
+    # Convert means and variances back to original space
+    original_means = scaler.inverse_transform(gmm.means_).flatten()
+    original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
+    # 2. Calculate fold change
+    fold_change = max(original_means) / min(original_means)
+    log_fold_change = np.log2(fold_change)
+    print("Fold Change:", fold_change)
+    print("Log2 Fold Change:", log_fold_change)
+    # 3. Plot the data
+    x = np.linspace(min(data), max(data), 1000)
+    scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
+    weights = gmm.weights_
+    pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
+    pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
+    total_pdf = pdf1 + pdf2
+    plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
+    plt.plot(x, pdf1, label='Distribution 1')
+    plt.plot(x, pdf2, label='Distribution 2')
+    plt.plot(x, total_pdf, 'k--', label='Mixture Model')
+    plt.legend()
+    plt.title(f"{c}: MT percentage mixture models, FC={fold_change:.4f}")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    plt.savefig(figpath + '/mixture_model_MT_perc_postqc_' + c + '.png', bbox_inches='tight')
+    plt.clf()
+    # If FC > 10:, find the intersection
+    if fold_change > 10:
+        def difference(z):
+            pdf1_val = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((z-original_means[0])**2)/original_variances[0])
+            pdf2_val = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((z-original_means[1])**2)/original_variances[1])
+            return pdf1_val - pdf2_val
+            
+            # Define a function that restricts the search space to values less than 10
+        lower_bound = 0
+        upper_bound = 10
+        try:
+            intersection = brentq(difference, lower_bound, upper_bound)
+            print("Intersection:", intersection)
+        except ValueError:
+            print("No intersection found in the given range.")
+
+# Have a look at the B Cell plasma cells above and below this threshold
+bcp_only = adata[adata.obs.category == "B Cell plasma"]
+bcp_only.obs['BCP_IGA_gt_MM_int'] = bcp_only.obs['pct_counts_gene_group__mito_transcript'] > intersection
+bcp_only.obs['BCP_IGA_gt_MM_int'] = bcp_only.obs['pct_counts_gene_group__mito_transcript'] > intersection
+bcp_only.obs['BCP_IGA_gt_MM_int'] = bcp_only.obs['BCP_IGA_gt_MM_int'].astype('category')
+sc.pl.umap(bcp_only, color='BCP_IGA_gt_MM_int', frameon=False , title="Above or below intersection of MM for MT%", save="_BCP_above_MT_mm.png")
+np.unique(bcp_only.obs['BCP_IGA_gt_MM_int'], return_counts=True)
+
+# Plot marker genes
+gene_ens = ["ENSG00000119888", ]
+gene_symb = ["EPCAM"]
+
+
+#################################################
 
 
 # Still looks like one samples isn't integrating very well
