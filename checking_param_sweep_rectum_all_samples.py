@@ -68,6 +68,15 @@ sc.pl.umap(adata, color="convoluted_samplename", frameon=True, save="_post_batch
 adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
 sc.pl.umap(adata, color="Keras:predicted_celltype_probability", frameon=True, save="_post_batch_post_sweep_keras_conf.png")
 sc.pl.umap(adata, color="lineage", frameon=True, save="_post_batch_post_sweep_lineage.png")
+sc.pl.umap(adata, color="n_genes_by_counts", frameon=True, save="_post_batch_post_ngenes.png")
+sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, save="_post_batch_mt_perc.png")
+adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
+sc.pl.umap(adata, color="log10ngenes", frameon=True, save="_post_batch_log10ngenes.png")
+
+# Plot PCA coloured by category, MT%
+sc.pl.pca(adata, color="category", components=['1,2,3,4,5,6,7,8,9,10'], save="_category.png")
+sc.pl.pca(adata, color="pct_counts_gene_group__mito_transcript", components=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], save="_mt_perc.png")
+
 
 # also CellTypist annotation
 sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
@@ -296,7 +305,7 @@ plt.clf()
 # Plot this data on a umap
 adata.obs = adata.obs.merge(keras_per_lin, left_index=True, right_index=True)
 for l in lins:
-    sc.pl.umap(adata, color=l, frameon=False , save="_" + c + "_post_batch_post_sweep_" + l + "_probability.png")
+    sc.pl.umap(adata, color=l, frameon=False , save="_post_batch_post_sweep_" + l + "_probability.png")
 
 # Plot all (and B plasma cells only) by their next-best guess category and lineage
 adata.obs = adata.obs.merge(keras_top2, left_index=True, right_index=True)
@@ -402,7 +411,7 @@ def relative_mt_per_lineage(row):
     else:
         return row['keep']  # Keep the value unchanged
 
-# Count the ndeviations
+# Count the ndeviations (direction aware)
 tempdata = []
 for index,c in enumerate(lins):
     print(c)
@@ -410,12 +419,28 @@ for index,c in enumerate(lins):
     mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
     absolute_diff = np.abs(mt_perc - np.median(mt_perc))
     mad = np.median(absolute_diff)
-    nmads = (absolute_diff)/mad
+    nmads = (mt_perc - np.median(mt_perc))/mad
     # Apply the function to change values in 'new_column' based on criteria
     temp.obs['mt_perc_nmads'] = nmads
     tempdata.append(temp)
 
-adata = ad.concat(tempdata)
+to_add = ad.concat(tempdata)
+to_add = to_add.obs
+adata.obs = adata.obs.merge(to_add[['mt_perc_nmads']], left_index=True, right_index=True)
+
+# Plotting MT% per lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    temp = adata[adata.obs.lineage == l]
+    sns.distplot(temp.obs['pct_counts_gene_group__mito_transcript'], hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('MT% per lineage')
+plt.xlabel('MT%')
+ax.set(xlim=(0, 50))
+plt.savefig(figpath + '/lin_mt_perc.png', bbox_inches='tight')
+plt.clf()
 
 # Plot the distribution of MADs for each lineage
 plt.figure(figsize=(8, 6))
@@ -430,6 +455,16 @@ plt.xlabel('Median absolute deviation')
 #plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
 plt.savefig(figpath + '/lin_mt_per_mads.png', bbox_inches='tight')
 plt.clf()
+
+# How would a cut off of 2.5 affect cell proportions
+relative_threshold = 2.5
+adata.obs['abs_mt_perc_nmads'] = np.abs(adata.obs['mt_perc_nmads'])
+adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)] = adata.obs['abs_mt_perc_nmads'] > relative_threshold
+adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)] = adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)].astype('category')
+sc.pl.umap(adata, color='abs_mt_perc_nmads_gt' + str(relative_threshold), frameon=False , title='abs_mt_perc_nmads_gt' + str(relative_threshold), save="_post_batch_post_sweep_post_abs_mt_perc_nmads_gt" + str(relative_threshold) +".png")
+for c in cats:
+    tempadata = adata[adata.obs.category == c]
+    sc.pl.umap(tempadata, color='abs_mt_perc_nmads_gt' + str(relative_threshold), frameon=False , title=c + '_abs_mt_perc_nmads_gt' + str(relative_threshold), save="_" + c + "_post_batch_post_sweep_post_abs_mt_perc_nmads_gt" + str(relative_threshold) +".png")
 
 # Have a look per category
 for c in cats:
@@ -516,8 +551,96 @@ sc.pl.umap(bcp_only, color='BCP_IGA_gt_MM_int', frameon=False , title="Above or 
 np.unique(bcp_only.obs['BCP_IGA_gt_MM_int'], return_counts=True)
 
 # Plot marker genes
-gene_ens = ["ENSG00000119888", ]
-gene_symb = ["EPCAM"]
+gene_ens = ["ENSG00000119888", "ENSG00000039068", "ENSG00000171345", "ENSG00000170476", "ENSG00000132465"]
+gene_symb = ["EPCAM", "CDH1", "KRT19", "MZB1", "JCHAIN"]
+for index, g in enumerate(gene_symb):
+    sc.pl.umap(adata[adata.obs.category == "B Cell plasma"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_BCP.png")
+    sc.pl.umap(adata[adata.obs.category == "Enterocyte"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Enterocytes.png")
+
+
+
+# Compute MM for lineages
+for l in lins:
+    # Extract data
+    data = adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
+    # Scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+    # 1. Fit a GMM with multiple initializations
+    gmm = GaussianMixture(n_components=2, n_init=10).fit(scaled_data.reshape(-1, 1))
+    # Convert means and variances back to original space
+    original_means = scaler.inverse_transform(gmm.means_).flatten()
+    original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
+    # 2. Calculate fold change
+    fold_change = max(original_means) / min(original_means)
+    log_fold_change = np.log2(fold_change)
+    print("Fold Change:", fold_change)
+    print("Log2 Fold Change:", log_fold_change)
+    # 3. Plot the data
+    x = np.linspace(min(data), max(data), 1000)
+    scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
+    weights = gmm.weights_
+    pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
+    pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
+    total_pdf = pdf1 + pdf2
+    plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
+    plt.plot(x, pdf1, label='Distribution 1')
+    plt.plot(x, pdf2, label='Distribution 2')
+    plt.plot(x, total_pdf, 'k--', label='Mixture Model')
+    plt.legend()
+    plt.title(f"{l}: MT percentage mixture models, FC={fold_change:.4f}")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    plt.savefig(figpath + '/mixture_model_MT_perc_postqc_' + l + '.png', bbox_inches='tight')
+    plt.clf()
+    # If FC > 10:, find the intersection
+    if fold_change > 4:
+        def difference(z):
+            pdf1_val = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((z-original_means[0])**2)/original_variances[0])
+            pdf2_val = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((z-original_means[1])**2)/original_variances[1])
+            return pdf1_val - pdf2_val
+            
+            # Define a function that restricts the search space to values less than 10
+        lower_bound = 0
+        upper_bound = 20
+        try:
+            intersection = brentq(difference, lower_bound, upper_bound)
+            print("Intersection:", intersection)
+        except ValueError:
+            print("No intersection found in the given range.")
+
+# Have a look at what would be lost at this res
+immune_only = adata[adata.obs.lineage == "Immune"]
+immune_only.obs['Immune_gt_MM_int'] = immune_only.obs['pct_counts_gene_group__mito_transcript'] > intersection
+immune_only.obs['Immune_gt_MM_int'] = immune_only.obs['pct_counts_gene_group__mito_transcript'] > intersection
+immune_only.obs['Immune_gt_MM_int'] = immune_only.obs['Immune_gt_MM_int'].astype('category')
+sc.pl.umap(immune_only, color='Immune_gt_MM_int', frameon=False , title="Above or below intersection of MM for MT%", save="_Immune_above_MT_mm.png")
+sc.pl.umap(immune_only, color='category', frameon=False , title="Above or below intersection of MM for MT%", save="_Immune_category.png")
+sc.pl.umap(immune_only, color='label', frameon=False , title="Above or below intersection of MM for MT%", save="_Immune_label.png")
+np.unique(immune_only.obs['Immune_gt_MM_int'], return_counts=True)
+
+
+# Plot marker genes
+gene_symb = ["MZB1", "JCHAIN", "CD19, MS4A1, CD79A", "CD163", "APOE", "C1QA-C", "CD3D", "CD4", ]
+gene_ens = []
+for value in gene_symb:
+    # Create a boolean mask for the condition
+    mask = adata.var['gene_symbols'] == value  # Change 'Name' to the column you want to search in
+    if mask.any():
+        # Use the index where the condition is True as the row name
+        row_name = adata.var.index[mask].tolist()
+        # Append the row name(s) to the list
+        gene_ens.append(row_name)
+    else:
+        gene_ens.append('NA')
+
+for index, g in enumerate(gene_symb):
+    try:
+        #sc.pl.umap(immune_only[immune_only.obs.lineage == "Immune"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Immune.png")
+        sc.pl.umap(adata[adata.obs.category.isin(["Enterocyte", "Stem cells"])], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Stem_Enterocyte.png")
+    except:
+        print("Gene not found")
+
 
 
 #################################################
