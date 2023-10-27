@@ -34,16 +34,10 @@ objpath = catpath + "/objects"
 sc.settings.figdir=figpath
 
 # Load in the data to be annotated (cell filtered, but not gene filtered or normalised)
-adata = ad.read_h5ad(objpath + "/adata_cell_filt.h5ad")
-sc.pp.filter_genes(adata, min_cells=6)
-# Before normalising the counts, extract the raw counts and save them
-adata.raw = adata
-adata.layers['counts'] = adata.X.copy()
-# Calulate the CP10K expression
-sc.pp.normalize_total(adata, target_sum=1e4)
-# Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
-sc.pp.log1p(adata)
+adata = ad.read_h5ad(objpath + "/adata_objs_param_sweep/NN_350_scanvi_umap.adata")
 
+# Re-count the data
+adata.X = adata.layers['log1p_cp10k'].copy()
 
 ## Load the models to assign cell types (if not already obtained)
 #models.download_models()
@@ -69,6 +63,9 @@ if ("gene_symbols" in adata.var.columns) == False:
 adata.X.index = adata.var.gene_symbols
 adata.var.index = adata.var.gene_symbols
 
+# Copy the scVI model matrix to NN so that it is used in the model
+adata.uns['distances'] = adata.uns['scVI_nn']
+
 # Run the model
 predictions = celltypist.annotate(adata, model = 'Cells_Intestinal_Tract.pkl', majority_voting = True)
 
@@ -77,6 +74,7 @@ adata = predictions.to_adata()
 
 # Perform dotplot
 celltypist.dotplot(predictions, use_as_reference = 'label', use_as_prediction = 'majority_voting', save=True)
+celltypist.dotplot(predictions, use_as_reference = 'label', use_as_prediction = 'predicted_labels', save=True)
 
 # Save the predictions, decision matrix
 predictions.probability_matrix.to_csv(tabdir + "/CellTypist_Elmentaite_prob_matrix.csv")
