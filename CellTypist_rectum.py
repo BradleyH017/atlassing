@@ -78,6 +78,13 @@ adata = predictions.to_adata()
 # Perform dotplot
 celltypist.dotplot(predictions, use_as_reference = 'label', use_as_prediction = 'majority_voting', save=True)
 
+# Save the predictions, decision matrix
+predictions.probability_matrix.to_csv(tabdir + "/CellTypist_Elmentaite_prob_matrix.csv")
+predictions.decision_matrix.to_csv(tabdir + "/CellTypist_Elmentaite_decision_matrix.csv")
+
+# Generate CellTypist plots
+
+
 # Plot annotations
 #sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
 #sc.pl.umap(adata, color="majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestine_high_majority.png")
