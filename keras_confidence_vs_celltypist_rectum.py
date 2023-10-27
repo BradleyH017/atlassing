@@ -156,6 +156,8 @@ plt.xlabel('1st - 2nd annotation confidence')
 plt.savefig(kerasconf + '/all_keras_second_over_first.png', bbox_inches='tight')
 plt.clf()
 
+common_conf.to_csv(tabdir + '/keras_all_common_anno_conf.csv')
+
 # Print those with poor annotation ( < 0.5)
 common_conf[common_conf.common_conf < 0.5]
 
@@ -267,89 +269,96 @@ heatmap = (ggplot(fs)
 heatmap.save(kerasconf +  "/prop_second_calls_from_each_first.png", verbose=True)
 plt.clf()
 
+##############################################################
+####################### CellTypist ###########################
+##############################################################
+from scipy import stats
+
+# Load the Elmentaite annotations per cells probabilties from CellTypist
+predictions = pd.read_csv(tabdir + "/CellTypist_Elmentaite_prob_matrix.csv", index_col=0)
+
+# Merge onto the keras annotations to test against one another
+keras_ct = keras.merge(predictions, left_index=True, right_index=True)
+
+# Rename columns 
+for column in keras_ct.columns:
+    if not column.startswith('probability__'):
+        keras_ct.rename(columns={column: 'Elm_' + column}, inplace=True)
+
+keras_ct.columns = keras_ct.columns.str.replace('probability_', 'keras')
+
+# Calculate the correlation between probailities of all cell type annotations from keras with those from Elmentaite
+keras_columns = [col for col in keras_ct.columns if col.startswith('keras')]
+elm_columns = [col for col in keras_ct.columns if col.startswith('Elm_')]
+
+# Calculate the correlation
+probcor = pd.DataFrame(index=keras_columns, columns=elm_columns)
+# Calculate correlations and p-values
+for keras_col in keras_columns:
+    for elm_col in elm_columns:
+        corr, p_value = stats.pearsonr(keras_ct[keras_col], keras_ct[elm_col])
+        if p_value < 0.05 and np.abs(corr) > 0.5:
+            probcor.loc[keras_col, elm_col] = corr
+        else:
+            probcor.loc[keras_col, elm_col] = 0
+
+# Convert the correlation matrix to numeric values
+probcor = probcor.apply(pd.to_numeric)
+
+# Remove columns (CellTypist annotations) for which there is no signficiantly correlated keras probability
+strongprobcor = probcor.iloc[:,(probcor.sum() > 0).values]
+# Same for rows
+strongprobcor = strongprobcor.iloc[(probcor.sum(axis=1) > 0).values,]
 
 
-
-
-
-
-
-
-
-
-
-
-sns.clustermap(df_square, 
-                   method = 'complete', 
-                   annot  = False, 
-                   annot_kws = {'size': 4})
-plt.setp(g.ax_heatmap.get_xticklabels(), rotation=60);
-plt.figure(figsize=(30, 20))
-sns.clustermap(df_square, 
-                   method = 'complete', 
-                   annot  = False, 
-                   annot_kws = {'size': 4})
-plt.savefig(kerasconf + '/keras_first_second_corr.png', bbox_inches='tight', dpi=300)
+# Plot
+plt.figure(figsize=(16, 12))
+sns.clustermap(strongprobcor, annot=False, cmap='coolwarm', cbar=True,
+               row_cluster=True, col_cluster=True, dendrogram_ratio=(.2, .2),
+               cbar_kws={'label': 'Correlation'})
+# Reduce axis label size
+plt.xticks(fontsize=10)
+plt.yticks(fontsize=10)
+# Rotate x-axis labels by 45 degrees
+plt.xticks(rotation=45)
+plt.title('Probability correlation across all cells (p<0.05, abs(cor) > 0.5)')
+plt.savefig(figpath + '/elm_ct_vs_keras_cormat.png', bbox_inches='tight', dpi=300)
 plt.clf
 
+# Quantify the proportional agreement between individual cell types from Elmentaite and those from keras (TI)
+predictions['elm_best_guess_probability'] = predictions.max(axis=1)
+predictions['elm_best_guess'] = predictions.idxmax(axis=1)
+predictions['elm_best_guess'] = predictions.apply(lambda row: row['elm_best_guess'] if row[row['elm_best_guess']] > 0.5 else 'uncertain', axis=1)
 
-# Sankey diagram - top vs second top hit per label
-# Can we analyse this within category? How many times are cells called outside their category? 
-temp = ktop3[["first", "second"]]
-conv = adata.obs[["label__machine", "category"]]
-conv = conv.reset_index()
-conv = conv[["label__machine", "category"]]
-conv = conv.drop_duplicates()
+# Merge this with the majority voting data
+ct_labels = pd.read_csv(tabdir + "/CellTypist_labels.csv", index_col=0)
+ct_labels = ct_labels.merge(predictions[["elm_best_guess", "elm_best_guess_probability"]], left_index=True, right_index=True)
 
+# Plot the finer predictions on a UMAP
+import matplotlib as mp
+adata.obs = adata.obs.merge(ct_labels, left_index=True, right_index=True)
+cats = np.unique(adata.obs.category)
+for c in cats:
+    print(c)
+    temp = adata[adata.obs.category == c]
+    # If there is less than 20 cells of a given label, make this NA
+    category_counts = temp.obs['predicted_labels'].value_counts()
+    # Identify annotations with less than 1% of cells in that category 
+    lim = temp.shape[0]*0.01
+    categories_to_replace = category_counts[category_counts < lim].index
+    # Replace those categories with 'NA'
+    temp.obs['predicted_labels'] = temp.obs['predicted_labels'].apply(lambda x: 'NA' if x in categories_to_replace else x)
+    print(c)
+    sc.pl.umap(temp, color="predicted_labels", title = "keras category - " + c + " - Elmentaite CellTypist", frameon=True, save="_post_batch_post_" + c+ "_celltypist_elm_fine.png", palette = "Dark2")
+    sc.pl.umap(temp, color="elm_best_guess_probability", title = "keras category - " + c + " - Elmentaite CellTypist confidence", frameon=True, save="_post_batch_post_" + c+ "_confidence_celltypist_elm_fine.png")
 
-
-import plotly.graph_objects as go
-import urllib, json
-from pySankey.sankey import sankey
-
-ktop3['first'] = ktop3['first'].astype("str")
-sankey(
-    ktop3['first'], ktop3['second'], aspect=20,
-    fontsize=12, figure_name=kerasconf + '/sankey_first_second'
-)
-
-
-
-df = pd.read_csv(
-    '/nfs/users/nfs_b/bh18/customer-goods.csv', sep=','
-)
-sankey(
-    left=df['customer'], right=df['good'], rightWeight=df['revenue'], aspect=20,
-    fontsize=20, figure_name="customer-good"
-)
-
-
-
-
-
-
-
-
-
-
-
-# First summarise the transfer from one to another
-fs = ktop3.groupby(['first', 'second']).size().reset_index(name='frequency')
-fs['second'] = remove_char(fs['second'] ,"probability__")
-sankey(
-    left=fs['first'], right=fs['second'], rightWeight=fs['frequency'], aspect=20,
-    fontsize=20
-)
-fig = plt.gcf()
-# Set size in inches
-fig.set_size_inches(12, 12)
-# Set the color of the background to white
-fig.set_facecolor("w")
-# Save the figure
-fig.savefig(kerasconf + '/sankey_first_second/png', bbox_inches="tight", dpi=400)
-
-
-
-
-
-
+# Claulate the proportion of keras labels per CellTypist label
+grouped = adata.obs.groupby(['label', 'predicted_labels']).size().reset_index(name='count')
+pivot_table = pd.pivot_table(grouped, values='count', index='label', columns='predicted_labels', fill_value=0)
+# Calculate proportions
+proportion_matrix = pivot_table.div(pivot_table.sum(axis=1), axis=0)
+# Summarise the max and max proportion in a new dataframe and save
+prop_sum = pd.DataFrame({"Elm_best_guess": "", "proportion": 0},  index = proportion_matrix.index)
+prop_sum["Elm_best_guess"] =  proportion_matrix.idxmax(axis=1)
+prop_sum["proportion"] = proportion_matrix.max(axis=1)
+prop_sum.to_csv(tabdir + "/Elmentaite_celltypist_proporion_summary_per_keras.csv")
