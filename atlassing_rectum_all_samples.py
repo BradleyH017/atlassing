@@ -443,88 +443,94 @@ for index,c in enumerate(lins):
     nmads = (mt_perc - np.median(mt_perc))/mad
     # Apply the function to change values in 'new_column' based on criteria
     temp.obs['mt_perc_nmads'] = nmads
+    # Also for absolute nMADs
+    nmads_abs = absolute_diff/mad
+    temp.obs['abs_mt_perc_nmads'] = nmads_abs
     tempdata.append(temp)
 
 to_add = ad.concat(tempdata)
 to_add = to_add.obs
-adata.obs = adata.obs.merge(to_add[['mt_perc_nmads']], left_index=True, right_index=True)
+adata.obs = adata.obs.merge(to_add[['mt_perc_nmads', 'abs_mt_perc_nmads']], left_index=True, right_index=True)
 
 
 # Optional: Now filter based on these cut offs (absollute)
 filter_relative_mt_thresh = True
 relative_mt_threshold = 2.5
+absolute = True
 if filter_relative_mt_thresh == True:
-    adata = adata[adata.obs['mt_perc_nmads'] < relative_mt_threshold]
+    if absolute == True:
+        adata = adata[adata.obs['abs_mt_perc_nmads'] < relative_mt_threshold]
+        print("ABSOLUTE")
+    else:
+        adata = adata[adata.obs['mt_perc_nmads'] < relative_mt_threshold]
+        print("NOT ABSOLUTE")
     print(adata.shape)
     print("NMADS SUBSET")
 
 # Alternative: We see that intermixing cells are from a distinct, high MT% subset of the immune cells based on a GMM model.
 # Can remove these based on their MT% above a threshold defined as the intersection of these two distributions
-from scipy import stats
-from sklearn.mixture import GaussianMixture
-from scipy.stats import norm
-from sympy import symbols, Eq, solve
-from sklearn.preprocessing import StandardScaler
-from scipy.optimize import fsolve
-from scipy.optimize import brentq
-for l in lins:
-    # Extract data
-    data = adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
-    # Scale the data
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
-    # 1. Fit a GMM with multiple initializations
-    gmm = GaussianMixture(n_components=2, n_init=10).fit(scaled_data.reshape(-1, 1))
-    # Convert means and variances back to original space
-    original_means = scaler.inverse_transform(gmm.means_).flatten()
-    original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
-    # 2. Calculate fold change
-    fold_change = max(original_means) / min(original_means)
-    log_fold_change = np.log2(fold_change)
-    print("Fold Change:", fold_change)
-    print("Log2 Fold Change:", log_fold_change)
-    # 3. Plot the data
-    x = np.linspace(min(data), max(data), 1000)
-    scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
-    weights = gmm.weights_
-    pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
-    pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
-    total_pdf = pdf1 + pdf2
-    plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
-    plt.plot(x, pdf1, label='Distribution 1')
-    plt.plot(x, pdf2, label='Distribution 2')
-    plt.plot(x, total_pdf, 'k--', label='Mixture Model')
-    plt.legend()
-    plt.title(f"{l}: MT percentage mixture models, FC={fold_change:.4f}")
-    plt.xlabel("Value")
-    plt.ylabel("Density")
-    plt.savefig(figpath + '/mixture_model_MT_perc_postqc_' + l + '.png', bbox_inches='tight')
-    plt.clf()
-    # If FC > 4:, find the intersection [ This is only the case for the Immune lineage]
-    if fold_change > 4:
-        def difference(z):
-            pdf1_val = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((z-original_means[0])**2)/original_variances[0])
-            pdf2_val = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((z-original_means[1])**2)/original_variances[1])
-            return pdf1_val - pdf2_val
-            
-            # Define a function that restricts the search space to values less than 10
-        lower_bound = 0
-        upper_bound = 20
-        try:
-            intersection = brentq(difference, lower_bound, upper_bound)
-            print("Intersection:", intersection)
-        except ValueError:
-            print("No intersection found in the given range.")
-
-# Create a flag for if this cells are both immune and above this threshold.
-def condition(row):
-    return row['lineage'] == 'Immune' and row['pct_counts_gene_group__mito_transcript'] > intersection
-
-# Add a new column based on the condition
-adata.obs['Immune_gt_MM_MT_perc'] = adata.obs.apply(condition, axis=1)
-# Subset for this
 subset_lineage_mm = False
 if subset_lineage_mm == True:
+    from scipy import stats
+    from sklearn.mixture import GaussianMixture
+    from scipy.stats import norm
+    from sympy import symbols, Eq, solve
+    from sklearn.preprocessing import StandardScaler
+    from scipy.optimize import fsolve
+    from scipy.optimize import brentq
+    for l in lins:
+        # Extract data
+        data = adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
+        # Scale the data
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+        # 1. Fit a GMM with multiple initializations
+        gmm = GaussianMixture(n_components=2, n_init=10).fit(scaled_data.reshape(-1, 1))
+        # Convert means and variances back to original space
+        original_means = scaler.inverse_transform(gmm.means_).flatten()
+        original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
+        # 2. Calculate fold change
+        fold_change = max(original_means) / min(original_means)
+        log_fold_change = np.log2(fold_change)
+        print("Fold Change:", fold_change)
+        print("Log2 Fold Change:", log_fold_change)
+        # 3. Plot the data
+        x = np.linspace(min(data), max(data), 1000)
+        scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
+        weights = gmm.weights_
+        pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
+        pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
+        total_pdf = pdf1 + pdf2
+        plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
+        plt.plot(x, pdf1, label='Distribution 1')
+        plt.plot(x, pdf2, label='Distribution 2')
+        plt.plot(x, total_pdf, 'k--', label='Mixture Model')
+        plt.legend()
+        plt.title(f"{l}: MT percentage mixture models, FC={fold_change:.4f}")
+        plt.xlabel("Value")
+        plt.ylabel("Density")
+        plt.savefig(figpath + '/mixture_model_MT_perc_postqc_' + l + '.png', bbox_inches='tight')
+        plt.clf()
+        # If FC > 4:, find the intersection [ This is only the case for the Immune lineage]
+        if fold_change > 4:
+            def difference(z):
+                pdf1_val = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((z-original_means[0])**2)/original_variances[0])
+                pdf2_val = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((z-original_means[1])**2)/original_variances[1])
+                return pdf1_val - pdf2_val 
+                # Define a function that restricts the search space to values less than 10
+            lower_bound = 0
+            upper_bound = 20
+            try:
+                intersection = brentq(difference, lower_bound, upper_bound)
+                print("Intersection:", intersection)
+            except ValueError:
+                print("No intersection found in the given range.")
+    # Create a flag for if this cells are both immune and above this threshold.
+    def condition(row):
+        return row['lineage'] == 'Immune' and row['pct_counts_gene_group__mito_transcript'] > intersection
+    # Add a new column based on the condition
+    adata.obs['Immune_gt_MM_MT_perc'] = adata.obs.apply(condition, axis=1)
+    # Subset for this
     adata = adata[adata.obs.Immune_gt_MM_MT_perc == False]
     print("SUBSET FOR THE RELATIVE MT PERC FROM MM")
     print(adata.shape)
