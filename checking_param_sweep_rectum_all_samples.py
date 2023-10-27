@@ -58,6 +58,7 @@ adata.write_h5ad(umap_file)
 # Define fig out dir
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
 figpath = data_name + "/" + status + "/" + category + "/figures"
+tabdir = data_name + "/" + status + "/" + category + "/tables"
 
 # Plot categories, labels, samples
 sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_category.png")
@@ -72,11 +73,6 @@ sc.pl.umap(adata, color="n_genes_by_counts", frameon=True, save="_post_batch_pos
 sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, save="_post_batch_mt_perc.png")
 adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
 sc.pl.umap(adata, color="log10ngenes", frameon=True, save="_post_batch_log10ngenes.png")
-
-# Plot PCA coloured by category, MT%
-sc.pl.pca(adata, color="category", components=['1,2,3,4,5,6,7,8,9,10'], save="_category.png")
-sc.pl.pca(adata, color="pct_counts_gene_group__mito_transcript", components=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], save="_mt_perc.png")
-
 
 # also CellTypist annotation
 sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
@@ -94,6 +90,29 @@ cells = adata.obs.index
 adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True, how='left')
 sc.pl.umap(adata, color="CellTypist:Intestinal_Elmentaite:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestinal_elmentaite_majority.png")
 
+#####################################################
+######## Investigation of low MT% epithelium ########
+#####################################################
+# If we subset using a mixture model (see below) or using a direction aware MAD cut off of MT%, there remains an epithelial population (enterocytes and stem cells) with almost NO
+# MT%. Find this very suspect and potentially an indicator of poorly sequenced cells, or cells without mitochondria (maybe burst?)
+# Subset for the epithelial populations
+epi = adata[adata.obs.lineage == "Epithelial"]
+
+# PErform some low-level (low res) clustering of these cells (takes ~ 2hours)
+sc.tl.leiden(epi, resolution=0.2, neighbors_key ="scVI_nn")
+
+# Plot
+sc.pl.umap(epi, color="leiden", frameon=True, save="_post_batch_post_epithelial_leiden_0.2.png")
+
+# Save annot
+epi.obs[['leiden']].to_csv(tabdir + "/epoithelial_only_leiden_0.2.csv")
+
+# Find markers of the rogue cell-type
+epi.uns['log1p'] = None 
+sc.tl.rank_genes_groups(epi, groupby="cell_type_annotation_column", method='t-test', groups = ["4"], reference="rest", use_raw=True)
+
+
+#####################################################
 
 # Plot RP%
 sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_sweep_rpperc.png")
