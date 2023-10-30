@@ -73,6 +73,7 @@ sc.pl.umap(adata, color="n_genes_by_counts", frameon=True, save="_post_batch_pos
 sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, save="_post_batch_mt_perc.png")
 adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
 sc.pl.umap(adata, color="log10ngenes", frameon=True, save="_post_batch_log10ngenes.png")
+sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_batch_rp_perc.png")
 
 # also CellTypist annotation
 sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
@@ -89,6 +90,21 @@ adata.obs.index = adata.obs.index.astype(str)
 cells = adata.obs.index
 adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True, how='left')
 sc.pl.umap(adata, color="CellTypist:Intestinal_Elmentaite:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestinal_elmentaite_majority.png")
+
+# Histogram of ngenes expressed
+cats=np.unique(adat.obs.category)
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats:
+    sns.distplot(adata.obs[adata.obs.category == c].n_genes_by_counts, hist=False, rug=True, label=c)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of ngenes expressed')
+plt.xlabel('nGenes expressed / cell')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category.png', bbox_inches='tight')
+plt.clf()
+
 
 #####################################################
 ######## Investigation of low MT% epithelium ########
@@ -136,6 +152,9 @@ for c in cats:
     sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras_conf.png")
     sc.pl.umap(temp, color="label", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_label.png")
     sc.pl.umap(temp, color="pct_counts_gene_group__mito_transcript", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mt_perc.png")
+    sc.pl.umap(temp, color="n_genes_by_counts", frameon=True, save="_" + c + "_post_batch_post_ngenes.png")
+    sc.pl.umap(temp, color="log10ngenes", frameon=True, save="_" + c + "_post_batch_log10ngenes.png")
+    sc.pl.umap(temp, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_" + c + "_post_batch_rp_perc.png")
 
 #####################################################
 ######## Exploration of B cell plasma cells #########
@@ -387,7 +406,7 @@ for c in cats:
 
 # This doesn't seem to have done too much in terms of addressing these cells
 # So will have a look at using a higher cut off as a last ditch atempt for the lineage probability approach
-lin_conf_cutoff = 0.95
+lin_conf_cutoff = 0.9
 adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] = max_vals > lin_conf_cutoff
 adata_high_filt = adata[adata.obs['lin_max_gt_' + str(lin_conf_cutoff)] == True]
 sc.pl.umap(adata_high_filt, color='category', frameon=False , save="_post_batch_post_sweep_post_lin_filt" + str(lin_conf_cutoff) + "_label.png")
@@ -638,6 +657,42 @@ sc.pl.umap(immune_only, color='category', frameon=False , title="Above or below 
 sc.pl.umap(immune_only, color='label', frameon=False , title="Above or below intersection of MM for MT%", save="_Immune_label.png")
 np.unique(immune_only.obs['Immune_gt_MM_int'], return_counts=True)
 
+# What if we have a look for 3 components at the lineage model
+for l in lins:
+    # Extract data
+    data = adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
+    # Scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+    # 1. Fit a GMM with multiple initializations
+    gmm = GaussianMixture(n_components=3, n_init=10).fit(scaled_data.reshape(-1, 1))
+    # Convert means and variances back to original space
+    original_means = scaler.inverse_transform(gmm.means_).flatten()
+    original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
+    # 2. Calculate fold change
+    fold_change = max(original_means) / min(original_means)
+    log_fold_change = np.log2(fold_change)
+    print("Fold Change:", fold_change)
+    print("Log2 Fold Change:", log_fold_change)
+    # 3. Plot the data
+    x = np.linspace(min(data), max(data), 1000)
+    scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
+    weights = gmm.weights_
+    pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
+    pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
+    pdf3 = weights[2] * (1/(np.sqrt(2*np.pi*original_variances[2]))) * np.exp(-0.5 * ((x-original_means[2])**2)/original_variances[2])
+    total_pdf = pdf1 + pdf2 + pdf3
+    plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
+    plt.plot(x, pdf1, label='Distribution 1')
+    plt.plot(x, pdf2, label='Distribution 2')
+    plt.plot(x, pdf3, label='Distribution 2')
+    plt.plot(x, total_pdf, 'k--', label='Mixture Model')
+    plt.legend()
+    plt.title(f"{l}: MT percentage mixture models (total=3), FC={fold_change:.4f}")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    plt.savefig(figpath + '/mixture_model_MT_perc_postqc_' + l + '_3models.png', bbox_inches='tight')
+    plt.clf()
 
 # Plot marker genes
 gene_symb = ["MZB1", "JCHAIN", "CD19, MS4A1, CD79A", "CD163", "APOE", "C1QA-C", "CD3D", "CD4", ]
@@ -660,6 +715,16 @@ for index, g in enumerate(gene_symb):
     except:
         print("Gene not found")
 
+# Have a look at whether or not a low threshdold for absolute cutoff would have removed these cells
+adata.obs['abs_nmads_less_2'] = adata.obs['abs_mt_perc_nmads'].values < 2
+adata.obs['abs_nmads_less_2'] = adata.obs['abs_nmads_less_2'].astype('category')
+colors = {'True': 'orange', 'False': 'Blue'}
+sc.pl.umap(adata, color='abs_nmads_less_2', frameon=False ,save='_post_batch_post_sweep_abs_nmad_less_2.png', palette="Set1")
+
+# Do intermixing cells have 0 MT%
+adata.obs['MT_gt_0'] = adata.obs['pct_counts_gene_group__mito_transcript'] > 0
+adata.obs['MT_gt_0'] = adata.obs['MT_gt_0'].astype('category')
+sc.pl.umap(adata, color='MT_gt_0', frameon=False ,save='_post_batch_post_sweep_no_mt_perc.png', palette="Set1")
 
 
 #################################################
