@@ -250,6 +250,8 @@ mt_perc=adata.obs["pct_counts_gene_group__mito_transcript"]
 mt_perc_ls50 = mt_perc < cutoff
 adata.obs["mt_perc_less_50"] = mt_perc_ls50
 adata=adata[adata.obs.mt_perc_less_50 == True] #325,318 cells
+# Also remove those with absolutely 0 (!) MT%
+adata = adata[adata.obs.pct_counts_gene_group__mito_transcript > 0]
 print("The number of cells that remain after filtration is", adata.n_obs)
 
 # 4. Probabilityof doublet. This has already been filtered by the yascp pipeline
@@ -640,7 +642,7 @@ adata.write(objpath + "/adata_PCAd.h5ad")
 ####################################
 
 # 1. scVI
-# Correcting for MT% (If not done, this seems to be very high in regions of the data where there is overlapping cell categories)
+print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
 scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
 model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
 model.train()
@@ -653,8 +655,32 @@ if os.path.exists(objpath) == False:
 
 adata.write(objpath + "/adata_PCAd_scvid.h5ad")
 
-# 2. scANVI
-# Have not performed this on the rectum data as this requires a confident annotation of cells - which is not yet obtained.
+# 2. scVI - default_metrics
+print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
+model_default = scvi.model.SCVI(adata)
+model_default.train()
+SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
+adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
+
+
+# 3. scANVI
+# Performing this across lineage
+print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
+scanvi_model = scvi.model.SCANVI.from_scvi_model(
+    model,
+    adata=adata,
+    labels_key="lineage",
+    unlabeled_category="Unknown",
+)
+scanvi_model.train(max_epochs=20, n_samples_per_label=100)
+SCANVI_LATENT_KEY = "X_scANVI"
+adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
+
+# 3. Harmony
+print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
+sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
+
+
 
 # Bench marking of the batch effect correction (using experiment id as I believe convoluted samplename gets re-written at some point)
 from scib_metrics.benchmark import Benchmarker
@@ -662,7 +688,7 @@ bm = Benchmarker(
     adata,
     batch_key="experiment_id",
     label_key="label",
-    embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY],
+    embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
     n_jobs=1,
     pre_integrated_embedding_obsm_key="X_pca"
 )
@@ -693,16 +719,24 @@ sc.pl.embedding(
 # Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
 # NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
 # Using non-corrected matrix
-# Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here)
-sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep="X_pca", key_added="pca_nn")
-sc.tl.umap(adata, neighbors_key="pca_nn", min_dist=0.5, spread=0.5)
-sc.pl.umap(adata, color = "label", save="_NN.png")
+# Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here) - Do this based on all embeddings
+colby = ["convoluted_samplename", "category", "label"]
+latents = ["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony']
+for l in latents:
+    print("Performing on UMAP embedding on {}".format(l))
+    # Calculate NN (using 350)
+    sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=l, key_added=l + "_nn")
+    # Perform UMAP embedding
+    sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
+    # Save a plot
+    for c in colby:
+        sc.pl.umap(adata, color = colby, save="_" + l + "_NN" + c + ".png")
 
 # Save the ouput adata file
 if os.path.exists(objpath) == False:
     os.mkdir(objpath)
 
-adata.write(objpath + "/adata_PCAd_scvid.h5ad")
+adata.write(objpath + "/adata_batch_correct_array.h5ad")
 
 # Pre-emptively compute the NN embedding using 350 neighbours and custom min_dist and spread parameters
 # Used to do this after parameter sweep, but these paramaters usually looked pretty good
