@@ -74,6 +74,9 @@ sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, 
 adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
 sc.pl.umap(adata, color="log10ngenes", frameon=True, save="_post_batch_log10ngenes.png")
 sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_batch_rp_perc.png")
+sc.pl.umap(adata, color="total_counts", frameon=True, save="_post_batch_post_batch_total_counts.png")
+adata.obs['log10_total_counts'] = np.log10(adata.obs['total_counts'])
+sc.pl.umap(adata, color="log10_total_counts", frameon=True, save="_post_batch_post_batch_log10total_counts.png")
 
 # also CellTypist annotation
 sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
@@ -104,6 +107,71 @@ plt.xlabel('nGenes expressed / cell')
 #plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
 plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category.png', bbox_inches='tight')
 plt.clf()
+
+#####################################################
+######## Investigation of low MT% Immune ############
+#####################################################
+# After using 2.5 absolute MAD as a threshold, this removes the low MT% epithelium (below)
+# This does however retain a population of Myeloid, B Cell and T cells with very low MT%
+# These seem to be mixing on the basis of this
+# Cluster these and have a look at their markers
+test_immune = adata[adata.obs.category.isin(["Myeloid", "T Cell", "B Cell"])]
+
+# PErform some low-level (low res) clustering of these cells (takes ~ 2hours)
+sc.tl.leiden(test_immune, resolution=0.2, neighbors_key ="scVI_nn")
+
+# Plot
+sc.pl.umap(test_immune, color="leiden", frameon=True, save="_post_batch_post_batch_coarse_immune_leiden.png",legend_loc='on data')
+
+# Check is number 7
+sc.pl.umap(test_immune[test_immune.obs.leiden == "7"], color="leiden", frameon=True, save="_post_batch_post_batch_coarse_immune_leiden_cl7.png",legend_loc='on data')
+
+# Extract cluster 7 and subcluster
+cl7 = test_immune[test_immune.obs.leiden == "7"]
+sc.tl.leiden(cl7, resolution=0.3, neighbors_key ="scVI_nn")
+sc.pl.umap(cl7, color="leiden", frameon=True, save="_post_batch_post_batch_coarse_immune_leiden_cl7_subclustered.png",legend_loc='on data')
+
+# Clusters 1 and 2 seem to match the strange cluster.
+# Add this onto the total adata and find markers
+strange_ids = cl7[cl7.obs.leiden.isin(["1","2"])].obs.index
+adata.obs['low_MT_strange_cluster'] = adata.obs.index.isin(strange_ids)
+adata.obs['low_MT_strange_cluster'] = adata.obs['low_MT_strange_cluster'].astype('category')
+sc.pl.umap(adata, color="low_MT_strange_cluster", frameon=True, save="_post_batch_post_batch_coarse_strange_low_MT_cluster.png")
+sc.tl.rank_genes_groups(adata, groupby="low_MT_strange_cluster", method='t-test', groups = ["True"], use_raw=True)
+sc.tl.rank_genes_groups(adata, 'low_MT_strange_cluster', method='t-test')
+sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, save="_markers_lowMT_strange_cluster.png")
+
+# Get results out
+results = adata.uns['rank_genes_groups']
+# Create a DataFrame for the results of the specified group
+True_markers = pd.DataFrame({
+    'names': results['names']['True'],
+    'logFC': results['logfoldchanges']['True'],
+    'pvals': results['pvals']['True'],
+    'pvals_adj': results['pvals_adj']['True'],
+})
+True_markers = True_markers[True_markers.pvals_adj < 0.05]
+
+# Add names
+ens_sym = adata.var[['gene_symbols']]
+ens_sym = ens_sym.reset_index()
+ens_sym = ens_sym.rename(columns={'index': 'names'})
+True_markers = True_markers.merge(ens_sym, on="names")
+# Remove RP and save
+True_markers = True_markers[~(True_markers.gene_symbols.str.contains("^RP"))]
+True_markers.to_csv(figpath + "/markers_strange_low_MT_Celltype.csv")
+
+# Plot markers
+sc.pl.rank_genes_groups_violin(adata, groups='True', n_genes=8, save="_strange_low_MT_cluster_markers.png")
+
+
+# Perform some enrichment
+from gprofiler import GProfiler
+gene_list = True_markers[True_markers.logFC > 2].gene_symbols.values.tolist()
+gp = GProfiler(return_dataframe=True)  # Set return_dataframe to True to get results as a DataFrame
+results = gp.profile(organism='hsapiens', query=gene_list, sources=['GO:BP'], user_threshold=0.05)
+results.to_csv(figpath + "/GO_BP_abslogFC_gt_2_strange_low_MT_cluster.csv")
+
 
 
 #####################################################
