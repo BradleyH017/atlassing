@@ -14,8 +14,12 @@ print(cwd)
 
 # Load packages
 import sys
+sys.path.append('/software/team152/bh18/pip')
+sys.path.append('/usr/local/')
+print("System path")
 print(sys.path)
 import numpy as np
+print("Numpy file")
 print(np.__file__)
 import pandas as pd
 import scanpy as sc
@@ -28,12 +32,19 @@ import scvi
 import csv
 import datetime
 import seaborn as sns
-from formulae import design_matrices
-from limix.qc import quantile_gaussianize
 import matplotlib.pyplot as plt
 import math
 import scipy.stats as st
 import re
+from scipy import stats
+from sklearn.mixture import GaussianMixture
+from scipy.stats import norm
+from sympy import symbols, Eq, solve
+from sklearn.preprocessing import StandardScaler
+from scipy.optimize import fsolve
+from scipy.optimize import brentq
+import torch
+from scib_metrics.benchmark import Benchmarker
 print("Loaded libraries")
 
 # Define the datasets - only running rectum in this script, so don't need to worry about the datset name, disease status or category (am using all here)
@@ -473,13 +484,6 @@ if filter_relative_mt_thresh == True:
 # Can remove these based on their MT% above a threshold defined as the intersection of these two distributions
 subset_lineage_mm = False
 if subset_lineage_mm == True:
-    from scipy import stats
-    from sklearn.mixture import GaussianMixture
-    from scipy.stats import norm
-    from sympy import symbols, Eq, solve
-    from sklearn.preprocessing import StandardScaler
-    from scipy.optimize import fsolve
-    from scipy.optimize import brentq
     for l in lins:
         # Extract data
         data = adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript.values.reshape(-1, 1)
@@ -643,17 +647,13 @@ adata.write(objpath + "/adata_PCAd.h5ad")
 
 # 1. scVI
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
+# Configure this to run on  GPU
+scvi.settings.dl_pin_memory_gpu_training =  True
 scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
 model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
-model.train()
+model.train(use_gpu=True)
 SCVI_LATENT_KEY = "X_scVI"
 adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
-
-# Save pre-benchmark
-if os.path.exists(objpath) == False:
-    os.mkdir(objpath)
-
-adata.write(objpath + "/adata_PCAd_scvid.h5ad")
 
 # 2. scVI - default_metrics
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
@@ -676,14 +676,18 @@ scanvi_model.train(max_epochs=20, n_samples_per_label=100)
 SCANVI_LATENT_KEY = "X_scANVI"
 adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
-# 3. Harmony
+# 4. Harmony
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
 sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
 
+# Save pre-benchmark
+if os.path.exists(objpath) == False:
+    os.mkdir(objpath)
+
+adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
 
 # Bench marking of the batch effect correction (using experiment id as I believe convoluted samplename gets re-written at some point)
-from scib_metrics.benchmark import Benchmarker
 bm = Benchmarker(
     adata,
     batch_key="experiment_id",
@@ -704,17 +708,6 @@ top = df1[df1.Total == max(df1.Total.values)].index
 print("The method with the greatest overall score is: ")
 print(str(top.values))
 
-# Plot the embedding
-SCVI_MDE_KEY = "X_scVI_MDE"
-adata.obsm[SCVI_MDE_KEY] = scvi.model.utils.mde(adata.obsm[SCVI_LATENT_KEY])
-sc.pl.embedding(
-    adata,
-    basis=SCVI_MDE_KEY,
-    color=["label", "convoluted_samplename"],
-    frameon=False,
-    save=True
-)
-
 # Compute NN and UMAP using the recommended number of PCs
 # Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
 # NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
@@ -730,7 +723,7 @@ for l in latents:
     sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
     # Save a plot
     for c in colby:
-        sc.pl.umap(adata, color = colby, save="_" + l + "_NN" + c + ".png")
+        sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
 
 # Save the ouput adata file
 if os.path.exists(objpath) == False:
