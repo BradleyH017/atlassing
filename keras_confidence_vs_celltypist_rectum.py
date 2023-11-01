@@ -330,6 +330,16 @@ predictions['elm_best_guess_probability'] = predictions.max(axis=1)
 predictions['elm_best_guess'] = predictions.idxmax(axis=1)
 predictions['elm_best_guess'] = predictions.apply(lambda row: row['elm_best_guess'] if row[row['elm_best_guess']] > 0.5 else 'uncertain', axis=1)
 
+# Add this to the adata object
+adata.obs = adata.obs.merge(predictions[["elm_best_guess_probability", "elm_best_guess"]], left_index=True, right_index=True)
+sc.pl.umap(adata, color = "elm_best_guess_probability", frameon=True, save="_post_batch_post_batch_cCellTypist_Elmentaite_best_guess_probability.png")
+sc.pl.umap(adata, color = "elm_best_guess", frameon=True, save="_post_batch_post_batch_cCellTypist_Elmentaite_best_guess.png", palette = "Set1")
+
+# Also plot majority voting
+adata.obs['majority_voting'] = adata.obs['majority_voting'].astype('category')
+sc.pl.umap(adata, color = "majority_voting", frameon=True, save="_post_batch_post_batch_CellTypist_Elmentaite_majority_voting.png", palette = "Set1")
+
+
 # Merge this with the majority voting data
 ct_labels = pd.read_csv(tabdir + "/CellTypist_labels.csv", index_col=0)
 ct_labels = ct_labels.merge(predictions[["elm_best_guess", "elm_best_guess_probability"]], left_index=True, right_index=True)
@@ -362,3 +372,98 @@ prop_sum = pd.DataFrame({"Elm_best_guess": "", "proportion": 0},  index = propor
 prop_sum["Elm_best_guess"] =  proportion_matrix.idxmax(axis=1)
 prop_sum["proportion"] = proportion_matrix.max(axis=1)
 prop_sum.to_csv(tabdir + "/Elmentaite_celltypist_proporion_summary_per_keras.csv")
+
+
+# Look at the ditribution of first vs second probabilities for CellTypist Annotations (just like done with the keras)
+filtered_columns = [col for col in predictions.columns if 'elm' not in col]
+# Calculate the second greatest value for each row in the filtered columns
+predictions['elm_next_best_guess'] = predictions[filtered_columns].apply(lambda row: row.nlargest(2).iloc[-1], axis=1)
+# Calculated the difference in these scores
+predictions['elm_first_less_second'] = predictions['elm_best_guess_probability'] - predictions['elm_next_best_guess']
+# Add keras category
+keras_cat = adata.obs[["category"]]
+predictions = predictions.merge(keras_cat, left_index=True, right_index=True)
+
+# Plot
+cats_all = np.unique(adata.obs.category)
+cats_all = np.append(cats_all, "All_cells")
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for c in cats_all:
+    if c != "All_cells":
+        dat = predictions[predictions.category == c].elm_first_less_second
+        sns.distplot(dat, hist=False, rug=True, label=c)
+    else:
+        dat = predictions.elm_first_less_second
+        sns.distplot(dat, hist=False, rug=True, label=c, color="black")
+
+plt.legend()
+ax.set(xlim=(0, 1))
+plt.title(c)
+plt.xlabel('Distribution of First - Second annotation confidence')
+plt.savefig(ctconf + '/CellTypist_first_less_second_confidence_distribution.png', bbox_inches='tight')
+plt.clf()
+
+# Now plot within category (Doesn't work well, because of the discordance between keras and CellTypist annotations, get a huge number of CellTypist predictions per keras category)
+#cats = np.unique(adata.obs.category)
+#for c in cats:
+#    labels = np.unique(predictions[predictions.category == c].elm_best_guess)
+#    plt.figure(figsize=(8, 6))
+#    fig,ax = plt.subplots(figsize=(8,6))
+#    for l in labels:
+#        idx = (predictions.category == c) & (predictions.elm_best_guess == l)
+#        dat = predictions.elm_first_less_second[idx]
+#        sns.distplot(dat, hist=False, rug=True, label=l)
+#    plt.legend()
+#    ax.set(xlim=(0, 1))
+#    plt.title(c)
+#    plt.xlabel('1st - 2nd Elmentaite CellTypist annotation confidence')
+#    plt.savefig(kerasconf + '/' + c + '_Elmentaite_CellTypist_second_over_first.png', bbox_inches='tight')
+#    plt.clf()
+
+# Find the peak distribution of first - second per celltypist annotation (Including the uncertain cells)
+predictions['elm_best_guess_inc_uncertain'] = predictions[filtered_columns].idxmax(axis=1)
+labs = np.unique(predictions.elm_best_guess_inc_uncertain)
+common_conf = pd.DataFrame({"Elm_top_guess": labs, "ncells": 0, "common_conf": np.nan})
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for index,l in enumerate(labs):
+    print(l)
+    idx = predictions.elm_best_guess == l
+    data = predictions.elm_first_less_second[idx]
+    common_conf.iloc[index,1] = data.shape[0]
+    # Find the x-value corresponding to the peak
+    if data.shape[0] >= 5:
+        sns.distplot(data, hist=False, rug=True, color='black')
+        sns.kdeplot(data, shade=True)
+        ax = plt.gca()
+        kde_xdata = ax.get_lines()[len(ax.get_lines())-1].get_xdata()
+        peak_x = kde_xdata[ax.get_lines()[len(ax.get_lines())-1].get_ydata().argmax()]
+        common_conf.iloc[index,2] = peak_x
+    else:
+        print("Less than 5 cells, not calculated")
+
+plt.xlabel('1st - 2nd annotation confidence')
+plt.savefig(ctconf + '/all_CellTypist_second_over_first.png', bbox_inches='tight')
+plt.clf()
+
+common_conf.to_csv(ctconf + '/CellTypist_Elmentaite_all_common_anno_conf.csv')
+
+# Print those with poor annotation ( < 0.5)
+common_conf[common_conf.common_conf < 0.5]
+
+# Plot these, coloured within category and highlighting bad
+common_conf['plot_label'] = common_conf.apply(lambda row: row['Elm_top_guess'] if row['common_conf'] < 0.5 else None, axis=1)
+subset_df = common_conf[common_conf.common_conf < 0.5]
+
+plt.figure(figsize=(16, 12))
+sns.scatterplot(data=common_conf, x='ncells', y='common_conf', s=100, edgecolor='k')
+for i, row in subset_df.iterrows():
+    plt.text(row['ncells'], row['common_conf'], row['plot_label'],rotation=25, fontsize=10, ha='left', va='bottom', color='black')
+
+plt.xlabel('Number of cells',fontsize=14)
+plt.ylabel('Common confidence', fontsize=14)
+plt.savefig(ctconf + '/first_less_second_conf_vs_ncells.png', bbox_inches='tight')
+plt.clf()
+
+
