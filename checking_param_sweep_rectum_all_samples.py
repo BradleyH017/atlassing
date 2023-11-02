@@ -39,15 +39,36 @@ status="healthy"
 category="All_not_gt_subset"
 param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
 
-# include the 11 high cell samples?
-inc_high_cell_samps = False
-if inc_high_cell_samps == True:
-    nn_file=param_sweep_path + "/inc_11_high_cell_samps/NN_{}_scanvi.adata".format(n)
-else:
-    nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
+# Load batched file
+objpath = data_name + "/" + status + "/" + category + "/objects"
+batched_file = objpath + "/adata_PCAd_batched.h5ad"
+adata = ad.read_h5ad(batched_file)
 
-# Load NN file
-adata = ad.read_h5ad(nn_file)
+# Recomput UMAP if not done, do this for all batch correction methods
+SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
+SCANVI_LATENT_KEY = "X_scANVI"
+if not "X_umap" in adata.obsm:
+    colby = ["convoluted_samplename", "category", "label"]
+    latents = [SCANVI_LATENT_KEY,
+               # "X_pca",
+               #, SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'
+               ]
+    for l in latents:
+        print("Working on" + l)
+        print("Performing on UMAP embedding on {}".format(l))
+        # Calculate NN (using 350) (17 nPCs from the atlassing script)
+        print("Calculating neighbours")
+        sc.pp.neighbors(adata, n_neighbors=350, n_pcs=17, use_rep=l, key_added=l + "_nn")
+        # Perform UMAP embedding
+        sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
+        adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
+        # Save a plot
+        for c in colby:
+            if c != "convoluted_samplename":
+                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
+            else:
+                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+
 
 # Recompute UMAP with percieved optimum conditions
 sc.tl.umap(adata, min_dist=min_dist, spread=spread, neighbors_key ="scVI_nn")
@@ -59,6 +80,7 @@ adata.write_h5ad(umap_file)
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
 figpath = data_name + "/" + status + "/" + category + "/figures"
 tabdir = data_name + "/" + status + "/" + category + "/tables"
+plt.gcf().set_dpi(300)
 
 # Plot categories, labels, samples
 sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_category.png")
@@ -95,7 +117,7 @@ adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True,
 sc.pl.umap(adata, color="CellTypist:Intestinal_Elmentaite:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestinal_elmentaite_majority.png")
 
 # Histogram of ngenes expressed
-cats=np.unique(adat.obs.category)
+cats=np.unique(adata.obs.category)
 plt.figure(figsize=(8, 6))
 fig,ax = plt.subplots(figsize=(8,6))
 for c in cats:
@@ -519,20 +541,51 @@ def relative_mt_per_lineage(row):
 
 # Count the ndeviations (direction aware)
 tempdata = []
+features = ["pct_counts_gene_group__mito_transcript", "pct_counts_gene_group__ribo_protein"]
+feature_names = ["mt_perc", "ribo_perc"]
 for index,c in enumerate(lins):
     print(c)
     temp = adata[adata.obs.lineage == c]
-    mt_perc=temp.obs["pct_counts_gene_group__mito_transcript"]
-    absolute_diff = np.abs(mt_perc - np.median(mt_perc))
-    mad = np.median(absolute_diff)
-    nmads = (mt_perc - np.median(mt_perc))/mad
-    # Apply the function to change values in 'new_column' based on criteria
-    temp.obs['mt_perc_nmads'] = nmads
+    for id2, f in enumerate(features):
+        feature = temp.obs[features[id2]]
+        absolute_diff = np.abs(feature - np.median(feature))
+        mad = np.median(absolute_diff)
+        nmads = (feature - np.median(feature))/mad
+        temp.obs[feature_names[id2] + "_nmads"] = nmads
     tempdata.append(temp)
 
 to_add = ad.concat(tempdata)
 to_add = to_add.obs
-adata.obs = adata.obs.merge(to_add[['mt_perc_nmads']], left_index=True, right_index=True)
+adata.obs = adata.obs.merge(to_add[[feature_names[0] + "_nmads", feature_names[1] + "_nmads"]], left_index=True, right_index=True)
+
+
+# Plotting RP% per lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    temp = adata[adata.obs.lineage == l]
+    sns.distplot(temp.obs['pct_counts_gene_group__ribo_protein'], hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('RP% per lineage')
+plt.xlabel('RP%')
+ax.set(xlim=(0, 50))
+plt.savefig(figpath + '/lin_rp_perc.png', bbox_inches='tight')
+plt.clf()
+
+# Plot the distribution of MADs for each lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    temp = adata[adata.obs.lineage == l]
+    sns.distplot(temp.obs['ribo_perc_nmads'], hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Median absolute deviations of MT% per lineage')
+plt.xlabel('Median absolute deviation')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/lin_rp_per_mads.png', bbox_inches='tight')
+plt.clf()
 
 # Plotting MT% per lineage
 plt.figure(figsize=(8, 6))
@@ -564,13 +617,15 @@ plt.clf()
 
 # How would a cut off of 2.5 affect cell proportions
 relative_threshold = 2.5
-adata.obs['abs_mt_perc_nmads'] = np.abs(adata.obs['mt_perc_nmads'])
-adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)] = adata.obs['abs_mt_perc_nmads'] > relative_threshold
-adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)] = adata.obs['abs_mt_perc_nmads_gt' + str(relative_threshold)].astype('category')
-sc.pl.umap(adata, color='abs_mt_perc_nmads_gt' + str(relative_threshold), frameon=False , title='abs_mt_perc_nmads_gt' + str(relative_threshold), save="_post_batch_post_sweep_post_abs_mt_perc_nmads_gt" + str(relative_threshold) +".png")
-for c in cats:
-    tempadata = adata[adata.obs.category == c]
-    sc.pl.umap(tempadata, color='abs_mt_perc_nmads_gt' + str(relative_threshold), frameon=False , title=c + '_abs_mt_perc_nmads_gt' + str(relative_threshold), save="_" + c + "_post_batch_post_sweep_post_abs_mt_perc_nmads_gt" + str(relative_threshold) +".png")
+for f in feature_names:
+    adata.obs['abs_' + f + '_nmads'] = np.abs(adata.obs[f + '_nmads'])
+    adata.obs['abs_' + f + '_nmads'] = np.abs(adata.obs['abs_' + f + '_nmads'])
+    adata.obs['abs_' + f + '_nmads' + '_gt' + str(relative_threshold)] = adata.obs['abs_' + f + '_nmads'] > relative_threshold
+    adata.obs['abs_' + f + '_nmads' + '_gt' + str(relative_threshold)] = adata.obs['abs_' + f + '_nmads' + '_gt' + str(relative_threshold)].astype('category')
+    sc.pl.umap(adata, color='abs_' + f + '_nmads' + '_gt' + str(relative_threshold), frameon=False , title='abs_' + f + '_nmads' + '_gt' + str(relative_threshold), save="_post_batch_post_sweep_post_abs_" + f + '_nmads' + '_gt' + str(relative_threshold) +".png")
+    for c in cats:
+        tempadata = adata[adata.obs.category == c]
+        sc.pl.umap(tempadata, color='abs_' + f + '_nmads' + '_gt' + str(relative_threshold), frameon=False , title=c + '_' + 'abs_' + f + '_nmads' + '_gt' + str(relative_threshold), save="_" + c + "_post_batch_post_sweep_post_abs_" + f + '_nmads' + '_gt' + str(relative_threshold) +".png")
 
 # Have a look per category
 for c in cats:
@@ -592,6 +647,10 @@ plt.savefig(figpath + '/postqc_mtperc_per_cat.png', bbox_inches='tight')
 plt.clf()
 
 # Fit a gaussian mixture model to this data
+# What if we subset for cels with MT% > 0.5
+not_low = adata[adata.obs.pct_counts_gene_group__mito_transcript > 0.5]
+sc.pl.umap(not_low, color='category', frameon=False , title="MT% > 0.5", save="_post_batch_post_sweep_mt_gt_0.5.png")
+
 from scipy import stats
 from sklearn.mixture import GaussianMixture
 from scipy.stats import norm
@@ -662,6 +721,64 @@ gene_symb = ["EPCAM", "CDH1", "KRT19", "MZB1", "JCHAIN"]
 for index, g in enumerate(gene_symb):
     sc.pl.umap(adata[adata.obs.category == "B Cell plasma"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_BCP.png")
     sc.pl.umap(adata[adata.obs.category == "Enterocyte"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Enterocytes.png")
+
+# What if we have a look at this on the basis of RP%
+
+from scipy import stats
+from sklearn.mixture import GaussianMixture
+from scipy.stats import norm
+from sympy import symbols, Eq, solve
+from sklearn.preprocessing import StandardScaler
+from scipy.optimize import fsolve
+from scipy.optimize import brentq
+for c in cats:
+    # Extract data
+    data = adata.obs[adata.obs.category == c].pct_counts_gene_group__ribo_protein.values.reshape(-1, 1)
+    # Scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data.reshape(-1, 1)).flatten()
+    # 1. Fit a GMM with multiple initializations
+    gmm = GaussianMixture(n_components=2, n_init=10).fit(scaled_data.reshape(-1, 1))
+    # Convert means and variances back to original space
+    original_means = scaler.inverse_transform(gmm.means_).flatten()
+    original_variances = gmm.covariances_.flatten() * (scaler.scale_**2)
+    # 2. Calculate fold change
+    fold_change = max(original_means) / min(original_means)
+    log_fold_change = np.log2(fold_change)
+    print("Fold Change:", fold_change)
+    print("Log2 Fold Change:", log_fold_change)
+    # 3. Plot the data
+    x = np.linspace(min(data), max(data), 1000)
+    scaled_x = scaler.transform(x.reshape(-1, 1)).flatten()
+    weights = gmm.weights_
+    pdf1 = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((x-original_means[0])**2)/original_variances[0])
+    pdf2 = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((x-original_means[1])**2)/original_variances[1])
+    total_pdf = pdf1 + pdf2
+    plt.hist(data, bins=30, density=True, alpha=0.5, label='Data')
+    plt.plot(x, pdf1, label='Distribution 1')
+    plt.plot(x, pdf2, label='Distribution 2')
+    plt.plot(x, total_pdf, 'k--', label='Mixture Model')
+    plt.legend()
+    plt.title(f"{c}: RP percentage mixture models, FC={fold_change:.4f}")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    plt.savefig(figpath + '/mixture_model_RP_perc_postqc_' + c + '.png', bbox_inches='tight')
+    plt.clf()
+    # If FC > 10:, find the intersection
+    if fold_change > 10:
+        def difference(z):
+            pdf1_val = weights[0] * (1/(np.sqrt(2*np.pi*original_variances[0]))) * np.exp(-0.5 * ((z-original_means[0])**2)/original_variances[0])
+            pdf2_val = weights[1] * (1/(np.sqrt(2*np.pi*original_variances[1]))) * np.exp(-0.5 * ((z-original_means[1])**2)/original_variances[1])
+            return pdf1_val - pdf2_val
+            
+            # Define a function that restricts the search space to values less than 10
+        lower_bound = 0
+        upper_bound = 10
+        try:
+            intersection = brentq(difference, lower_bound, upper_bound)
+            print("Intersection:", intersection)
+        except ValueError:
+            print("No intersection found in the given range.")
 
 
 
