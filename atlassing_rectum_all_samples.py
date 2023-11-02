@@ -678,6 +678,12 @@ scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
 SCANVI_LATENT_KEY = "X_scANVI"
 adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
+# Save pre-benchmark (& Harmony) - may be causing issues
+if os.path.exists(objpath) == False:
+    os.mkdir(objpath)
+
+adata.write(objpath + "/adata_PCAd_batched.h5ad")
+
 # 4. Harmony
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
 sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
@@ -687,28 +693,6 @@ if os.path.exists(objpath) == False:
     os.mkdir(objpath)
 
 adata.write(objpath + "/adata_PCAd_batched.h5ad")
-
-
-# Bench marking of the batch effect correction (using experiment id as I believe convoluted samplename gets re-written at some point)
-bm = Benchmarker(
-    adata,
-    batch_key="experiment_id",
-    label_key="label",
-    embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
-    n_jobs=1,
-    pre_integrated_embedding_obsm_key="X_pca"
-)
-bm.benchmark()
-
-# Get the results out
-df = bm.get_results(min_max_scale=False)
-print(df)
-# Save 
-df.to_csv(tabdir + "/integration_benchmarking.csv")
-df1 = df.drop('Metric Type')
-top = df1[df1.Total == max(df1.Total.values)].index
-print("The method with the greatest overall score is: ")
-print(str(top.values))
 
 # Compute NN and UMAP using the recommended number of PCs
 # Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
@@ -732,8 +716,24 @@ for l in latents:
         else:
             sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
 
-# Save the ouput adata file
-if os.path.exists(objpath) == False:
-    os.mkdir(objpath)
 
-adata.write(objpath + "/adata_batch_correct_array.h5ad")
+# Bench marking of the batch effect correction (using experiment id as I believe convoluted samplename gets re-written at some point)
+bm = Benchmarker(
+    adata,
+    batch_key="experiment_id",
+    label_key="label",
+    embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
+    n_jobs=1,
+    pre_integrated_embedding_obsm_key="X_pca"
+)
+bm.benchmark()
+
+# Get the results out
+df = bm.get_results(min_max_scale=False)
+print(df)
+# Save 
+df.to_csv(tabdir + "/integration_benchmarking.csv")
+df1 = df.drop('Metric Type')
+top = df1[df1.Total == max(df1.Total.values)].index
+print("The method with the greatest overall score is: ")
+print(str(top.values))
