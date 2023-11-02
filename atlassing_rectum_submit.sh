@@ -19,3 +19,7 @@ cd scripts/scRNAseq/Atlassing/
 python atlassing_rectum_all_samples.py
 # bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q long -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
 
+
+# Running on GPUs
+# bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q gpu-huge -gpu - -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
+

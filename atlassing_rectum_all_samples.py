@@ -641,13 +641,15 @@ pca.to_csv(tabdir + "/PCA_up_to_knee.csv")
 adata.write(objpath + "/adata_PCAd.h5ad")
 
 
-###################################
+####################################
 ######## Batch correction ##########
 ####################################
 
 # 1. scVI
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
 # Configure this to run on  GPU
+from pytorch_lightning import Trainer
+Trainer(accelerator="cuda")
 scvi.settings.dl_pin_memory_gpu_training =  True
 scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
 model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
@@ -658,7 +660,7 @@ adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
 # 2. scVI - default_metrics
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
 model_default = scvi.model.SCVI(adata)
-model_default.train()
+model_default.train(use_gpu=True)
 SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
 adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
 
@@ -672,7 +674,7 @@ scanvi_model = scvi.model.SCANVI.from_scvi_model(
     labels_key="lineage",
     unlabeled_category="Unknown",
 )
-scanvi_model.train(max_epochs=20, n_samples_per_label=100)
+scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
 SCANVI_LATENT_KEY = "X_scANVI"
 adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
@@ -718,54 +720,20 @@ latents = ["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY,
 for l in latents:
     print("Performing on UMAP embedding on {}".format(l))
     # Calculate NN (using 350)
+    print("Calculating neighbours")
     sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=l, key_added=l + "_nn")
     # Perform UMAP embedding
     sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
+    adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
     # Save a plot
     for c in colby:
-        sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
+        if c != "convoluted_samplename":
+            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
+        else:
+            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
 
 # Save the ouput adata file
 if os.path.exists(objpath) == False:
     os.mkdir(objpath)
 
 adata.write(objpath + "/adata_batch_correct_array.h5ad")
-
-# Pre-emptively compute the NN embedding using 350 neighbours and custom min_dist and spread parameters
-# Used to do this after parameter sweep, but these paramaters usually looked pretty good
-knee = pd.read_csv("rectum/" + status + "/" + category + "/knee.txt")
-knee = float(knee.columns[0])
-knee=int(knee)
-nPCs=knee+5
-print(nPCs)
-# Compute NN
-n="350"
-n=int(n)
-SCVI_LATENT_KEY = "X_scVI"
-sc.pp.neighbors(adata, n_neighbors=n, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
-param_sweep_path = "rectum/" + status + "/" + category + "/objects/adata_objs_param_sweep"
-nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
-adata.write_h5ad(nn_file)
-# Compute UMAP 
-sc.tl.umap(adata, min_dist=0.5, spread=0.5, neighbors_key ="scVI_nn")
-# Save 
-umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
-adata.write_h5ad(umap_file)
-
-
-#adata.obs['id_run'] = adata.obs.id_run.astype('category')
-adata.obs['convoluted_samplename'] = adata.obs.id_run.astype('category')
-#sc.pl.umap(adata, color = "id_run", save="_id_run_NN.png")
-sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_NN.png", palette=list(mp.colors.CSS4_COLORS.values()))
-# Now using batch effect corrected annotation
-sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=SCVI_LATENT_KEY, key_added="scVI_nn")
-sc.tl.umap(adata, neighbors_key ="scVI_nn", min_dist=0.5, spread=0.5)
-sc.pl.umap(adata, color = "label", save="_" + SCVI_LATENT_KEY + ".png")
-sc.pl.umap(adata, color = "convoluted_samplename", save="_sample_" + SCVI_LATENT_KEY + ".png")
-
-# Save the scANVI matrix
-scanvi = pd.DataFrame(adata.obsm[SCVI_LATENT_KEY])
-scanvi = scanvi.iloc[:,0:knee_point]
-scanvi.index = adata.obs.index
-scanvi.to_csv(tabdir + "/scVI_up_to_knee.csv")
-
