@@ -48,7 +48,16 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, precision_score
+import torch
+from pytorch_lightning import Trainer
+Trainer(accelerator="cuda")
+import tensorflow as tf
 print("Loaded libraries")
+
+# Define plotting options
+sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
+sc.logging.print_header()
+sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
 
 # Define options
 data_name="rectum"
@@ -61,6 +70,11 @@ param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_o
 nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
 umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
 adata = ad.read_h5ad(umap_file)
+# If testing (!) third the data being used 
+testing = True
+if testing == True:
+    sc.pp.subsample(adata, 0.3)
+
 all_high_qc = adata
 # NN on scVI-corrected components have already been computed for this
 
@@ -68,8 +82,8 @@ all_high_qc = adata
 ################# Clustering all data #####################
 ###########################################################
 
-# Perform leiden clustering across a range of resolutions
-resolution = "0.5"
+# Perform leiden clustering across a range of resolutions (the exact parameter for this will be inhereted by this script)
+resolution = "0.1"
 sc.tl.leiden(adata, resolution = float(resolution), neighbors_key = "scVI_nn")
 
 # Save a dataframe of the cells and their annotation
@@ -84,6 +98,15 @@ if os.path.exists(outdir) == False:
     os.mkdir(outdir)
 
 res.to_csv(outdir + "leiden_" + resolution + ".csv")
+
+# Plot cells by their leiden annotation at this resolution
+sc.settings.figdir=outdir
+sc.pl.umap(adata, color = "leiden_" + resolution, frameon=False, legend_loc='on data', title="leiden_" + resolution, save= "_leiden_" + resolution + ".png"  )
+# How does that compare to the categories?
+file_path = outdir + "umap_category.png"
+if os.path.exists(file_path) != True:
+    sc.pl.umap(adata, color = "category", frameon=False, legend_loc='on data', title="category", save= "_category.png")
+
 
 ###########################################################
 ####### Downsample clustered data for grid search #########
@@ -114,7 +137,7 @@ scaler = preprocessing.StandardScaler(
 X_std = scaler.fit_transform(np.asarray(X))
 adata.layers['X_std'] = X_std
 
-# Now build model to predict the expression of the remaining cells from the 
+# Now build model to predict the expression of the remaining cells from these
 X = adata.layers['X_std']
 y = res[['leiden_' + resolution]]
 cellmask = res.col.isin(adata.obs.index).values
@@ -193,7 +216,7 @@ n_splits = 5
 
 # 3. Perform grid search using GridSearchCV
 grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=n_splits)
-grid_result = grid.fit(X_train, Y_train)
+grid_result = grid.fit(X_train, Y_train, batch_size=5)
 
 # Print the best parameters and their corresponding accuracy
 print(f"Best: {grid_result.best_score_:.4f} using {grid_result.best_params_}")
