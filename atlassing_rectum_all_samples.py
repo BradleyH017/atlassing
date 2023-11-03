@@ -659,7 +659,7 @@ adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
 
 # 2. scVI - default_metrics
 print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
-model_default = scvi.model.SCVI(adata)
+model_default = scvi.model.SCVI(adata,  n_latent=30)
 model_default.train(use_gpu=True)
 SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
 adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
@@ -700,7 +700,7 @@ adata.write(objpath + "/adata_PCAd_batched.h5ad")
 # Using non-corrected matrix
 # Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here) - Do this based on all embeddings
 colby = ["convoluted_samplename", "category", "label"]
-latents = ["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony']
+latents = ["X_pca", SCVI_LATENT_KEY, SCANVI_LATENT_KEY, 'X_pca_harmony', SCVI_LATENT_KEY_DEFAULT]
 for l in latents:
     print("Performing on UMAP embedding on {}".format(l))
     # Calculate NN (using 350)
@@ -715,6 +715,8 @@ for l in latents:
             sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
         else:
             sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+    # Overwite file after each 
+    adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
 
 # Bench marking of the batch effect correction (using experiment id as I believe convoluted samplename gets re-written at some point)
