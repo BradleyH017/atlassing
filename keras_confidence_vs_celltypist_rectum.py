@@ -34,7 +34,7 @@ objpath = catpath + "/objects"
 sc.settings.figdir=figpath
 
 # Load in the rectum object (post processing)data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
-adata = ad.read_h5ad(objpath + "/adata_objs_param_sweep/NN_350_scanvi_umap.adata")
+adata = ad.read_h5ad(objpath + "/adata_PCAd_batched.h5ad")
 samples = np.unique(adata.obs.experiment_id)
 import re
 def remove_char(lst, char):
@@ -113,7 +113,24 @@ plt.xlabel('Distribution of annotation confidence')
 plt.savefig(kerasconf + '/keras_top_confidence_distribution.png', bbox_inches='tight')
 plt.clf()
 
-
+# Plot the distribution of first + second condience 
+ktop3['first_second'] = ktop3.first_confidence + ktop3.second_confidence
+cats = np.unique(adata.obs.category)
+for c in cats:
+    labels = np.unique(adata.obs[adata.obs.category == c].label)
+    plt.figure(figsize=(8, 6))
+    fig,ax = plt.subplots(figsize=(8,6))
+    for l in labels:
+        idx = adata.obs.label == l
+        dat = ktop3.first_second[idx]
+        sns.distplot(dat, hist=False, rug=True, label=l)
+    plt.legend()
+    ax.set(xlim=(0, 1))
+    plt.title(c)
+    plt.xlabel('1st + 2nd annotation confidence')
+    plt.savefig(kerasconf + '/' + c + '_keras_second_and_first.png', bbox_inches='tight')
+    plt.clf()
+# This isn't actually very informative
 
 # Plot the proportion of the second versus the first annotation, within category and annotated by cell-type
 cats = np.unique(adata.obs.category)
