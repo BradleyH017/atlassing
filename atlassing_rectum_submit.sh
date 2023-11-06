@@ -3,7 +3,7 @@
 #BSUB -e logs/preprocessing-%J-error.log 
 #BSUB -q normal
 #BSUB -G team152
-#BSUB -n 4
+#BSUB -n 30
 #BSUB -M 200000
 #BSUB -a "memlimit=True"
 #BSUB -R "select[mem>200000] rusage[mem=200000] span[hosts=1]"
