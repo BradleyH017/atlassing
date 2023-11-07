@@ -53,6 +53,8 @@ from pytorch_lightning import Trainer
 Trainer(accelerator="cuda")
 import tensorflow as tf
 print("Loaded libraries")
+seed_value = 17
+np.random.seed(seed_value)
 
 # Define plotting options
 sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
@@ -65,15 +67,14 @@ status="healthy"
 category="All_not_gt_subset"
 
 # Load in the data we want to use here (This has been through the atlassing pre-processing script, then checked and subject to parameter sweep)
-n="350"
-param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
-nn_file=param_sweep_path + "/NN_{}_scanvi.adata".format(n)
-umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
-adata = ad.read_h5ad(umap_file)
-# If testing (!) third the data being used 
+objpath = data_name + "/" + status + "/" + category + "/objects"
+batched_file = objpath + "/adata_PCAd_batched.h5ad"
+# If testing (!) load in a subset of the original data
 testing = True
 if testing == True:
-    sc.pp.subsample(adata, 0.3)
+    adata = ad.read_h5ad(objpath + "/adata_PCAd_batched_0.1.h5ad")
+else:
+    adata = ad.read_h5ad(batched_file)
 
 all_high_qc = adata
 # NN on scVI-corrected components have already been computed for this
@@ -83,8 +84,11 @@ all_high_qc = adata
 ###########################################################
 
 # Perform leiden clustering across a range of resolutions (the exact parameter for this will be inhereted by this script)
+# Using the X_scVI latent reduction of the data
 resolution = "0.1"
-sc.tl.leiden(adata, resolution = float(resolution), neighbors_key = "scVI_nn")
+latent_use="X_scVI"
+adata.obsm['X_umap'] = adata.obsm['UMAP_' + latent_use]
+sc.tl.leiden(adata, resolution = float(resolution), neighbors_key = latent_use + "_nn")
 
 # Save a dataframe of the cells and their annotation
 adata.obs = adata.obs.rename(columns={'leiden': 'leiden_' + resolution})
@@ -114,8 +118,6 @@ if os.path.exists(file_path) != True:
 
 # Downsample the adata (This grid search won't be possible with ~350k cells that we have)
 # Subset to include half of the data
-seed_value = 17
-np.random.seed(seed_value)
 sc.pp.subsample(adata, 0.5)
 
 # Decide proportion to subset data with
@@ -139,9 +141,7 @@ adata.layers['X_std'] = X_std
 
 # Now build model to predict the expression of the remaining cells from these
 X = adata.layers['X_std']
-y = res[['leiden_' + resolution]]
-cellmask = res.col.isin(adata.obs.index).values
-y = y.iloc[cellmask,:]
+y = adata.obs[['leiden_' + resolution]]
 
 # One hot encode y (the cell type classes) - like making a design matrix without intercept, encoding categorical variables as numerical
 # encode class values as integers
@@ -228,6 +228,7 @@ print(f"Test Accuracy: {accuracy:.4f}")
 
 # Extract the desired parameters for the model at this resolution of clustering
 best_params = grid_result.best_params_
+print(best_params)
 
 ###########################################################
 #### Now apply this model to the rest of the data #########
@@ -247,7 +248,7 @@ adata.layers['X_std'] = X_std
 
 # Re-format the Y outcome
 X = adata.layers['X_std']
-y = res[['leiden_' + resolution]]
+y = adata.obs[['leiden_' + resolution]]
 label_encoder = LabelEncoder()
 Y_encoded = label_encoder.fit_transform(y)
 Y_encoded = Y_encoded.reshape(-1, 1)  # Reshape for one-hot encoding
@@ -287,6 +288,13 @@ def create_model(optimizer=optimizer, activation=activation, epochs = epochs, lo
 
 model = KerasClassifier(build_fn=create_model, verbose=0)
 history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test))
+
+
+
+
+
+
+
 
 # HERE ###########
 
