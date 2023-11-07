@@ -38,49 +38,48 @@ data_name="rectum"
 status="healthy"
 category="All_not_gt_subset"
 param_sweep_path = data_name + "/" + status + "/" + category + "/objects/adata_objs_param_sweep"
+statpath = "rectum/" + status
+catpath = statpath + "/" + category
+figpath = catpath + "/figures"
+tabdir = catpath + "/tables"
 
 # Load batched file
 objpath = data_name + "/" + status + "/" + category + "/objects"
 batched_file = objpath + "/adata_PCAd_batched.h5ad"
 adata = ad.read_h5ad(batched_file)
 
-# Recomput UMAP if not done, do this for all batch correction methods
-SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
-SCANVI_LATENT_KEY = "X_scANVI"
-if not "X_umap" in adata.obsm:
-    colby = ["convoluted_samplename", "category", "label"]
-    latents = [SCANVI_LATENT_KEY,
-               # "X_pca",
-               #, SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'
-               ]
-    for l in latents:
-        print("Working on" + l)
-        print("Performing on UMAP embedding on {}".format(l))
-        # Calculate NN (using 350) (17 nPCs from the atlassing script)
-        print("Calculating neighbours")
-        sc.pp.neighbors(adata, n_neighbors=350, n_pcs=17, use_rep=l, key_added=l + "_nn")
-        # Perform UMAP embedding
-        sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
-        adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
-        # Save a plot
-        for c in colby:
-            if c != "convoluted_samplename":
-                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
-            else:
-                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+# Summary of the best integration method
+metrics = pd.read_csv(tabdir + "/integration_benchmarking.csv", index_col=0)
+metrics_plot = metrics.iloc[:-1,].astype(float)
 
+# Plot these
+plt.figure(figsize=(14, 6))  # Set the figure size
+sns.heatmap(metrics_plot, annot=True, cmap='coolwarm', linewidths=0.5)
+plt.axvline(x=5, color='black', linewidth=3)
+plt.axvline(x=10, color='black', linewidth=3)
+plt.axvline(x=12, color='black', linewidth=3)
+plt.title('Summary of integration metrics')
+plt.xlabel('Integration metric')
+plt.xticks(rotation=45, ha="right")
+plt.yticks(rotation=90)
+plt.savefig(figpath + '/Integration_metric_summary.png', bbox_inches='tight')
+plt.clf()
 
-# Recompute UMAP with percieved optimum conditions
-sc.tl.umap(adata, min_dist=min_dist, spread=spread, neighbors_key ="scVI_nn")
-# Save post UMAP
-umap_file = re.sub("_scanvi.adata", "_scanvi_umap.adata", nn_file)
-adata.write_h5ad(umap_file)
+metric_types = ["Bio conservation", "Batch correction"]
+for m in metric_types:
+    print(m)
+    temp = metrics.T
+    subset_df = temp[temp['Metric Type'] == m]
+    subset_means = np.mean(subset_df.iloc[:,:-1].astype(float), axis=0)
+    print(subset_means)
 
 # Define fig out dir
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
-figpath = data_name + "/" + status + "/" + category + "/figures"
-tabdir = data_name + "/" + status + "/" + category + "/tables"
-plt.gcf().set_dpi(300)
+plt.gcf().set_dpi(500)
+
+# Decide latent variable
+latent_use="X_scVI"
+adata.obsm['X_umap'] = adata.obsm['UMAP_' + latent_use]
 
 # Plot categories, labels, samples
 sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_category.png")
@@ -129,6 +128,32 @@ plt.xlabel('nGenes expressed / cell')
 #plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
 plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category.png', bbox_inches='tight')
 plt.clf()
+
+# Check some very obvious markers across these cells
+markers = pd.read_csv("rectum/check_markers.csv")
+helm_cats = np.unique(markers.Category)
+helm_cats = np.char.mod('%s', helm_cats)
+helm_cats = np.char.replace(helm_cats, '/', '-')
+conv = pd.DataFrame(adata.var['gene_symbols'])
+conv = conv.reset_index()
+conv.columns.values[0] = "ensembl"
+markers = markers.merge(conv, on="gene_symbols")
+markers = pd.DataFrame(markers)
+markerdir=figpath + "/marker_figs"
+if not os.path.exists(markerdir):
+    os.mkdir(markerdir)
+
+sc.settings.figdir=markerdir
+for h in helm_cats:
+    print(h)
+    for m in markers[markers.Category == h].ensembl:
+        print(m)
+        sc.pl.umap(adata, color=m, title=np.array_str(markers[markers.ensembl == m].gene_symbols.values), frameon=True, save="_post_batch_post_sweep_" + h + "_" + np.array_str(markers[markers.ensembl == m].gene_symbols.values) + ".png")
+
+
+
+sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
+
 
 #####################################################
 ######## Investigation of low MT% Immune ############
@@ -234,17 +259,54 @@ adata.obs['ig_perc'] = ig_perc
 sc.pl.umap(adata, color="ig_perc", frameon=True, save="_post_batch_post_sweep_igperc.png")
 
 
-# Plot within category, coloured by keras confidence, label, MTperc
+# Plot within category, coloured by keras confidence, label, MTperc, for each embedding
+latents = metrics.index[:-1].values
 cats = np.unique(adata.obs.category)
-for c in cats:
-    print(c)
-    temp = adata[adata.obs.category == c]
-    sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_keras_conf.png")
-    sc.pl.umap(temp, color="label", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_label.png")
-    sc.pl.umap(temp, color="pct_counts_gene_group__mito_transcript", title=c, frameon=False , save="_" + c + "_post_batch_post_sweep_mt_perc.png")
-    sc.pl.umap(temp, color="n_genes_by_counts", frameon=True, save="_" + c + "_post_batch_post_ngenes.png")
-    sc.pl.umap(temp, color="log10ngenes", frameon=True, save="_" + c + "_post_batch_log10ngenes.png")
-    sc.pl.umap(temp, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_" + c + "_post_batch_rp_perc.png")
+for l in latents:
+    print(l)
+    adata.obsm['X_umap'] = adata.obsm['UMAP_' + l]
+    for c in cats:
+        print(c)
+        temp = adata[adata.obs.category == c]
+        sc.pl.umap(temp, color="Keras:predicted_celltype_probability", title=c, frameon=False, save="_" + l + "_" + c + "_post_batch_post_sweep_keras_conf.png")
+        sc.pl.umap(temp, color="label", title=c, frameon=False , save="_" + l + "_" + c + "_post_batch_post_sweep_label.png")
+        sc.pl.umap(temp, color="pct_counts_gene_group__mito_transcript", title=c, frameon=False , save="_" + l + "_" + c + "_post_batch_post_sweep_mt_perc.png")
+        sc.pl.umap(temp, color="n_genes_by_counts", frameon=True, save="_" + l + "_" + c + "_post_batch_post_ngenes.png")
+        sc.pl.umap(temp, color="log10ngenes", frameon=True, save="_" + l + "_" + c + "_post_batch_log10ngenes.png")
+        sc.pl.umap(temp, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_" + l + "_" + c + "_post_batch_rp_perc.png")
+
+# Has created lots of files. Sort these out
+import shutil
+for l in latents:
+    print(l)
+    lfigdir=figpath + "/" + l
+    print(lfigdir)
+    if not os.path.exists(lfigdir):
+        os.mkdir(lfigdir)
+    files = os.listdir(figpath)
+    for file in files:
+        if l in file and ".png" in file:
+            print(file)
+            src = os.path.join(figpath, file)
+            dest = os.path.join(lfigdir, file)
+            shutil.move(src, dest)
+            print("Moved")
+
+# Correct "X_pca_harmony" and "X_scVI_default"
+for file in os.listdir("rectum/healthy/All_not_gt_subset/figures/X_pca"):
+    if "harmony" in file:
+        src = os.path.join("rectum/healthy/All_not_gt_subset/figures/X_pca", file)
+        dest = os.path.join("rectum/healthy/All_not_gt_subset/figures/X_pca_harmony", file)
+        shutil.move(src, dest)
+        print("Moved")
+
+for file in os.listdir("rectum/healthy/All_not_gt_subset/figures/X_scVI"):
+    if "default" in file:
+        src = os.path.join("rectum/healthy/All_not_gt_subset/figures/X_scVI", file)
+        dest = os.path.join("rectum/healthy/All_not_gt_subset/figures/X_scVI_default", file)
+        shutil.move(src, dest)
+        print("Moved")
+        
 
 #####################################################
 ######## Exploration of B cell plasma cells #########
