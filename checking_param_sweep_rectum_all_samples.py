@@ -73,6 +73,24 @@ for m in metric_types:
     subset_means = np.mean(subset_df.iloc[:,:-1].astype(float), axis=0)
     print(subset_means)
 
+# Also have a look at if we remove the bad annotations
+metrics = pd.read_csv(tabdir + "/integration_benchmarking_confident_annotations_only.csv", index_col=0)
+metrics_plot = metrics.iloc[:-1,].astype(float)
+
+# Plot these
+plt.figure(figsize=(14, 6))  # Set the figure size
+sns.heatmap(metrics_plot, annot=True, cmap='coolwarm', linewidths=0.5)
+plt.axvline(x=5, color='black', linewidth=3)
+plt.axvline(x=10, color='black', linewidth=3)
+plt.axvline(x=12, color='black', linewidth=3)
+plt.title('Summary of integration metrics - Confidence annotations only')
+plt.xlabel('Integration metric')
+plt.xticks(rotation=45, ha="right")
+plt.yticks(rotation=90)
+plt.savefig(figpath + '/Integration_metric_summary_conf_only.png', bbox_inches='tight')
+plt.clf()
+
+
 # Define fig out dir
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
 plt.gcf().set_dpi(500)
@@ -126,7 +144,21 @@ plt.legend(bbox_to_anchor=(1.0, 1.0))
 plt.title('Distribution of ngenes expressed')
 plt.xlabel('nGenes expressed / cell')
 #plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
-plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category.png', bbox_inches='tight')
+plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category_after_QC.png', bbox_inches='tight')
+plt.clf()
+
+# Do this per lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+lins = np.unique(adata.obs.lineage)
+for l in lins:
+    sns.distplot(adata.obs[adata.obs.lineage == l].n_genes_by_counts, hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of ngenes expressed')
+plt.xlabel('nGenes expressed / cell')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/ngenes_expressed_per_cell_per_lineage_after_QC.png', bbox_inches='tight')
 plt.clf()
 
 # Check some very obvious markers across these cells
@@ -154,7 +186,82 @@ for h in helm_cats:
 
 sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
 
+####################################################################
+#### Investigation of ngenes detected in each category/lineage #####
+####################################################################
+# Looks like there is a population of cells with relatively low ngenes expressed in Epithelium
+# And these seem to overlap with those from the B Cell plasma with relatively high ngenes expressed in B cell plasma
+# Plot the nMADs of these per category and lineage
+feature="n_genes_by_counts"
+lins = np.unique(adata.obs.lineage)
+tempdata = []
+for index,c in enumerate(lins):
+    print(c)
+    temp = adata[adata.obs.lineage == c]
+    counts=temp.obs[feature]
+    absolute_diff = np.abs(counts - np.median(counts))
+    mad = np.median(absolute_diff)
+    # Use direction aware filtering
+    nmads = (counts - np.median(counts))/mad
+    # Apply the function to change values in 'new_column' based on criteria
+    temp.obs[feature + "_nmads"] = nmads
+    # Also for absolute nMADs
+    nmads_abs = absolute_diff/mad
+    temp.obs["abs_" +  feature + "_nmads"] = nmads_abs
+    tempdata.append(temp)
 
+to_add = ad.concat(tempdata)
+to_add = to_add.obs
+adata.obs = adata.obs.merge(to_add[[feature + "_nmads", "abs_" +  feature + "_nmads"]], left_index=True, right_index=True)
+
+# Plot this per lineage and overall
+sc.pl.umap(adata, color=feature + "_nmads", title="nGenes_nMads", frameon=True, save="_post_batch_post_sweep_nGenes_nMads.png")
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color=feature + "_nmads", title=l + " nGenes_nMads", frameon=True, save="_post_batch_post_sweep_" + l + "_nGenes_nMads.png")
+
+# Plot as a distribution (direction aware)
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+lins = np.unique(adata.obs.lineage)
+for l in lins:
+    sns.distplot(adata.obs[adata.obs.lineage == l].n_genes_by_counts_nmads, hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of ngenes expressed (nMADs)')
+plt.xlabel('nMAD Genes expressed / cell')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/ngenes_expressed_per_cell_per_lineage_after_QC_nMads.png', bbox_inches='tight')
+plt.clf()
+
+# If we were to set a threshold of -2.5 and +2.5 nMAds? (so an absolute of 2.5, like the MT%)
+min, max = -2.5,2.5
+adata.obs['ngene_nMads_keep'] = (adata.obs.n_genes_by_counts_nmads > min) & (adata.obs.n_genes_by_counts_nmads < max)
+adata.obs['ngene_nMads_keep'] = adata.obs['ngene_nMads_keep'].astype('category')
+sc.pl.umap(adata, color='ngene_nMads_keep', title="nGenes_nMads_keep", frameon=True, save="_post_batch_post_sweep_nGenes_nMads_keep.png")
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color="ngene_nMads_keep", title=l + " ngene_nMads_keep", frameon=True, save="_post_batch_post_sweep_" + l + "_nGenes_nMads_keep.png")
+
+# Check the cells remaining if we apply this threshold
+adata_strict = adata[adata.obs.abs_n_genes_by_counts_nmads < 2.5]
+for c in cats:
+    print(c)
+    before = adata.obs[adata.obs.category == c].shape[0]
+    after = adata_strict.obs[adata_strict.obs.category == c].shape[0]
+    loss = before - after
+    loss_perc = 100*(loss/before)
+    print("From {}, we lose {} cells ({:.2f}%)".format(c, loss, loss_perc))
+    sc.pl.umap(adata_strict[adata_strict.obs.category == c], color='label', title=c + " ngene_nMads_keep (abs < 2.5)", frameon=True, save="_post_batch_post_sweep_" + c + "_nGenes_nMads_keep.png")
+
+# Check enterocyte/B Cell markers in these cells
+gene_ens = ["ENSG00000119888", "ENSG00000039068", "ENSG00000171345", "ENSG00000170476", "ENSG00000132465"]
+gene_symb = ["EPCAM", "CDH1", "KRT19", "MZB1", "JCHAIN"]
+for index, g in enumerate(gene_symb):
+    sc.pl.umap(adata[adata.obs.category == "B Cell plasma"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_BCP.png")
+    sc.pl.umap(adata[adata.obs.category == "Enterocyte"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Enterocytes.png")
+
+    
 #####################################################
 ######## Investigation of low MT% Immune ############
 #####################################################
