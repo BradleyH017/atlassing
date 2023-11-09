@@ -150,11 +150,11 @@ plt.clf()
 # Subset this
 adata = adata[adata.obs.tot_count_gt_200 == True]
 
-# 2. N gene expressed
+# 2. N gene expressed (Originally set at 100, have raised this to 300 as we see clumps of very low nGene cells from the Immune compartment [Lucia uses 400 for Immune])
 print("The number of cells initially included is", adata.n_obs)
 counts=adata.X
 ncounts_gt1=(counts >= 1).sum(axis=1)
-express_gt100 = ncounts_gt1 > 100
+express_gt100 = ncounts_gt1 > 400
 print("The number of cells with >1 count in ", np.count_nonzero(express_gt100))
 
 # Plot
@@ -261,8 +261,8 @@ mt_perc=adata.obs["pct_counts_gene_group__mito_transcript"]
 mt_perc_ls50 = mt_perc < cutoff
 adata.obs["mt_perc_less_50"] = mt_perc_ls50
 adata=adata[adata.obs.mt_perc_less_50 == True] #325,318 cells
-# Also remove those with absolutely 0 (!) MT%
-adata = adata[adata.obs.pct_counts_gene_group__mito_transcript > 0]
+# Also remove those with absolutely 0 (!) MT%. Have since repeated this but raising to 0.5 (Also helps reduce the clumping of low MT%, low nGene cells)
+adata = adata[adata.obs.pct_counts_gene_group__mito_transcript > 0.5]
 print("The number of cells that remain after filtration is", adata.n_obs)
 
 # 4. Probabilityof doublet. This has already been filtered by the yascp pipeline
@@ -566,10 +566,6 @@ to_add = ad.concat(tempdata)
 to_add = to_add.obs
 adata.obs = adata.obs.merge(to_add[[feature + "_nmads", "abs_" +  feature + "_nmads"]], left_index=True, right_index=True)
 
-sc.pl.umap(adata, color=feature + "_nmads", title="nGenes_nMads", frameon=True, save="_post_batch_post_sweep_nGenes_nMads.png")
-for l in lins:
-    print(l)
-    sc.pl.umap(adata[adata.obs.lineage == l], color=feature + "_nmads", title=l + " nGenes_nMads", frameon=True, save="_post_batch_post_sweep_" + l + "_nGenes_nMads.png")
 
 # Plot as a distribution (direction aware)
 plt.figure(figsize=(8, 6))
@@ -775,7 +771,7 @@ bm = Benchmarker(
     batch_key="experiment_id",
     label_key="label",
     embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
-    n_jobs=25,
+    n_jobs=4,
     pre_integrated_embedding_obsm_key="X_pca"
 )
 bm.benchmark()
@@ -800,7 +796,7 @@ bm = Benchmarker(
     batch_key="experiment_id",
     label_key="label",
     embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
-    n_jobs=25,
+    n_jobs=4,
     pre_integrated_embedding_obsm_key="X_pca"
 )
 bm.benchmark()
