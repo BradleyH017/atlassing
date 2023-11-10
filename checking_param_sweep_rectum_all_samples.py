@@ -99,29 +99,7 @@ plt.gcf().set_dpi(500)
 latent_use="X_scVI"
 adata.obsm['X_umap'] = adata.obsm['UMAP_' + latent_use]
 
-# Plot categories, labels, samples
-sc.pl.umap(adata, color="category",frameon=True, save="_post_batch_post_sweep_category.png")
-sc.pl.umap(adata, color="label",frameon=True, save="_post_batch_post_sweep_keras.png")
-sc.pl.umap(adata, color="bead_lot",frameon=True, save="_post_batch_post_sweep_bead_lot.png")
-sc.pl.umap(adata, color="gem_lot",frameon=True, save="_post_batch_post_sweep_gem_lot.png")
-sc.pl.umap(adata, color="convoluted_samplename", frameon=True, save="_post_batch_post_sweep_samples.png", palette=list(mp.colors.CSS4_COLORS.values()))
-adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
-sc.pl.umap(adata, color="Keras:predicted_celltype_probability", frameon=True, save="_post_batch_post_sweep_keras_conf.png")
-sc.pl.umap(adata, color="lineage", frameon=True, save="_post_batch_post_sweep_lineage.png")
-sc.pl.umap(adata, color="n_genes_by_counts", frameon=True, save="_post_batch_post_ngenes.png")
-sc.pl.umap(adata, color="pct_counts_gene_group__mito_transcript", frameon=True, save="_post_batch_mt_perc.png")
-adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
-sc.pl.umap(adata, color="log10ngenes", frameon=True, save="_post_batch_log10ngenes.png")
-sc.pl.umap(adata, color="pct_counts_gene_group__ribo_protein", frameon=True, save="_post_batch_post_batch_rp_perc.png")
-sc.pl.umap(adata, color="total_counts", frameon=True, save="_post_batch_post_batch_total_counts.png")
-adata.obs['log10_total_counts'] = np.log10(adata.obs['total_counts'])
-sc.pl.umap(adata, color="log10_total_counts", frameon=True, save="_post_batch_post_batch_log10total_counts.png")
-
-# also CellTypist annotation
-sc.pl.umap(adata, color="Celltypist:Immune_All_Low:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_low_majority.png")
-sc.pl.umap(adata, color="Celltypist:Immune_All_High:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_immune_all_high_majority.png")
-
-# Append the CellTypist annotation from the intestine (see CellTypist_rectum.py script)
+# Load in Elmentaite majority voting
 statpath = data_name + "/" + status
 catpath = statpath + "/" + category
 figpath = catpath + "/figures"
@@ -131,35 +109,51 @@ intestinal_annot = intestinal_annot.add_prefix('CellTypist:Intestinal_Elmentaite
 adata.obs.index = adata.obs.index.astype(str)
 cells = adata.obs.index
 adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True, how='left')
-sc.pl.umap(adata, color="CellTypist:Intestinal_Elmentaite:majority_voting", frameon=True, save="_post_batch_post_sweep_celltypist_intestinal_elmentaite_majority.png")
 
-# Histogram of ngenes expressed
-cats=np.unique(adata.obs.category)
-plt.figure(figsize=(8, 6))
-fig,ax = plt.subplots(figsize=(8,6))
-for c in cats:
-    sns.distplot(adata.obs[adata.obs.category == c].n_genes_by_counts, hist=False, rug=True, label=c)
+# Plot categories, labels, samples within categories, lineages and across all
+adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
+adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
+adata.obs['log10_ncounts'] = np.log10(adata.obs.total_counts)
+features = ["category", "label", "bead_lot", "gem_lot", "convoluted_samplename", "Keras:predicted_celltype_probability", "n_genes_by_counts", "log10ngenes", "log10_ncounts",
+            "pct_counts_gene_group__mito_transcript","log10ngenes", "pct_counts_gene_group__ribo_protein", "total_counts", "Celltypist:Immune_All_Low:majority_voting", 
+            "Celltypist:Immune_All_High:majority_voting", "CellTypist:Intestinal_Elmentaite:majority_voting"]
 
-plt.legend(bbox_to_anchor=(1.0, 1.0))
-plt.title('Distribution of ngenes expressed')
-plt.xlabel('nGenes expressed / cell')
-#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
-plt.savefig(figpath + '/ngenes_expressed_per_cell_per_category_after_QC.png', bbox_inches='tight')
-plt.clf()
-
-# Do this per lineage
-plt.figure(figsize=(8, 6))
-fig,ax = plt.subplots(figsize=(8,6))
+levels = ["all", "category", "lineage"]
+cats = np.unique(adata.obs.category)
 lins = np.unique(adata.obs.lineage)
-for l in lins:
-    sns.distplot(adata.obs[adata.obs.lineage == l].n_genes_by_counts, hist=False, rug=True, label=l)
+for l in levels:
+    ldir = data_name + "/" + status + "/" + category + "/figures/" + l
+    sc.settings.figdir = ldir
+    if not os.path.exists(ldir):
+        os.mkdir(ldir)
+    # Plot each of the features in this directory
+    for f in features:
+        if l == "all":
+            sc.pl.umap(adata, color=f,frameon=True, save="_post_batch_post_sweep_" + f + ".png")
+        else:
+            resolutions = np.unique(adata.obs[l])
+            for r in resolutions:
+                sc.pl.umap(adata[adata.obs[l] == r], color=f, title=r, frameon=True, save="_post_batch_post_sweep_" + f + "_" + r + ".png")
+            
+# Also plot the distributions of QC metrics
+adata.obs['log10_ncounts'] = np.log10(adata.obs.total_counts)
+metrics = ["n_genes_by_counts", "log10ngenes", "pct_counts_gene_group__mito_transcript", "log10_ncounts", "total_counts"]
+for l in levels[1:]:
+    ldir = data_name + "/" + status + "/" + category + "/figures/" + l
+    for m in metrics:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        resolutions = np.unique(adata.obs[l])
+        for r in resolutions:
+            sns.distplot(adata.obs[adata.obs[l] == r][m], hist=False, rug=True, label=r)
+        
+        plt.legend(bbox_to_anchor=(1.0, 1.0))
+        plt.title('Distribution of ' + m)
+        plt.xlabel(m + ' / cell')
+        plt.savefig(ldir + '/dist_' + m + '_per_cell_per_' + r + '_after_QC.png', bbox_inches='tight')
+        plt.clf()
 
-plt.legend(bbox_to_anchor=(1.0, 1.0))
-plt.title('Distribution of ngenes expressed')
-plt.xlabel('nGenes expressed / cell')
-#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
-plt.savefig(figpath + '/ngenes_expressed_per_cell_per_lineage_after_QC.png', bbox_inches='tight')
-plt.clf()
+
 
 # Check some very obvious markers across these cells
 markers = pd.read_csv("rectum/check_markers.csv")
@@ -182,9 +176,166 @@ for h in helm_cats:
         print(m)
         sc.pl.umap(adata, color=m, title=np.array_str(markers[markers.ensembl == m].gene_symbols.values), frameon=True, save="_post_batch_post_sweep_" + h + "_" + np.array_str(markers[markers.ensembl == m].gene_symbols.values) + ".png")
 
+# Have a couple questionable clusters, so plot the categories with their anotation over the cells
+for c in cats:
+    l="category"
+    print(c)
+    ldir = data_name + "/" + status + "/" + category + "/figures/" + l
+    sc.settings.figdir = ldir
+    sc.pl.umap(adata[adata.obs.category == c], color="label", title=c, frameon=True, legend_loc="on data", save="_post_batch_post_sweep_label_" + c + "_legend_on.png")
+
+# Make an additional set of markers to query
+others = pd.DataFrame({"label": ["T cell CD4+ PASK+ CCR7+", "T cell CD4+ PASK+ CCR7+", "T cell CD4+ PASK+ CCR7+",
+                                "Paneth cell", "Paneth cell", "Paneth cell", 
+                                "Enterocyte middle villus (1)", "Enterocyte middle villus (1)", "Enterocyte middle villus (1)",
+                                "ILC3", "ILC3", "ILC3", 
+                                "Endocrine cell", "Endocrine cell", "Endocrine cell"], 
+                       "gene_symbols": ["ST8SIA1", "AC139720.1", "SARDH", 
+                                        "LINC01819", "RASD2", "SCGB1C2",
+                                        "DUOXA2", "ZNF488", "PDX1",
+                                        "PAGE4", "TAS2R42", "GOLGA8M",
+                                        "DSCAM", "PAX4", "ST8SIA3"]})
+others = others.merge(conv, on="gene_symbols")
+others = others.merge(adata.obs[['label', 'category']], on='label', how="left")
+others.drop_duplicates(inplace=True)
+sc.settings.figdir=markerdir
+for r in range(0,others.shape[0]):
+    label=others.label.values[r]
+    cat=others.category.values[r]
+    gene_sym = others.gene_symbols.values[r]
+    ens = others.ensembl.values[r]
+    sc.pl.umap(adata[adata.obs.category == cat], color=ens, title=cat + " - " + label + " " + gene_sym, frameon=True, save="_post_batch_post_sweep_" + cat + "_" + gene_sym + ".png")
+
+# Looks like we might have found microfold cells!
+# Have a look at these markers in the data
+microfold = pd.DataFrame({"label": ["Microfold", "Microfold", "Microfold", "Microfold", "Microfold", "Microfold", "Microfold"], 
+                       "gene_symbols": ["GP2", "TNFSF11", "SPIB", "CCL9", "CCL20", "CCL23", "TFF2"], 
+                       "category": ["Enterocyte", "Enterocyte", "Enterocyte", "Enterocyte", "Enterocyte", "Enterocyte", "Enterocyte"]})
+microfold = microfold.merge(conv, on="gene_symbols")
+sc.settings.figdir=markerdir
+for r in range(0,microfold.shape[0]):
+    label=microfold.label.values[r]
+    cat=microfold.category.values[r]
+    gene_sym = microfold.gene_symbols.values[r]
+    ens = microfold.ensembl.values[r]
+    sc.pl.umap(adata[adata.obs.category == cat], color=ens, title=cat + " - " + label + " " + gene_sym, frameon=True, save="_post_batch_post_sweep_" + cat + "_" + gene_sym + ".png")
+
+# plot secretory without the CellTypist 'TA' cells to check this is what they are being labelled as
+temp = adata[adata.obs["CellTypist:Intestinal_Elmentaite:majority_voting"] != "TA"]
+sc.pl.umap(temp[temp.obs.category == "Secretory"], color="CellTypist:Intestinal_Elmentaite:majority_voting", title = "Secretory - no Elmentaite TA", frameon=True, save="_post_batch_post_sweep_Secretory_CellTypist:Intestinal_Elmentaite:majority_voting_no_TA.png")
+
+# Do these express Goblet/TA markers?
+goblets = pd.DataFrame({"label": ["Goblet cell middle villus", "Goblet cell middle villus", "Goblet cell middle villus"], 
+                       "gene_symbols": ["CLCA1", "FCGBP", "MUC2"], 
+                       "category": ["Secretory", "Secretory", "Secretory"]})
+goblets = goblets.merge(conv, on="gene_symbols")
+sc.settings.figdir=markerdir
+for r in range(0,goblets.shape[0]):
+    label=goblets.label.values[r]
+    cat=goblets.category.values[r]
+    gene_sym = goblets.gene_symbols.values[r]
+    ens = goblets.ensembl.values[r]
+    sc.pl.umap(adata[adata.obs.category == cat], color=ens, title=cat + " - " + label + " " + gene_sym, frameon=True, save="_post_batch_post_sweep_" + cat + "_" + gene_sym + ".png")
 
 
-sc.settings.figdir=data_name + "/" + status + "/" + category + "/figures"
+
+# Plotting nUMI
+lins=np.unique(adata.obs.lineage)
+adata.obs['log10_ncounts'] = np.log10(adata.obs.total_counts)
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color='total_counts', title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_nCounts.png")
+    sc.pl.umap(adata[adata.obs.lineage == l], color='log10_ncounts', title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_log10nCounts.png")
+
+# Plot distribution of nCounts per lineage
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for l in lins:
+    sns.distplot(adata.obs[adata.obs.lineage == l].log10_ncounts, hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of log10_ncounts')
+plt.xlabel('MT% / cell')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/log10_ncounts_per_cell_per_lineage_after_QC.png', bbox_inches='tight')
+plt.clf()
+
+# Fit nMAd for log10_counts?
+feature="log10_ncounts"
+lins = np.unique(adata.obs.lineage)
+tempdata = []
+for index,c in enumerate(lins):
+    print(c)
+    temp = adata[adata.obs.lineage == c]
+    counts=temp.obs[feature]
+    absolute_diff = np.abs(counts - np.median(counts))
+    mad = np.median(absolute_diff)
+    # Use direction aware filtering
+    nmads = (counts - np.median(counts))/mad
+    # Apply the function to change values in 'new_column' based on criteria
+    temp.obs[feature + "_nmads"] = nmads
+    # Also for absolute nMADs
+    nmads_abs = absolute_diff/mad
+    temp.obs["abs_" +  feature + "_nmads"] = nmads_abs
+    tempdata.append(temp)
+
+to_add = ad.concat(tempdata)
+to_add = to_add.obs
+adata.obs = adata.obs.merge(to_add[[feature + "_nmads", "abs_" +  feature + "_nmads"]], left_index=True, right_index=True)
+# Plot nMAds on the UMAP
+sc.pl.umap(adata, color=feature + "_nmads", frameon=True, save="_post_batch_post_batch_log10total_counts_nMAds.png")
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color=feature + "_nmads", title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_" + feature + "_nmads" + ".png")
+
+# If we filter on abs(nMAds) < 2.5
+adata_filt=adata[adata.obs["abs_" +  feature + "_nmads"] < 2.5]
+for l in lins:
+    print(l)
+    sc.pl.umap(adata_filt[adata_filt.obs.lineage == l], color=feature + "_nmads", title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_" + feature + "_nmads_less_abs_2.5" + ".png")
+
+
+
+# Raising the minimum nGene threshold to 300 may remove these strange immune-y cells
+thresh = 400
+adata.obs['gt_' + str(thresh) + '_nGenes'] = adata.obs['n_genes_by_counts'] > thresh
+adata.obs['gt_' + str(thresh) + '_nGenes'] = adata.obs['gt_' + str(thresh) + '_nGenes'].astype('category')
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color='gt_' + str(thresh) + '_nGenes', title=l + '_gt_' + str(thresh) + '_nGenes', frameon=True, save="_" + l + "_post_batch_post_sweep_nGene_thresh.png")
+    
+
+# Raising the minimum MT% cut off 
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+lins = np.unique(adata.obs.lineage)
+for l in lins:
+    sns.distplot(adata.obs[adata.obs.lineage == l].pct_counts_gene_group__mito_transcript, hist=False, rug=True, label=l)
+
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of MT%')
+plt.xlabel('MT% / cell')
+#plt.axvline(x = 0.7, color = 'red', linestyle = '--', alpha = 0.5)
+plt.savefig(figpath + '/mt_perc_per_cell_per_lineage_after_QC.png', bbox_inches='tight')
+plt.clf()
+
+# How about a cut off of 1%
+thresh = 1
+adata.obs['gt_' + str(thresh) + '_MT'] = adata.obs['pct_counts_gene_group__mito_transcript'] > thresh
+adata.obs['gt_' + str(thresh) + '_MT'] = adata.obs['gt_' + str(thresh) + '_MT'].astype('category')
+sc.pl.umap(adata[adata.obs.pct_counts_gene_group__mito_transcript > thresh], color='category', title='MT > ' + str(thresh), frameon=True, save="_post_batch_post_sweep_MT_gt_" + str(thresh) + ".png")
+
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color='gt_' + str(thresh) + '_MT', title=l + '_gt_' + str(thresh) + '_MT', frameon=True, save="_" + l + "_post_batch_post_sweep_MT_gt_" + str(thresh) + ".png")
+    sc.pl.umap(adata[adata.obs.lineage == l], color='pct_counts_gene_group__mito_transcript', title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_MT.png")
+    
+
+for l in lins:
+    print(l)
+    sc.pl.umap(adata[adata.obs.lineage == l], color='gt_' + str(thresh) + '_nGenes', title=l + '_gt_' + str(thresh) + '_nGenes', frameon=True, save="_" + l + "_post_batch_post_sweep_nGene_thresh.png")
+    
+
 
 ####################################################################
 #### Investigation of ngenes detected in each category/lineage #####
@@ -367,7 +518,7 @@ sc.pl.umap(adata, color="ig_perc", frameon=True, save="_post_batch_post_sweep_ig
 
 
 # Plot within category, coloured by keras confidence, label, MTperc, for each embedding
-latents = metrics.index[:-1].values
+latents = ["X_pca", "X_scANVI", "X_scVI_default", "X_scVI", 'X_pca_harmony']
 cats = np.unique(adata.obs.category)
 for l in latents:
     print(l)
@@ -890,6 +1041,7 @@ gene_symb = ["EPCAM", "CDH1", "KRT19", "MZB1", "JCHAIN"]
 for index, g in enumerate(gene_symb):
     sc.pl.umap(adata[adata.obs.category == "B Cell plasma"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_BCP.png")
     sc.pl.umap(adata[adata.obs.category == "Enterocyte"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Enterocytes.png")
+    sc.pl.umap(adata[adata.obs.category == "Stem cells"], color=gene_ens[index], frameon=False , title=g, save="_" + g + "_Stem.png")
 
 # What if we have a look at this on the basis of RP%
 
