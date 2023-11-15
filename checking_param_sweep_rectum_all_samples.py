@@ -114,9 +114,17 @@ adata.obs = adata.obs.merge(intestinal_annot, left_index=True, right_index=True,
 adata.obs['Keras:predicted_celltype_probability'] = adata.obs['Keras:predicted_celltype_probability'].astype("float")
 adata.obs['log10ngenes'] = np.log10(adata.obs['n_genes_by_counts'])
 adata.obs['log10_ncounts'] = np.log10(adata.obs.total_counts)
+# Have a look at the probabilities of CellTypist annotations.
+ct_probs = pd.read_csv(tabdir+ "/CellTypist_Elmentaite_prob_matrix.csv", index_col=0)
+ct_probs['top_conf_Elmentaite'] = ct_probs.max(axis=1)
+ct_probs = ct_probs[ct_probs.index.isin(adata.obs.index)]
+adata.obs['Azimuth:predicted.celltype.l2.score'] = adata.obs['Azimuth:predicted.celltype.l2.score'].astype('float')
+adata.obs['Azimuth:mapping.score'] = adata.obs['Azimuth:mapping.score'].astype('float')
+adata.obs = adata.obs.merge(ct_probs['top_conf_Elmentaite'], left_index=True, right_index=True, how="left")
 features = ["category", "label", "bead_lot", "gem_lot", "convoluted_samplename", "Keras:predicted_celltype_probability", "n_genes_by_counts", "log10ngenes", "log10_ncounts",
             "pct_counts_gene_group__mito_transcript","log10ngenes", "pct_counts_gene_group__ribo_protein", "total_counts", "Celltypist:Immune_All_Low:majority_voting", 
-            "Celltypist:Immune_All_High:majority_voting", "CellTypist:Intestinal_Elmentaite:majority_voting"]
+            "Celltypist:Immune_All_High:majority_voting", "CellTypist:Intestinal_Elmentaite:majority_voting", "top_conf_Elmentaite", 'Azimuth:predicted.celltype.l2', 
+            'Azimuth:predicted.celltype.l2.score', 'Azimuth:mapping.score', 'Azimuth:L0_predicted.celltype.l2', 'Azimuth:L1_predicted.celltype.l2']
 
 levels = ["all", "category", "lineage"]
 cats = np.unique(adata.obs.category)
@@ -137,7 +145,7 @@ for l in levels:
             
 # Also plot the distributions of QC metrics
 adata.obs['log10_ncounts'] = np.log10(adata.obs.total_counts)
-metrics = ["n_genes_by_counts", "log10ngenes", "pct_counts_gene_group__mito_transcript", "log10_ncounts", "total_counts"]
+metrics = ["n_genes_by_counts", "log10ngenes", "pct_counts_gene_group__mito_transcript", "pct_counts_gene_group__ribo_protein", "log10_ncounts", "total_counts"]
 for l in levels[1:]:
     ldir = data_name + "/" + status + "/" + category + "/figures/" + l
     for m in metrics:
@@ -188,12 +196,12 @@ for c in cats:
 others = pd.DataFrame({"label": ["T cell CD4+ PASK+ CCR7+", "T cell CD4+ PASK+ CCR7+", "T cell CD4+ PASK+ CCR7+",
                                 "Paneth cell", "Paneth cell", "Paneth cell", 
                                 "Enterocyte middle villus (1)", "Enterocyte middle villus (1)", "Enterocyte middle villus (1)",
-                                "ILC3", "ILC3", "ILC3", 
+                                "ILC3", "ILC3", "ILC3", "ILC3",
                                 "Endocrine cell", "Endocrine cell", "Endocrine cell"], 
                        "gene_symbols": ["ST8SIA1", "AC139720.1", "SARDH", 
                                         "LINC01819", "RASD2", "SCGB1C2",
                                         "DUOXA2", "ZNF488", "PDX1",
-                                        "PAGE4", "TAS2R42", "GOLGA8M",
+                                        "PAGE4", "TAS2R42", "GOLGA8M", "AL049870.2",
                                         "DSCAM", "PAX4", "ST8SIA3"]})
 others = others.merge(conv, on="gene_symbols")
 others = others.merge(adata.obs[['label', 'category']], on='label', how="left")
@@ -224,10 +232,13 @@ for r in range(0,microfold.shape[0]):
 temp = adata[adata.obs["CellTypist:Intestinal_Elmentaite:majority_voting"] != "TA"]
 sc.pl.umap(temp[temp.obs.category == "Secretory"], color="CellTypist:Intestinal_Elmentaite:majority_voting", title = "Secretory - no Elmentaite TA", frameon=True, save="_post_batch_post_sweep_Secretory_CellTypist:Intestinal_Elmentaite:majority_voting_no_TA.png")
 
-# Do these express Goblet/TA markers?
-goblets = pd.DataFrame({"label": ["Goblet cell middle villus", "Goblet cell middle villus", "Goblet cell middle villus"], 
-                       "gene_symbols": ["CLCA1", "FCGBP", "MUC2"], 
-                       "category": ["Secretory", "Secretory", "Secretory"]})
+# Do these express Goblet/TA markers? (Secretory TA markers obtained from Smillie et al Supplementary Table)
+goblets = pd.DataFrame({"label": ["Goblet cell middle villus", "Goblet cell middle villus", "Goblet cell middle villus", 
+                                  "Secretory TA", "Secretory TA","Secretory TA"], 
+                       "gene_symbols": ["CLCA1", "FCGBP", "MUC2", 
+                                        "LGALS4", "TFF3", "PIGR"], 
+                       "category": ["Secretory", "Secretory", "Secretory",
+                                    "Secretory", "Secretory", "Secretory"]})
 goblets = goblets.merge(conv, on="gene_symbols")
 sc.settings.figdir=markerdir
 for r in range(0,goblets.shape[0]):
@@ -260,44 +271,58 @@ plt.xlabel('MT% / cell')
 plt.savefig(figpath + '/log10_ncounts_per_cell_per_lineage_after_QC.png', bbox_inches='tight')
 plt.clf()
 
-# Fit nMAd for log10_counts?
-feature="log10_ncounts"
+# Fit nMAd for log10_counts? RP%?
+features=["pct_counts_gene_group__ribo_protein", "log10_ncounts"]
 lins = np.unique(adata.obs.lineage)
-tempdata = []
-for index,c in enumerate(lins):
-    print(c)
-    temp = adata[adata.obs.lineage == c]
-    counts=temp.obs[feature]
-    absolute_diff = np.abs(counts - np.median(counts))
-    mad = np.median(absolute_diff)
-    # Use direction aware filtering
-    nmads = (counts - np.median(counts))/mad
-    # Apply the function to change values in 'new_column' based on criteria
-    temp.obs[feature + "_nmads"] = nmads
-    # Also for absolute nMADs
-    nmads_abs = absolute_diff/mad
-    temp.obs["abs_" +  feature + "_nmads"] = nmads_abs
-    tempdata.append(temp)
+for f in features:
+    print(f)
+    tempdata = []
+    for index,c in enumerate(lins):
+        print(c)
+        temp = adata[adata.obs.lineage == c]
+        counts=temp.obs[f]
+        absolute_diff = np.abs(counts - np.median(counts))
+        mad = np.median(absolute_diff)
+        # Use direction aware filtering
+        nmads = (counts - np.median(counts))/mad
+        # Apply the function to change values in 'new_column' based on criteria
+        temp.obs[f + "_nmads"] = nmads
+        # Also for absolute nMADs
+        nmads_abs = absolute_diff/mad
+        temp.obs["abs_" +  f + "_nmads"] = nmads_abs
+        tempdata.append(temp)
+    to_add = ad.concat(tempdata)
+    to_add = to_add.obs
+    adata.obs = adata.obs.merge(to_add[[f + "_nmads", "abs_" +  f + "_nmads"]], left_index=True, right_index=True)
+    # Plot nMAds on the UMAP
+    sc.pl.umap(adata, color=f + "_nmads", frameon=True, save="_post_batch_post_batch_log10total_counts_nMAds.png")
+    for l in lins:
+        print(l)
+        sc.pl.umap(adata[adata.obs.lineage == l], color=f + "_nmads", title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_" + f + "_nmads" + ".png")
+    # If we filter on abs(nMAds) < 2.5
+    adata.obs[f + "_nmads_keep"] = np.abs(adata.obs[f + "_nmads"]) < 2.5
+    adata.obs[f + "_nmads_keep"] = adata.obs[f + "_nmads_keep"].astype('category')
+    for l in lins:
+        print(l)
+        sc.pl.umap(adata[adata.obs.lineage == l], color=f + "_nmads_keep", title=f + "_nmads_keep under 2.5", frameon=True, save="_" + l + "_post_batch_post_sweep_" + f + "_nmads_less_abs_2.5" + ".png")
 
-to_add = ad.concat(tempdata)
-to_add = to_add.obs
-adata.obs = adata.obs.merge(to_add[[feature + "_nmads", "abs_" +  feature + "_nmads"]], left_index=True, right_index=True)
-# Plot nMAds on the UMAP
-sc.pl.umap(adata, color=feature + "_nmads", frameon=True, save="_post_batch_post_batch_log10total_counts_nMAds.png")
-for l in lins:
-    print(l)
-    sc.pl.umap(adata[adata.obs.lineage == l], color=feature + "_nmads", title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_" + feature + "_nmads" + ".png")
+# Plot distribution of these
+ldir = data_name + "/" + status + "/" + category + "/figures/" + l
+plt.figure(figsize=(8, 6))
+l="lineage"
+m=f + "_nmads"
+fig,ax = plt.subplots(figsize=(8,6))
+for r in lins:
+    sns.distplot(adata.obs[adata.obs[l] == r][m], hist=False, rug=True, label=r)
 
-# If we filter on abs(nMAds) < 2.5
-adata_filt=adata[adata.obs["abs_" +  feature + "_nmads"] < 2.5]
-for l in lins:
-    print(l)
-    sc.pl.umap(adata_filt[adata_filt.obs.lineage == l], color=feature + "_nmads", title=l, frameon=True, save="_" + l + "_post_batch_post_sweep_" + feature + "_nmads_less_abs_2.5" + ".png")
-
-
+plt.legend(bbox_to_anchor=(1.0, 1.0))
+plt.title('Distribution of ' + m)
+plt.xlabel(m + ' / cell')
+plt.savefig(ldir + '/dist_' + m + '_per_cell_per_' + r + '_after_QC.png', bbox_inches='tight')
+plt.clf()
 
 # Raising the minimum nGene threshold to 300 may remove these strange immune-y cells
-thresh = 400
+thresh = 350
 adata.obs['gt_' + str(thresh) + '_nGenes'] = adata.obs['n_genes_by_counts'] > thresh
 adata.obs['gt_' + str(thresh) + '_nGenes'] = adata.obs['gt_' + str(thresh) + '_nGenes'].astype('category')
 for l in lins:
@@ -334,7 +359,54 @@ for l in lins:
 for l in lins:
     print(l)
     sc.pl.umap(adata[adata.obs.lineage == l], color='gt_' + str(thresh) + '_nGenes', title=l + '_gt_' + str(thresh) + '_nGenes', frameon=True, save="_" + l + "_post_batch_post_sweep_nGene_thresh.png")
-    
+
+####################################################################
+########## Investigation ogf Azimuth/keras annotations #############
+####################################################################
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+
+idx = adata.obs.lineage == "Immune"
+use = adata.obs
+use.columns = use.columns.str.strip()
+use = use.rename(columns={"Azimuth:predicted.celltype.l2": "Azimuth_L2"})
+concordance = pd.crosstab(use['label'][idx], use['Azimuth_L2'][idx])
+#concordance.reset_index(inplace=True)
+node_labels = concordance.index.astype(str)
+link_source, link_target = np.meshgrid(range(29), range(29))
+link_source, link_target = link_source.flatten(), link_target.flatten()
+link_value = concordance.values.flatten()
+num_rows = concordance.shape[0]
+node_positions_left = np.arange(num_rows)
+node_positions_right = np.arange(num_rows, 2 * num_rows)
+
+# Creating Sankey plot
+fig = go.Figure(data=[go.Sankey(
+    node=dict(
+        pad=15,
+        thickness=20,
+        line=dict(color='black', width=0.5),
+        label=node_labels.tolist() * 2,  # Duplicate labels for both sides
+        x=[0] * num_rows + [1] * num_rows,  # Assigning x=0 for left, x=1 for right
+        y=np.concatenate([node_positions_left, node_positions_right])
+    ),
+    link=dict(
+        source=np.concatenate([link_source, link_source + num_rows]),
+        target=np.concatenate([link_target, link_target + num_rows]),
+        value=link_value
+    )
+)])
+
+# Adding title and labels
+fig.update_layout(title_text='Two-Sided Concordance Matrix Sankey Plot', font_size=10)
+fig.update_xaxes(title_text='Source')
+fig.update_yaxes(title_text='Target')
+
+# Save the plot as an image using plotly.io
+image_bytes = pio.to_image(fig, format='png')
+with open(figpath + "/two_sided_concordance_sankey_plot.png", "wb") as image_file:
+    image_file.write(image_bytes)
 
 
 ####################################################################
