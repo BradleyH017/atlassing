@@ -4,15 +4,13 @@
 # Following https://github.com/theislab/scarches/blob/master/notebooks/scvi_surgery_pipeline.ipynb and
 # https://github.com/theislab/scarches/blob/master/notebooks/hlca_map_classify.ipynb and 
 # https://github.com/MarioniLab/oor_benchmark/tree/master/src/oor_benchmark/methods
+# Forked from https://github.com/MarioniLab/oor_benchmark.git
 __author__ = 'Bradley Harris'
 __date__ = '2024-01-02'
 __version__ = '0.0.1'
 
 ## Load packagesimport scanpy as sc
-# git clone https://github.com/theislab/scarches
-# cd scarches
-# mamba env create -f envs/scarches_linux.yaml
-# mamba activate scarches
+# Using the atlassing conda environment
 import os
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -24,6 +22,15 @@ from scarches.dataset.trvae.data_handling import remove_sparsity
 import matplotlib.pyplot as plt
 import numpy as np
 import gdown
+import scvi
+from scarches.models.scpoli import scPoli
+# Forked from https://github.com/MarioniLab/oor_benchmark.git
+from pathlib import Path
+import sys
+absolute_path = str(Path("repos/oor_benchmark/src/oor_benchmark/methods").resolve())
+sys.path.append(absolute_path)
+from _latent_embedding import embedding_scArches, _filter_genes_scvi, _fit_scVI, _train_scVI
+
 print("Loaded libraries")
 
 # Set script and plotting params
@@ -37,7 +44,7 @@ def parse_options():
     # Inherit options
     parser = argparse.ArgumentParser(
             description="""
-                Prepping files for the SAIGEQTL analysis
+                Transfer learning of TI annotations into the rectum
                 """
         )
     
@@ -71,74 +78,84 @@ def parse_options():
 def main():
     inherited_options = parse_options()
     ref__file = inherited_options.ref__file
+    # ref__file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/freeze_003/ti-cd_healthy-fr003_004/anderson_ti_freeze003_004-eqtl_processed.h5ad"
+    # Think it is worth making sure this is the VERY GOOD QUALITY CELLS FROM DISCOVERY AND REPLICATION
     query__file = inherited_options.query__file
+    # query__file="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/2023_09_rectum/adata.h5ad"
+    # All cells
     outdir = inherited_options.output_directory
+    # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum_to_TI"
     
     # Load in the reference data (TI)
-    adata = sc.read(ref__file)
-    
-    # define the plot outdir
-    plotdir=f"{outdir}/plots"
-    if not os.path.exists(plotdir):
-        os.makedirs(plotdir)
-        
-    
-    sc.settings.figdir=plotdir
-    
-    # determine the batch and label keys
-    batch_key="sanger_sample_id"
-    label_key="label"
-    
-    # Create scvi model using the query data labels
-    sca.models.SCVI.setup_anndata(adata, batch_key=batch_key, labels_key=label_key)
+ref = sc.read(ref__file)
+ref.layers["counts"] = ref.X.copy()
 
-    # Train this on the reference data - NOTE: This is using the optimum parameters suggested by the authors: https://docs.scvi-tools.org/en/stable/tutorials/notebooks/scrna/harmonization.html
-    vae = sca.models.SCVI(
-        adata,
-        n_layers=2,
-        n_latent=30,
-        gene_likelihood="nb",
-        encode_covariates=True,
-        deeply_inject_covariates=False,
-        use_layer_norm="both",
-        use_batch_norm="none",
-    )
+# Load in the query
+query = sc.read(query__file)
+query.layers["counts"] = query.X.copy()
 
-    print("Training the reference scVI model")
-    vae.train()
+# define the plot outdir
+plotdir=f"{outdir}/plots"
+if not os.path.exists(plotdir):
+    os.makedirs(plotdir)
+    
 
-    # Get latent representation of this data (NOTE: not really neccessary, but will compute anyway)
-    print("Getting latent representation of the reference model")
-    reference_latent = sc.AnnData(vae.get_latent_representation())
-    reference_latent.obs["cell_type"] = adata.obs[label_key].tolist()
-    reference_latent.obs["batch"] = adata.obs[batch_key].tolist()
-    sc.pp.neighbors(reference_latent, n_neighbors=200)
-    sc.tl.leiden(reference_latent)
-    sc.tl.umap(reference_latent)
-    sc.pl.umap(reference_latent,
-            color=['batch', 'cell_type'],
-            frameon=False,
-            wspace=0.6,
-            save="ref_latent.png")
-    
-    # Save the reference model to output
-    ref_path = f"{outdir}/ref_model"
-    vae.save(ref_path, overwrite=True)
-    print("Saved the reference model")
-    
-    # Now load in the query data
-    target_adata = sc.read(query__file)
-    
-    # Perform surgery on the reference and training
-    model = sca.models.SCVI.load_query_data(
-        target_adata,
-        ref_path,
-        freeze_dropout = True,
-    )
-    
-    # Train the model
-    print("Training the model on the query dataset")
-    model.train(max_epochs=200, plan_kwargs=dict(weight_decay=0.0))
+sc.settings.figdir=plotdir
+
+# determine the batch and label keys
+batch_key="sanger_sample_id"
+label_key="label"
+
+# Generate an scVI model on the reference data
+sca.models.SCVI.setup_anndata(ref, batch_key=batch_key)
+
+# Add params (NOTE: These are not default, but recommended by scVI)
+vae = sca.models.SCVI(
+    ref,
+    n_layers=2,
+    n_latent=30,
+    gene_likelihood="nb",
+    encode_covariates=True,
+    deeply_inject_covariates=False,
+    use_layer_norm="both",
+    use_batch_norm="none",
+)
+
+vae.train()
+
+# Plot before saving
+latent_key='X_scVI'
+ref[latent_key] = sc.AnnData(vae.get_latent_representation())
+ref.obs["cell_type"] = ref.obs[label_key].tolist()
+ref.obs["batch"] = ref.obs[batch_key].tolist()
+sc.pp.neighbors(ref, n_neighbors=300, use_rep=latent_key)
+sc.tl.umap(ref)
+sc.pl.umap(ref,
+           color=['batch', 'cell_type', 'category__machine'],
+           frameon=False,
+           wspace=0.6,
+           )
+
+# Save this
+ref_path = f"{outdir}/ref_model"
+vae.save(ref_path, overwrite=True)
+
+# Now transfer the query dataset into this space using scArches
+model = sca.models.SCVI.load_query_data(
+    query,
+    ref_path,
+    freeze_dropout = True,
+)
+
+model.train(max_epochs=200, plan_kwargs=dict(weight_decay=0.0))
+
+query[latent_key] = sc.AnnData(model.get_latent_representation())
+query.obs['cell_type'] = query.obs[label_key].tolist()
+query.obs['batch'] = query.obs[batch_key].tolist()
+
+
+
+
 
     # Get the latent representation of the query dataset (Also probably not all that interesting, but will generate anyway)
     query_latent = sc.AnnData(model.get_latent_representation())
