@@ -10,7 +10,7 @@ __date__ = '2024-01-02'
 __version__ = '0.0.1'
 
 ## Load packagesimport scanpy as sc
-# Using the atlassing conda environment
+# Using the scarches (!!!!) conda environment
 import os
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -27,9 +27,13 @@ from scarches.models.scpoli import scPoli
 # Forked from https://github.com/MarioniLab/oor_benchmark.git
 from pathlib import Path
 import sys
+import pandas as pd
+import seaborn as sns
+import argparse
+from sklearn.metrics import classification_report
 absolute_path = str(Path("repos/oor_benchmark/src/oor_benchmark/methods").resolve())
 sys.path.append(absolute_path)
-from _latent_embedding import embedding_scArches, _filter_genes_scvi, _fit_scVI, _train_scVI
+#from _latent_embedding import embedding_scArches, _filter_genes_scvi, _fit_scVI, _train_scVI
 
 print("Loaded libraries")
 
@@ -51,7 +55,7 @@ def parse_options():
     parser.add_argument(
             '-r', '--ref__file',
             action='store',
-            dest='query__file',
+            dest='ref__file',
             required=True,
             help=''
         )
@@ -72,7 +76,7 @@ def parse_options():
             help=''
         )
 
-
+    return parser.parse_args()
 
 # Define the main script
 def main():
@@ -85,106 +89,229 @@ def main():
     # All cells
     outdir = inherited_options.output_directory
     # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum_to_TI"
+    print(f"ref__file: {ref__file}")
+    print(f"query__file: {query__file}")
+    print(f"output_directory: {outdir}")
     
     # Load in the reference data (TI)
-ref = sc.read(ref__file)
-ref.layers["counts"] = ref.X.copy()
+    source_adata = sc.read(ref__file)
+    source_adata.layers["counts"] = source_adata.X.copy()
+    print("Loaded source data")
+    # TEMP!!!
+    sc.pp.subsample(source_adata, 0.00125)
+    print(f"source shape = {source_adata.shape}")
 
-# Load in the query
-query = sc.read(query__file)
-query.layers["counts"] = query.X.copy()
+    # Load in the query
+    target_adata = sc.read(query__file)
+    target_adata.layers["counts"] = target_adata.X.copy()
+    # Make sure column names match
+    target_adata.obs = target_adata.obs.rename(columns = {"convoluted_samplename": "sanger_sample_id"})
+    target_adata.obs = target_adata.obs.rename(columns = {"Keras:predicted_celltype": "label__machine"})
+    print("Loaded target data")
+    sc.pp.subsample(target_adata, 0.0006125)
+    print(f"target shape = {target_adata.shape}")
 
-# define the plot outdir
-plotdir=f"{outdir}/plots"
-if not os.path.exists(plotdir):
-    os.makedirs(plotdir)
-    
+    # define the plot outdir
+    plotdir=f"{outdir}/plots"
+    if not os.path.exists(plotdir):
+        os.makedirs(plotdir)
+        
 
-sc.settings.figdir=plotdir
+    sc.settings.figdir=plotdir
 
-# determine the batch and label keys
-batch_key="sanger_sample_id"
-label_key="label"
+    # determine the batch and label keys
+    condition_key="sanger_sample_id"
+    cell_type_key="label__machine"
 
-# Generate an scVI model on the reference data
-sca.models.SCVI.setup_anndata(ref, batch_key=batch_key)
-
-# Add params (NOTE: These are not default, but recommended by scVI)
-vae = sca.models.SCVI(
-    ref,
-    n_layers=2,
-    n_latent=30,
-    gene_likelihood="nb",
-    encode_covariates=True,
-    deeply_inject_covariates=False,
-    use_layer_norm="both",
-    use_batch_norm="none",
-)
-
-vae.train()
-
-# Plot before saving
-latent_key='X_scVI'
-ref[latent_key] = sc.AnnData(vae.get_latent_representation())
-ref.obs["cell_type"] = ref.obs[label_key].tolist()
-ref.obs["batch"] = ref.obs[batch_key].tolist()
-sc.pp.neighbors(ref, n_neighbors=300, use_rep=latent_key)
-sc.tl.umap(ref)
-sc.pl.umap(ref,
-           color=['batch', 'cell_type', 'category__machine'],
-           frameon=False,
-           wspace=0.6,
-           )
-
-# Save this
-ref_path = f"{outdir}/ref_model"
-vae.save(ref_path, overwrite=True)
-
-# Now transfer the query dataset into this space using scArches
-model = sca.models.SCVI.load_query_data(
-    query,
-    ref_path,
-    freeze_dropout = True,
-)
-
-model.train(max_epochs=200, plan_kwargs=dict(weight_decay=0.0))
-
-query[latent_key] = sc.AnnData(model.get_latent_representation())
-query.obs['cell_type'] = query.obs[label_key].tolist()
-query.obs['batch'] = query.obs[batch_key].tolist()
-
-
-
-
-
-    # Get the latent representation of the query dataset (Also probably not all that interesting, but will generate anyway)
-    query_latent = sc.AnnData(model.get_latent_representation())
-    query_latent.obs['cell_type'] = target_adata.obs[cell_type_key].tolist()
-    query_latent.obs['batch'] = target_adata.obs[condition_key].tolist()
-    sc.pp.neighbors(query_latent)
-    sc.tl.leiden(query_latent)
-    sc.tl.umap(query_latent)
-    plt.figure()
-    sc.pl.umap(
-        query_latent,
-        color=["batch", "cell_type"],
-        frameon=False,
-        wspace=0.6,
+    # Use scPoli to integrate query into the reference and perform transfer learning
+    # From https://github.com/theislab/scarches/blob/master/notebooks/scpoli_surgery_pipeline.ipynb
+    # Better: https://docs.scarches.org/en/latest/scpoli_surgery_pipeline.html
+    # NOTE: These are using the paramaters of this github and have not been optimised
+    scpoli_model = scPoli(
+        adata=source_adata,
+        condition_keys=condition_key,
+        cell_type_keys=cell_type_key,
+        embedding_dims=5,
+        recon_loss='nb',
     )
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    early_stopping_kwargs = {
+        "early_stopping_metric": "val_prototype_loss",
+        "mode": "min",
+        "threshold": 0,
+        "patience": 20,
+        "reduce_lr": True,
+        "lr_patience": 13,
+        "lr_factor": 0.1,
+    }
 
+    print("~~~~~~~~~ training the scPoli model ~~~~~~~~~~~~")
+    scpoli_model.train(
+        n_epochs=50,
+        pretraining_epochs=40,
+        early_stopping_kwargs=early_stopping_kwargs,
+        eta=5,
+    )
 
+    # Now map the query into this space
+    scpoli_query = scPoli.load_query_data(
+        adata=target_adata,
+        reference_model=scpoli_model,
+        labeled_indices=[],
+    )
+
+    print("~~~~~~~~~ Mapping query into reference ~~~~~~~~~~~~")
+    # Train the model
+    scpoli_query.train(
+        n_epochs=50,
+        pretraining_epochs=40,
+        eta=10
+    )
+        
+    # Transfer the labels from reference to query
+    results_dict = scpoli_query.classify(target_adata, scale_uncertainties=True)
+    for i in range(len(cell_type_key)):
+        preds = results_dict[cell_type_key]["preds"]
+        results_dict[cell_type_key]["uncert"]
+        classification_df = pd.DataFrame(
+            classification_report(
+                y_true=target_adata.obs[cell_type_key],
+                y_pred=preds,
+                output_dict=True,
+            )
+        ).transpose()
+
+    print(classification_df)
+    tabdir = f"{outdir}/tables"
+    if not os.path.exists(tabdir):
+        os.makedirs(tabdir)
+        
+    classification_df.to_csv(f"{tabdir}/classification_report.csv")
+        
+    # get latent representation of reference data
+    print("~~~~~~~~~~~~ Calculating latent representations ~~~~~~~~~~~~")
+    scpoli_query.model.eval()
+    data_latent_source = scpoli_query.get_latent(
+        source_adata, 
+        mean=True
+    )
+
+    adata_latent_source = sc.AnnData(data_latent_source)
+    adata_latent_source.obs = source_adata.obs.copy()
+
+    #get latent representation of query data
+    data_latent= scpoli_query.get_latent(
+        target_adata, 
+        mean=True
+    )
+
+    adata_latent = sc.AnnData(data_latent)
+    adata_latent.obs = target_adata.obs.copy()
+
+    #get label annotations
+    adata_latent.obs['cell_type_pred'] = results_dict['label__machine']['preds'].tolist()
+    adata_latent.obs['cell_type_uncert'] = results_dict['label__machine']['uncert'].tolist()
+    adata_latent.obs['classifier_outcome'] = (
+        adata_latent.obs['cell_type_pred'] == adata_latent.obs['label__machine']
+    )
+
+    #get prototypes
+    labeled_prototypes = scpoli_query.get_prototypes_info()
+    labeled_prototypes.obs['study'] = 'labeled prototype'
+    unlabeled_prototypes = scpoli_query.get_prototypes_info(prototype_set='unlabeled')
+    unlabeled_prototypes.obs['study'] = 'unlabeled prototype'
+
+    #join adatas
+    adata_latent_full = adata_latent_source.concatenate(
+        [adata_latent, labeled_prototypes, unlabeled_prototypes], 
+        batch_key='query'
+    )
+    adata_latent_full.obs['cell_type_pred'][adata_latent_full.obs['query'].isin(['0'])] = np.nan
+    sc.pp.neighbors(adata_latent_full, n_neighbors=300)
+    sc.tl.umap(adata_latent_full)
+
+    # Also get adata without prototypes
+    adata_no_prototypes = adata_latent_full[adata_latent_full.obs['query'].isin(['0', '1'])]
+
+    # Save these 
+    objpath = f"{outdir}/objects"
+    if not os.path.exists(objpath):
+        os.makedirs(objpath)
+
+    print("~~~~~~~~~~~~~ Saving objects ~~~~~~~~~~~~")
+    columns_to_remove = [col for col in adata_no_prototypes.obs.columns if 'Keras' in col or 'Azimuth' in col]
+    adata_no_prototypes.obs = adata_no_prototypes.obs.drop(columns=columns_to_remove)
+    adata_no_prototypes.write_h5ad(objpath + "/adata_ref_query_no_prototypes.h5ad")
+    columns_to_remove = [col for col in adata_latent_full.obs.columns if 'Keras' in col or 'Azimuth' in col]
+    adata_latent_full.obs = adata_latent_full.obs.drop(columns=columns_to_remove)
+    adata_latent_full.write_h5ad(objpath + "/adata_ref_query_full.h5ad")
+
+    # Plot this according to predictions and tissue
+    print("~~~~~~~~~~ Plotting results ~~~~~~~~~~~")
+    sc.pl.umap(
+        adata_no_prototypes, 
+        color='cell_type_pred',
+        show=False, 
+        frameon=False,
+        save="_TI-rectum_no_prototypes_label__machine.png"
+    )
+
+    adata_no_prototypes.obs['query'] = pd.Categorical(adata_no_prototypes.obs['query'], categories=['0','1'])
+    adata_no_prototypes.obs['tissue'] = adata_no_prototypes.obs['query'].map({'0': 'TI', '1': 'rectum'})
+
+    sc.pl.umap(
+        adata_no_prototypes, 
+        color='tissue',
+        show=False, 
+        frameon=False,
+        save="_TI-rectum_no_prototypes_tissue.png"
+    )
+
+    # Inspect the uncertainty
+    sc.pl.umap(
+        adata_no_prototypes, 
+        color='cell_type_uncert',
+        show=False, 
+        frameon=False,
+        cmap='magma',
+        vmax=1,
+        save="_TI-rectum_no_prototypes_scPoli_annotation_uncertainty.png"
+    )
+
+    # How does this correlate with confidence of annotation? 
+    adata_no_prototypes.obs['keras_uncertainty_rectum'] = 1- adata_no_prototypes.obs['Keras:predicted_celltype_probability'].astype('float')
+    adata_no_prototypes.obs.loc[adata_no_prototypes.obs['tissue'] == 'TI', 'keras_uncertainty_rectum'] = np.nan
+    sc.pl.umap(
+        adata_no_prototypes, 
+        color='keras_uncertainty_rectum',
+        show=False, 
+        frameon=False,
+        cmap='magma',
+        vmax=1,
+        save="_TI-rectum_no_prototypes_keras_uncertainty_rectum.png"
+    )
+
+    # Inspect prototypes
+    # Not included
+
+    adata_emb = scpoli_query.get_conditional_embeddings()
+    # Plot these
+    from sklearn.decomposition import KernelPCA
+    pca = KernelPCA(n_components=2, kernel='linear')
+    emb_pca = pca.fit_transform(adata_emb.X)
+    conditions = scpoli_query.conditions_[condition_key]
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    sns.scatterplot(x=emb_pca[:, 0], y=emb_pca[:, 1], hue=conditions, ax=ax)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    for i, c in enumerate(conditions):
+        ax.plot([0, emb_pca[i, 0]], [0, emb_pca[i, 1]])
+        ax.text(emb_pca[i, 0], emb_pca[i, 1], c)
+    sns.despine()
+    plt.savefig(plotdir + '/condition_loadings.png', bbox_inches='tight')
+    plt.clf()
+        
+    
+    
+# Execute
+if __name__ == '__main__':
+    main()
