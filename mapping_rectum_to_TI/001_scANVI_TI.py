@@ -6,6 +6,7 @@ __version__ = '0.0.1'
 
 # Perform scANVI batch integration of the TI data (all)
 # This is the first step to perform reference mapping and label transfer
+# Following example using the HLCA - https://docs.scarches.org/en/latest/hlca_map_classify.html
 
 # Load libraries
 import sys
@@ -17,7 +18,6 @@ import numpy as np
 print("Numpy file")
 print(np.__file__)
 import pandas as pd
-import scanpy as sc
 import anndata as ad
 import matplotlib as mp
 from matplotlib import pyplot as plt
@@ -39,16 +39,13 @@ from sklearn.preprocessing import StandardScaler
 from scipy.optimize import fsolve
 from scipy.optimize import brentq
 import torch
-from scib_metrics.benchmark import Benchmarker
 from pytorch_lightning import Trainer
-scvi.settings.dl_pin_memory_gpu_training =  True
+#scvi.settings.dl_pin_memory_gpu_training =  True
 from scipy import sparse
+import argparse
 print("Loaded libraries")
 
 # Plotting options
-sc.settings.set_figure_params(dpi=200, frameon=False)
-sc.set_figure_params(dpi=200)
-sc.set_figure_params(figsize=(4, 4))
 torch.set_printoptions(precision=3, sci_mode=False, edgeitems=7)
 
 # Parse script options (ref, query, outdir)
@@ -101,17 +98,19 @@ def main():
     # ref__file="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/freeze_003/ti-cd_healthy-fr003_004/anderson_ti_freeze003_004-eqtl_processed.h5ad"
     label_col = inherited_options.ref__file
     # label_col="label__machine"
-    outdir = outdir
+    outdir = inherited_options.outdir
     # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/rectum_to_TI/objects"
     sample_identifier = inherited_options.sample_identifier
     # sample_identifier = "sanger_sample_id"
     
     # Load in the anndata
     adata = ad.read_h5ad(ref__file)
-    # TEMP!! 
-    sc.pp.subsample(adata, 0.0025)
     print("Loaded the data")
     print(f"Dataset shape: {adata.shape}")
+    
+    # Check if GPU is available:
+    gpu_use = torch.cuda.is_available()
+    print(f"Is a GPU avalable?: {gpu_use}")
     
     # Make sure there is a 'counts' layer for 'X', and this is raw (printing)
     adata.layers['counts'] = adata.X.copy()
@@ -137,7 +136,8 @@ def main():
         unlabeled_category="Unknown",
     )
     
-    scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
+    #scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
+    scanvi_model.train(max_epochs=20, n_samples_per_label=100)
     SCANVI_LATENT_KEY = "X_scANVI"
     adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
     
@@ -145,4 +145,7 @@ def main():
     adata.write(outdir + "/adata_PCAd_batched.h5ad")
     scanvi_model.save(f"{outdir}/TI_scanvi_model", overwrite=True)
     
+# Execute
+if __name__ == '__main__':
+    main()
     
