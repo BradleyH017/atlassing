@@ -46,7 +46,34 @@ from scipy.optimize import brentq
 import torch
 from scib_metrics.benchmark import Benchmarker
 from pytorch_lightning import Trainer
+import argparse
 print("Loaded libraries")
+
+########### Define custom functions used here ###############
+def nmad_calc(data):
+    absolute_diff = np.abs(data - np.median(data))
+    mad = np.median(absolute_diff)
+    # Use direction aware filtering
+    nmads = (data - np.median(data))/mad
+    return(nmads)
+
+def nmad_append(df, var, group=[]):
+    # Calculate
+    if group:
+        vals = df.groupby(group)[var].apply(nmad_calc)
+        # Return to df
+        temp = pd.DataFrame(vals)
+        temp.reset_index(inplace=True)
+        if "level_1" in temp.columns:
+            temp.set_index("level_1", inplace=True)
+        else: 
+            temp.set_index("cell", inplace=True)
+        
+        temp = temp.reindex(df.index)
+        return(temp[var])
+    else:
+        vals = nmad_calc(df[var])
+        return(vals)
 
 # Parse script options (ref, query, outdir)
 def parse_options():    
@@ -98,6 +125,14 @@ def parse_options():
         )
 
     parser.add_argument(
+            '-abi', '--all_blood_immune',
+            action='store',
+            dest='all_blood_immune',
+            required=True,
+            help=''
+        )
+
+    parser.add_argument(
         '-nUMI', '--min_nUMI',
         action='store',
         dest='min_nUMI',
@@ -109,6 +144,14 @@ def parse_options():
         '-abs_nUMI', '--use_absolute_nUMI',
         action='store',
         dest='use_absolute_nUMI',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-groups', '--relative_grouping',
+        action='store',
+        dest='relative_grouping',
         required=True,
         help=''
     )
@@ -162,17 +205,9 @@ def parse_options():
     )
     
     parser.add_argument(
-        '-samp_nGene_blood', '--min_mean_nGene_per_samp_blood',
+        '-samp_nCount_blood', '--min_mean_nCount_per_samp_blood',
         action='store',
-        dest='min_mean_nGene_per_samp_blood',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-samp_nCount_gut', '--min_mean_nCount_per_samp_gut',
-        action='store',
-        dest='min_mean_nCount_per_samp_gut',
+        dest='min_mean_nCount_per_samp_blood',
         required=True,
         help=''
     )
@@ -249,40 +284,74 @@ def main():
     # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined"
     discard_other_inflams = inherited_options.discard_other_inflams
     # discard_other_inflams = "yes"
-    min_nUMI = inherited_options.min_nUMI.astype('float')
+    relative_grouping = inherited_options.relative_grouping
+    relative_grouping = relative_grouping.split("|")
+    # relative_grouping = ["tissue", "lineage"]
+    all_blood_immune = inherited_options.all_blood_immune
+    # all_blood_immune = "yes"
+    min_nUMI = float(inherited_options.min_nUMI)
     # min_nUMI = 200
     use_absolute_nUMI = inherited_options.use_absolute_nUMI
-    # use_absolute_nUMI = "yes"
-    relative_nMAD_threshold = inherited_options.relative_nMAD_threshold.astype('float')
+    # use_absolute_nUMI = "no"
+    relative_nMAD_threshold = float(inherited_options.relative_nMAD_threshold)
     # relative_nMAD_threshold = 2.5
-    min_nGene = inherited_options.min_nGene.astype('float')
+    min_nGene = float(inherited_options.min_nGene)
     # min_nGene = 400
     use_absolute_nGene = inherited_options.use_absolute_nGene
-    # use_absolute_nGene = "yes"
-    MTgut = inherited_options.MTgut.astype('float')
+    # use_absolute_nGene = "no"
+    MTgut = float(inherited_options.MT_thresh_gut)
     # MTgut = 50
-    MTblood = inherited_options.MTblood.astype('float')
+    MTblood = float(inherited_options.MT_thresh_blood)
     # MTblood = 20
     use_absolute_MT = inherited_options.use_absolute_MT
-    # use_absolute_MT = "yes"
-    min_mean_nCount_per_samp_blood = inherited_options.min_mean_nCount_per_samp_blood.astype('float')
+    # use_absolute_MT = "no"
+    absolute_max_MT = float(inherited_options.absolute_max_MT)
+    # absolute_max_MT = 50
+    min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
     # min_mean_nCount_per_samp_blood = 3000
-    min_mean_nCount_per_samp_gut = inherited_options.min_mean_nCount_per_samp_gut.astype('float')
+    min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
     # min_mean_nCount_per_samp_gut = 7500
-    min_mean_nGene_per_samp_blood = inherited_options.min_mean_nGene_per_samp_blood.astype('float')
+    min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
     # min_mean_nGene_per_samp_blood = 1000
-    min_mean_nGene_per_samp_gut = inherited_options.min_mean_nGene_per_samp_gut.astype('float')
+    min_mean_nGene_per_samp_gut = float(inherited_options.min_mean_nGene_per_samp_gut)
     # min_mean_nGene_per_samp_gut = 1750
     use_abs_per_samp = inherited_options.use_abs_per_samp
-    # use_abs_per_samp = "yes"
+    # use_abs_per_samp = "no"
     filt_blood_keras = inherited_options.filt_blood_keras
     # filt_blood_keras = "no"
-    n_variable_genes = inherited_options.n_variable_genes.astype('float')
+    n_variable_genes = float(inherited_options.n_variable_genes)
     # n_variable_genes = 4000
     remove_problem_genes = inherited_options.remove_problem_genes
     # remove_problem_genes = "yes"
+    
+    print("~~~~~~~~~ Running arguments ~~~~~~~~~")
+    print(f"blood_file:{blood_file}")
+    print(f"TI_file: {TI_file}")
+    print(f"rectum_file:{rectum_file}")
+    print(f"outdir:{outdir}")
+    print(f"discard_other_inflams:{discard_other_inflams}")
+    print(f"all_blood_immune:{all_blood_immune}")
+    print(f"min_nUMI:{min_nUMI}")
+    print(f"use_absolute_nUMI:{use_absolute_nUMI}")
+    print(f"relative_grouping:{relative_grouping}")
+    print(f"relative_nMAD_threshold:{relative_nMAD_threshold}")
+    print(f"min_nGene:{min_nGene}")
+    print(f"use_absolute_nGene:{use_absolute_nGene}")
+    print(f"MTgut:{MTgut}")
+    print(f"MTblood:{MTblood}")
+    print(f"use_absolute_MT:{use_absolute_MT}")
+    print(f"absolute_max_MT:{absolute_max_MT}")
+    print(f"min_mean_nCount_per_samp_blood:{min_mean_nCount_per_samp_blood}")
+    print(f"min_mean_nCount_per_samp_gut:{min_mean_nCount_per_samp_gut}")
+    print(f"min_mean_nGene_per_samp_blood:{min_mean_nGene_per_samp_blood}")
+    print(f"min_mean_nGene_per_samp_gut:{min_mean_nGene_per_samp_gut}")
+    print(f"use_abs_per_samp:{use_abs_per_samp}")
+    print(f"filt_blood_keras:{filt_blood_keras}")
+    print(f"n_variable_genes:{n_variable_genes}")
+    print(f"remove_problem_genes:{remove_problem_genes}")
+    print("Parsed args")
 
-    # Define output directories
+    # Define output directories    
     figpath = f"{outdir}/figures"
     if os.path.exists(figpath) == False:
         os.mkdir(figpath)
@@ -294,6 +363,8 @@ def main():
     objpath = f"{outdir}/objects"
     if os.path.exists(objpath) == False:
         os.mkdir(objpath)
+
+    print("Set up outdirs")
 
     # Define global figure directory
     sc.settings.figdir=figpath
@@ -321,6 +392,7 @@ def main():
     adata.var.set_index("index", inplace=True)
     del blood, TI, rectum
     print("Loaded the input files and merged")
+    print(f"Initial shape of the data is:{adata.shape}")
 
     # Discard other inflams if wanted to 
     if discard_other_inflams == "yes":
@@ -335,6 +407,11 @@ def main():
     adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['B_Cell', 'B_Cell_plasma', 'T_Cell', 'Myeloid']), 'Immune', "")
     adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['Stem_cells', 'Secretory', 'Enterocyte']), 'Epithelial', adata.obs['lineage'])
     adata.obs['lineage'] = np.where(adata.obs['category__machine']== 'Mesenchymal', 'Mesenchymal', adata.obs['lineage'])
+
+    # Make all blood lineages immune? 
+    if all_blood_immune == "yes":
+        adata.obs.loc[adata.obs['tissue'] == 'blood', 'lineage'] = 'Immune'
+
 
     ####################################
     ######### Preliminary QC ###########
@@ -400,10 +477,17 @@ def main():
 
     # Filter for this cut off if using an absolute cut off, or define a relative cut off
     if use_absolute_nUMI == "yes":
-        adata = adata[adata.obs['total_counts'] > min_nUMI]
+        # adata = adata[adata.obs['total_counts'] > min_nUMI]
+        adata.obs['total_counts_keep'] = adata[adata.obs['total_counts'] > min_nUMI]
     else:
-        # TO DO: Write in the relative nUMI filtration
-        print("Defining nMAD cut off")
+        print("Defining nMAD cut off: total_counts_keep")
+        adata.obs['total_counts_nMAD'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
+        adata.obs['total_counts_keep'] = adata.obs['total_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        for t in tissues:
+            print(f"Min for {t}:")
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
+                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
+                print(f"{l}: {this_thresh}")
 
     # 2. nGene
     print("Filtration of cells with low nGenes")
@@ -454,11 +538,17 @@ def main():
 
     # Filter for this cut off if using an absolute cut off, or define a relative cut off
     if use_absolute_nGene == "yes":
-        adata = adata[adata.obs['n_genes_by_counts'].astype(int) > min_nGene]
+        adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts'].astype(int) > min_nGene
     else:
-        # TO DO: Write in the relative nUMI filtration
-        print("Defining nMAD cut off")
-        
+        print("Defining nMAD cut off: nGenes")
+        adata.obs['n_genes_by_counts_nMAD'] = nmad_append(adata.obs, 'n_genes_by_counts', relative_grouping)
+        adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        for t in tissues:
+            print(f"Min for {t}:")
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
+                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
+                print(f"{l}: {this_thresh}")
+    
     # 3. MT% 
     print("Filtration of cells with abnormal/low MT%")
     plt.figure(figsize=(8, 6))
@@ -518,12 +608,25 @@ def main():
     if use_absolute_MT == "yes":
         blood_mask = (adata.obs['tissue'] == 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTblood)
         gut_tissue_mask = (adata.obs['tissue'] != 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTgut)
-        adata = adata[blood_mask | gut_tissue_mask]
+        adata['MT_perc_keep'] = blood_mask | gut_tissue_mask
     else:
-        print("Defining nMAD cut off")
+        print("Defining MAD cut off: pct_counts_gene_group__mito_transcript")
+        adata.obs['MT_perc_nMads'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
+        adata.obs['MT_perc_keep'] = adata.obs['MT_perc_nMads'] < relative_nMAD_threshold # Direction aware
+        # Apply the absolute max still
+        adata.obs.loc[adata.obs['pct_counts_gene_group__mito_transcript'] > absolute_max_MT, 'MT_perc_keep'] = False
+        # Print filters
+        for t in tissues:
+            print(f"Max for {t}:")
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
+                this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
+                print(f"{l}: {this_thresh}")
+
+        
         
     # 4. Remove samples with outlying sequencing depth
-    samp_data = np.unique(adata.obs.experiment_id, return_counts=True)
+    adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
+    samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
     cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
     plt.figure(figsize=(8, 6))
     fig,ax = plt.subplots(figsize=(8,6))
@@ -549,12 +652,12 @@ def main():
     high_samps = np.array(cells_sample.loc[cells_sample.Ncells > 10000, "sample"])
     low_samps = np.array(cells_sample.loc[cells_sample.Ncells < 500, "sample"])
     # Summarise
-    depth_count = pd.DataFrame(index = np.unique(adata.obs.experiment_id), columns=["Mean_nCounts", "nCells", "High_cell_sample", "n_genes_by_counts"])
+    depth_count = pd.DataFrame(index = np.unique(adata.obs.samp_tissue), columns=["Mean_nCounts", "nCells", "High_cell_sample", "n_genes_by_counts"])
     for s in range(0, depth_count.shape[0]):
         samp = depth_count.index[s]
-        depth_count.iloc[s,1] = adata.obs[adata.obs.experiment_id == samp].shape[0]
-        depth_count.iloc[s,0] = sum(adata.obs[adata.obs.experiment_id == samp].total_counts)/depth_count.iloc[s,1]
-        depth_count.iloc[s,3] = sum(adata.obs[adata.obs.experiment_id == samp].n_genes_by_counts)/depth_count.iloc[s,1]
+        depth_count.iloc[s,1] = adata.obs[adata.obs.samp_tissue == samp].shape[0]
+        depth_count.iloc[s,0] = sum(adata.obs[adata.obs.samp_tissue == samp].total_counts)/depth_count.iloc[s,1]
+        depth_count.iloc[s,3] = sum(adata.obs[adata.obs.samp_tissue == samp].n_genes_by_counts)/depth_count.iloc[s,1]
         if samp in high_samps:
             depth_count.iloc[s,2] = "Red"
         else: 
@@ -622,11 +725,46 @@ def main():
         gut_keep = gut_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] != "blood"]['experiment_id'])
         gut_keep = gut_keep[gut_keep == True].index
         both_keep = list(np.concatenate([blood_keep, gut_keep]))
-        adata = adata[adata.obs['experiment_id'].isin(both_keep)]
+        adata['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
     else:
         # Calculating relative threshold
-        print("Calculating relative threshold")
+        print("Calculating relative threshold: sample level mean nCells and depth")
+        sample_tissue = adata.obs[['samp_tissue','tissue']].reset_index()
+        sample_tissue = sample_tissue[['samp_tissue','tissue']].drop_duplicates()
+        depth_count.reset_index(inplace=True)
+        depth_count = depth_count.rename(columns = {"index": "samp_tissue"})
+        depth_count = depth_count.merge(sample_tissue, on="samp_tissue")
+        depth_count.set_index("samp_tissue", inplace=True)
+        nMads=depth_count.groupby('tissue')[['Mean_nCounts', 'n_genes_by_counts']].apply(nmad_calc)
+        unique_tissues = nMads.index.get_level_values('tissue').unique()
+        result_list = []
+        for tissue in unique_tissues:
+            tissue_data = pd.DataFrame(nMads.loc[tissue])
+            tissue_data['tissue'] = tissue
+            result_list.append(tissue_data)
 
+        result_df = pd.concat(result_list)
+        result_df = result_df.reset_index()
+        result_df = result_df.rename(columns = {'Mean_nCounts': 'Mean_nCounts_nMad', 'n_genes_by_counts': 'n_genes_by_counts_nMad'})
+        depth_count = depth_count.merge(result_df[['samp_tissue', 'Mean_nCounts_nMad', 'n_genes_by_counts_nMad']], on="samp_tissue")
+        # Exclude those on the lower end only
+        depth_count['samp_Mean_nCounts_keep'] = depth_count['Mean_nCounts_nMad'] > -(relative_nMAD_threshold) # Direction aware
+        depth_count['samp_n_genes_by_counts_keep'] = depth_count['n_genes_by_counts_nMad'] > -(relative_nMAD_threshold) # Direction aware
+        depth_count['keep_both'] = depth_count['samp_Mean_nCounts_keep'] & depth_count['samp_n_genes_by_counts_keep']
+        adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(depth_count[depth_count['keep_both'] == True]['samp_tissue'])
+        # print filters
+        print("For sample level samp_Mean_nCounts")
+        for t in tissues:
+            print(f"for {t}:")
+            this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['Mean_nCounts'])
+            print(this_thresh)
+            
+        print("For sample level samp_n_genes_by_counts")
+        for t in tissues:
+            print(f"for {t}:")
+            this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['n_genes_by_counts'])
+            print(this_thresh)
+    
 
     # 5. Final bit of cell/sample QC: see what blood cell categories are left and the strength in their annotations.
     # There should be no epithelial or mesenchymal cells in the blood data! -However this may be an issue with keras
@@ -655,23 +793,32 @@ def main():
     if filt_blood_keras == "yes":
         adata = adata[~((adata.obs['tissue'] == 'blood') & (adata.obs['label__machine_probability'].astype('float') < 0.5))]
 
+    # Apply filters to the cells before expression normalisation
+    adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep'] & adata.obs['samples_keep']
+    adata = adata[adata.obs['keep_high_QC'] == True ]
+
     ####################################
     #### Expression Normalisation ######
     ####################################
     print("~~~~~~~~~~~~ Conducting expression normalisation ~~~~~~~~~~~~~")
     sc.pp.filter_genes(adata, min_cells=5)
+    print("Filtered genes")
 
     # Keep a copy of the raw counts
     adata.layers['counts'] = adata.X.copy()
+    print("Copied counts")
 
     # Calulate the CP10K expression
     sc.pp.normalize_total(adata, target_sum=1e4)
+    print("CP10K")
 
     # Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
     sc.pp.log1p(adata)
+    print("log1p")
 
     # identify highly variable genes and scale these ahead of PCA
-    sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=n_variable_genes, batch_key='experiment_id')
+    sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes), batch_key='experiment_id')
+    print("Found highly variable")
 
     # Check for intersection of IG, MT and RP genes in the HVGs
     print("IG")
@@ -688,6 +835,7 @@ def main():
 
     # Scale
     sc.pp.scale(adata, max_value=10)
+    print("Scaled")
 
     # Print the final shape of the high QC data
     print(f"The final shape of the high QC data is: {adata.shape}")
@@ -734,7 +882,7 @@ def main():
     pcs = list(range(1,knee_point+1))
     cols = ["{}{}".format("PC", i) for i in pcs]
     loadings.columns = cols
-    loadings.to_csv(tabdir + "/PCA_loadings.csv")
+    loadings.to_csv(tabpath + "/PCA_loadings.csv")
 
     # Save the PCA matrix 
     pca = pd.DataFrame(adata.obsm['X_pca'])
