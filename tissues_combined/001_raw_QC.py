@@ -534,7 +534,7 @@ def main():
         plt.title(t)
         plt.savefig(f"{qc_path}/nUMI_filt_nGene__per_lineage_{t}.png", bbox_inches='tight')
         plt.clf()
-        
+            
 
     # Filter for this cut off if using an absolute cut off, or define a relative cut off
     if use_absolute_nGene == "yes":
@@ -548,7 +548,7 @@ def main():
             for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
                 print(f"{l}: {this_thresh}")
-    
+        
     # 3. MT% 
     print("Filtration of cells with abnormal/low MT%")
     plt.figure(figsize=(8, 6))
@@ -622,8 +622,7 @@ def main():
                 this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
                 print(f"{l}: {this_thresh}")
 
-        
-        
+    
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
     samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
@@ -641,7 +640,7 @@ def main():
     for t in tissues:
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
-        sns.distplot(cells_sample[cells_sample['sample'].isin(adata.obs[adata.obs['tissue'] == t]['experiment_id'])].Ncells)
+        sns.distplot(cells_sample[cells_sample['sample'].isin(adata.obs[adata.obs['tissue'] == t]['samp_tissue'])].Ncells)
         plt.xlabel('Cells/sample')
         plt.axvline(x = 500, color = 'red', linestyle = '--', alpha = 0.5)
         ax.set(xlim=(0, max(cells_sample.Ncells)))
@@ -677,8 +676,9 @@ def main():
     plt.clf()
 
     # Plot the distribution per tissue
+    plt.figure(figsize=(8, 6))
     for t in tissues:
-        samps = adata.obs[adata.obs['tissue'] == t]['experiment_id']
+        samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
         data = depth_count[depth_count.index.isin(samps)]["Mean_nCounts"]
         sns.distplot(data, hist=False, rug=True, label=t)
 
@@ -688,7 +688,7 @@ def main():
     plt.clf()
 
     for t in tissues:
-        samps = adata.obs[adata.obs['tissue'] == t]['experiment_id']
+        samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
         data = depth_count[depth_count.index.isin(samps)]["n_genes_by_counts"]
         sns.distplot(data, hist=False, rug=True, label=t)
 
@@ -699,7 +699,7 @@ def main():
 
     # Within tissue
     for t in tissues:
-        samps = adata.obs[adata.obs['tissue'] == t]['experiment_id']
+        samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
         plt.figure(figsize=(8, 6))
         plt.scatter(depth_count[depth_count.index.isin(samps)]["Mean_nCounts"], depth_count[depth_count.index.isin(samps)]["n_genes_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
         plt.xlabel('Mean counts / cell')
@@ -764,10 +764,10 @@ def main():
             print(f"for {t}:")
             this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['n_genes_by_counts'])
             print(this_thresh)
-    
 
-    # 5. Final bit of cell/sample QC: see what blood cell categories are left and the strength in their annotations.
-    # There should be no epithelial or mesenchymal cells in the blood data! -However this may be an issue with keras
+
+        # 5. Final bit of cell/sample QC: see what blood cell categories are left and the strength in their annotations.
+        # There should be no epithelial or mesenchymal cells in the blood data! -However this may be an issue with keras
     blood = adata[adata.obs['tissue'] == "blood"]
     # Plot the distribution of the cell confidences across lineages and categories in blood cells
     for c in cats:
@@ -776,7 +776,8 @@ def main():
 
     plt.legend()
     plt.title("Blood")
-    plt.xlabel('Keras annotation probability')
+    plt.xlim(0, 1)
+    plt.xlabel('Keras annotation probability - max cell-type score')
     plt.savefig(qc_path + '/postQC_dist_keras_conf_blood_category.png', bbox_inches='tight')
     plt.clf()
 
@@ -787,6 +788,7 @@ def main():
     plt.legend()
     plt.title("Blood")
     plt.xlabel('Keras annotation probability')
+    plt.xlim(0, 1)
     plt.savefig(qc_path + '/postQC_dist_keras_conf_blood_lineage.png', bbox_inches='tight')
     plt.clf()
 
