@@ -69,6 +69,7 @@ def nmad_append(df, var, group=[]):
         else: 
             temp.set_index("cell", inplace=True)
         
+        #temp = temp[var]
         temp = temp.reindex(df.index)
         return(temp[var])
     else:
@@ -85,25 +86,9 @@ def parse_options():
         )
     
     parser.add_argument(
-            '-b', '--blood_file',
+            '-i', '--input_file',
             action='store',
-            dest='blood_file',
-            required=True,
-            help=''
-        )
-    
-    parser.add_argument(
-            '-t', '--TI_file',
-            action='store',
-            dest='TI_file',
-            required=True,
-            help=''
-        )
-
-    parser.add_argument(
-            '-r', '--rectum_file',
-            action='store',
-            dest='rectum_file',
+            dest='input_file',
             required=True,
             help=''
         )
@@ -149,6 +134,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-use_rel_mad', '--use_relative_mad',
+        action='store',
+        dest='use_relative_mad',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
         '-groups', '--relative_grouping',
         action='store',
         dest='relative_grouping',
@@ -165,6 +158,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-rel_nUMI_log', '--relative_nUMI_log',
+        action='store',
+        dest='relative_nUMI_log',
+        required=True,
+        help=''
+    )    
+    
+    parser.add_argument(
         '-nGene', '--min_nGene',
         action='store',
         dest='min_nGene',
@@ -176,6 +177,14 @@ def parse_options():
         '-abs_nGene', '--use_absolute_nGene',
         action='store',
         dest='use_absolute_nGene',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-rel_nGene_log', '--relative_nGene_log',
+        action='store',
+        dest='relative_nGene_log',
         required=True,
         help=''
     )
@@ -200,6 +209,14 @@ def parse_options():
         '-abs_MT', '--use_absolute_MT',
         action='store',
         dest='use_absolute_MT',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-abs_max_MT', '--absolute_max_MT',
+        action='store',
+        dest='absolute_max_MT',
         required=True,
         help=''
     )
@@ -274,12 +291,8 @@ def parse_options():
 def main():
     # Parse options
     inherited_options = parse_options()
-    blood_file = inherited_options.blood_file
-    # blood_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_analysis/blood/results/merged_h5ad/outlier_filtered_adata.h5ad"
-    TI_file = inherited_options.TI_file
-    # TI_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/anderson_ti_freeze003_004-otar-processed.h5ad"
-    rectum_file = inherited_options.rectum_file
-    # rectum_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/2023_09_rectum/adata.h5ad"
+    input_file = inherited_options.input_file
+    # input_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input.h5ad"
     outdir = inherited_options.outdir
     # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined"
     discard_other_inflams = inherited_options.discard_other_inflams
@@ -290,15 +303,21 @@ def main():
     all_blood_immune = inherited_options.all_blood_immune
     # all_blood_immune = "yes"
     min_nUMI = float(inherited_options.min_nUMI)
-    # min_nUMI = 200
+    # min_nUMI = 300
     use_absolute_nUMI = inherited_options.use_absolute_nUMI
-    # use_absolute_nUMI = "no"
+    # use_absolute_nUMI = "yes"
+    use_relative_mad = inherited_options.use_relative_mad
+    # use_relative_mad = "yes"
     relative_nMAD_threshold = float(inherited_options.relative_nMAD_threshold)
     # relative_nMAD_threshold = 2.5
+    relative_nUMI_log = inherited_options.relative_nUMI_log
+    # relative_nUMI_log = "yes"
     min_nGene = float(inherited_options.min_nGene)
-    # min_nGene = 400
+    # min_nGene = 100
     use_absolute_nGene = inherited_options.use_absolute_nGene
-    # use_absolute_nGene = "no"
+    # use_absolute_nGene = "yes"
+    relative_nGene_log = inherited_options.relative_nGene_log
+    # relative_nGene_log = "yes"
     MTgut = float(inherited_options.MT_thresh_gut)
     # MTgut = 50
     MTblood = float(inherited_options.MT_thresh_blood)
@@ -325,9 +344,7 @@ def main():
     # remove_problem_genes = "yes"
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
-    print(f"blood_file:{blood_file}")
-    print(f"TI_file: {TI_file}")
-    print(f"rectum_file:{rectum_file}")
+    print(f"input_file: {input_file}")
     print(f"outdir:{outdir}")
     print(f"discard_other_inflams:{discard_other_inflams}")
     print(f"all_blood_immune:{all_blood_immune}")
@@ -335,8 +352,10 @@ def main():
     print(f"use_absolute_nUMI:{use_absolute_nUMI}")
     print(f"relative_grouping:{relative_grouping}")
     print(f"relative_nMAD_threshold:{relative_nMAD_threshold}")
+    print(f"relative_nUMI_log:{relative_nUMI_log}")
     print(f"min_nGene:{min_nGene}")
     print(f"use_absolute_nGene:{use_absolute_nGene}")
+    print(f"relative_nGene_log:{relative_nGene_log}")
     print(f"MTgut:{MTgut}")
     print(f"MTblood:{MTblood}")
     print(f"use_absolute_MT:{use_absolute_MT}")
@@ -373,25 +392,14 @@ def main():
     sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
 
     # Load the given files and perform initial formatting / filters
-    blood = sc.read_h5ad(blood_file)
-    blood.obs['tissue'] = "blood"
-    blood.obs = blood.obs.rename(columns = {'Keras:predicted_celltype_probability': 'label__machine_probability'})
-    blood.obs = blood.obs.rename(columns = {'Keras:predicted_celltype': 'label__machine'})
-    gene_conv = blood.var[['gene_symbols']]
-    gene_conv = gene_conv.reset_index()
-    TI = sc.read_h5ad(TI_file)
-    TI.obs['tissue'] = "TI"
-    TI.obs = TI.obs.rename(columns = {'predicted_celltype_probability': 'label__machine_probability'})
-    rectum = sc.read_h5ad(rectum_file)
-    rectum.obs['tissue'] = "rectum"
-    rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype_probability': 'label__machine_probability'})
-    rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype': 'label__machine'})
-    adata = ad.concat([blood, TI, rectum])
-    adata.var = adata.var.reset_index()
-    adata.var = adata.var.merge(gene_conv, on="index", how="left")
-    adata.var.set_index("index", inplace=True)
-    del blood, TI, rectum
-    print("Loaded the input files and merged")
+    adata = sc.read_h5ad(input_file)
+    # make sure we have counts
+    if "counts" in adata.layers.keys():
+        adata.X = adata.layers['counts'].copy()
+    
+    if "lognorm" in adata.layers.keys():
+        del adata.layers["lognorm"]
+    
     print(f"Initial shape of the data is:{adata.shape}")
 
     # Discard other inflams if wanted to 
@@ -408,9 +416,10 @@ def main():
     adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['Stem_cells', 'Secretory', 'Enterocyte']), 'Epithelial', adata.obs['lineage'])
     adata.obs['lineage'] = np.where(adata.obs['category__machine']== 'Mesenchymal', 'Mesenchymal', adata.obs['lineage'])
 
-    # Make all blood lineages immune? 
+    # Make all blood lineages immune (and categories 'blood')? 
     if all_blood_immune == "yes":
         adata.obs.loc[adata.obs['tissue'] == 'blood', 'lineage'] = 'Immune'
+        adata.obs.loc[adata.obs['tissue'] == 'blood', 'category__machine'] = 'blood'
 
 
     ####################################
@@ -428,7 +437,7 @@ def main():
     # plot a distribution of nUMI per tissue
     adata.obs['total_counts'] = adata.obs['total_counts'].astype(int)
     tissues = np.unique(adata.obs['tissue'])
-    cats = np.unique(adata.obs['category__machine'])
+    cats = np.unique(adata.obs['category__machine'].astype(str))
     lins = np.unique(adata.obs['lineage'])
 
     plt.figure(figsize=(8, 6))
@@ -439,7 +448,8 @@ def main():
 
     plt.legend()
     plt.xlabel('log10(nUMI)')
-    plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
+    plt.title(f"Absolute cut off (black): {min_nUMI}")
+    plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5)
     plt.savefig(qc_path + '/raw_nUMI_per_tissue.png', bbox_inches='tight')
     plt.clf()
 
@@ -454,10 +464,11 @@ def main():
         
         plt.legend()
         plt.xlabel('log10(nUMI)')
-        plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
-        plt.title(t)
+        plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5)
+        plt.title(f"{t} - Absolute cut off (black): {min_nUMI}")
         plt.savefig(f"{qc_path}/raw_nUMI_per_category_{t}.png", bbox_inches='tight')
         plt.clf()
+
 
     # Plot per lineage, within tissue
     for t in tissues:
@@ -466,28 +477,46 @@ def main():
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
             data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].total_counts)
-            sns.distplot(data, hist=False, rug=True, label=l)
+            absolute_diff = np.abs(data - np.median(data))
+            mad = np.median(absolute_diff)
+            cutoff = np.median(data) - (relative_nMAD_threshold * mad)
+            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
         plt.xlabel('log10(nUMI)')
-        plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
-        plt.title(t)
+        plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5,  label=f"absolute: {min_nUMI}")
+        plt.title(f"{t} - Absolute cut off (black): {min_nUMI}")
         plt.savefig(f"{qc_path}/raw_nUMI_per_lineage_{t}.png", bbox_inches='tight')
         plt.clf()
 
-    # Filter for this cut off if using an absolute cut off, or define a relative cut off
-    if use_absolute_nUMI == "yes":
+
+    # Filter for this cut off if using an absolute cut off, or define a relative cut off or BOTH. NOTE: Can do this based on absolute or relative counts
+    adata.obs['log10_total_counts'] = np.log10(adata.obs['total_counts'])
+    if use_absolute_nUMI == "yes" and use_relative_mad == "no":
         # adata = adata[adata.obs['total_counts'] > min_nUMI]
         adata.obs['total_counts_keep'] = adata[adata.obs['total_counts'] > min_nUMI]
-    else:
+
+    if use_relative_mad == "yes":
         print("Defining nMAD cut off: total_counts_keep")
-        adata.obs['total_counts_nMAD'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
+        if relative_nUMI_log == "yes":
+            adata.obs['total_counts_nMAD'] = nmad_append(adata.obs, 'log10_total_counts', relative_grouping)
+        else:
+            adata.obs['total_counts_nMAD'] = nmad_append(adata.obs, 'total_counts', relative_grouping)
+        
         adata.obs['total_counts_keep'] = adata.obs['total_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        # However, can also apply the min threshold still:
+        if use_absolute_nUMI == "yes": 
+            adata.obs.loc[adata.obs['total_counts'] < min_nUMI, 'total_counts_keep'] = False
+        
+        # print the results
         for t in tissues:
             print(f"Min for {t}:")
             for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
                 print(f"{l}: {this_thresh}")
+        
 
     # 2. nGene
     print("Filtration of cells with low nGenes")
@@ -499,8 +528,9 @@ def main():
 
     plt.legend()
     plt.xlabel('log10(nGene)')
+    plt.title(f"Absolute cut off: {min_nGene}")
     plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
-    plt.savefig(qc_path + '/nUMI_filt_nGene_per_tissue.png', bbox_inches='tight')
+    plt.savefig(qc_path + '/raw_nGene_per_tissue.png', bbox_inches='tight')
     plt.clf()
 
     # Plot per category, within tissue
@@ -514,9 +544,9 @@ def main():
         
         plt.legend()
         plt.xlabel('log10(nGene)')
-        plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
-        plt.title(t)
-        plt.savefig(f"{qc_path}/nUMI_filt_nGene_per_category_{t}.png", bbox_inches='tight')
+        plt.axvline(x = np.log10(min_nGene), color = 'black', linestyle = '--', alpha = 0.5)
+        plt.title(f"{t} - Absolute cut off (black): {min_nGene}")
+        plt.savefig(f"{qc_path}/raw_nGene_per_category_{t}.png", bbox_inches='tight')
         plt.clf()
 
     # Plot per lineage, within tissue
@@ -526,29 +556,47 @@ def main():
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
             data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].n_genes_by_counts)
-            sns.distplot(data, hist=False, rug=True, label=l)
+            absolute_diff = np.abs(data - np.median(data))
+            mad = np.median(absolute_diff)
+            cutoff = np.median(data) - (relative_nMAD_threshold * mad)
+            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
         plt.xlabel('log10(nGene)')
-        plt.axvline(x = np.log10(min_nGene), color = 'red', linestyle = '--', alpha = 0.5)
-        plt.title(t)
-        plt.savefig(f"{qc_path}/nUMI_filt_nGene__per_lineage_{t}.png", bbox_inches='tight')
+        plt.axvline(x = np.log10(min_nGene), color = 'black', linestyle = '--', alpha = 0.5)
+        plt.title(f"{t} - Absolute cut off (black): {min_nGene}")
+        plt.savefig(f"{qc_path}/raw_nGene_per_lineage_{t}.png", bbox_inches='tight')
         plt.clf()
-            
-
+                
+        
     # Filter for this cut off if using an absolute cut off, or define a relative cut off
-    if use_absolute_nGene == "yes":
-        adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts'].astype(int) > min_nGene
-    else:
-        print("Defining nMAD cut off: nGenes")
-        adata.obs['n_genes_by_counts_nMAD'] = nmad_append(adata.obs, 'n_genes_by_counts', relative_grouping)
+    adata.obs['log10_n_genes_by_counts'] = np.log10(adata.obs['n_genes_by_counts'])
+    if use_absolute_nGene == "yes" and use_relative_mad == "no":
+        # adata = adata[adata.obs['total_counts'] > min_nUMI]
+        adata.obs['n_genes_by_counts_keep'] = adata[adata.obs['n_genes_by_counts'].astype(int) > min_nGene]
+
+    if use_relative_mad == "yes":
+        print("Defining nMAD cut off: total_counts_keep")
+        if relative_nGene_log == "yes":
+            adata.obs['n_genes_by_counts_nMAD'] = nmad_append(adata.obs, 'log10_n_genes_by_counts', relative_grouping)
+        else:
+            adata.obs['n_genes_by_counts_nMAD'] = nmad_append(adata.obs, 'n_genes_by_counts', relative_grouping)
+        
         adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        # However, can also apply the min threshold still:
+        if use_absolute_nGene == "yes": 
+            adata.obs.loc[adata.obs['n_genes_by_counts'] < min_nGene, 'n_genes_by_counts_keep'] = False
+        
+        # print the results
         for t in tissues:
             print(f"Min for {t}:")
             for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
-                print(f"{l}: {this_thresh}")
-        
+                print(f"{l}: {this_thresh}")        
+
+
     # 3. MT% 
     print("Filtration of cells with abnormal/low MT%")
     plt.figure(figsize=(8, 6))
@@ -559,9 +607,10 @@ def main():
 
     plt.legend()
     plt.xlabel('MT%')
+    plt.xlim(0,100)
     plt.axvline(x = MTgut, color = 'green', linestyle = '--', alpha = 0.5)
     plt.axvline(x = MTblood, color = 'red', linestyle = '--', alpha = 0.5)
-    plt.savefig(qc_path + '/nUMI_nGene_filt_MT_per_tissue.png', bbox_inches='tight')
+    plt.savefig(qc_path + '/raw_MT_per_tissue.png', bbox_inches='tight')
     plt.clf()
 
     # Plot per category, within tissue
@@ -577,11 +626,13 @@ def main():
         plt.xlabel('MT%')
         if t == "blood":
             plt.axvline(x = MTblood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - Absolute cut off: {MTblood}")
         else:
             plt.axvline(x = MTgut, color = 'green', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - Absolute cut off: {MTgut}")
         
-        plt.title(t)
-        plt.savefig(f"{qc_path}/nUMI_nGene_filt_MT_per_category_{t}.png", bbox_inches='tight')
+        plt.xlim(0,100)
+        plt.savefig(f"{qc_path}/raw_MT_per_category_{t}.png", bbox_inches='tight')
         plt.clf()
 
     # Plot per lineage, within tissue
@@ -590,22 +641,29 @@ def main():
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
-            data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].n_genes_by_counts)
-            sns.distplot(data, hist=False, rug=True, label=l)
+            data = adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].pct_counts_gene_group__mito_transcript
+            absolute_diff = np.abs(data - np.median(data))
+            mad = np.median(absolute_diff)
+            cutoff = np.median(data) + (relative_nMAD_threshold * mad)
+            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
-        plt.xlabel('log10(nGene)')
+        plt.xlabel('MT%')
         if t == "blood":
-            plt.axvline(x = MTblood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = MTblood, color = 'black', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - Absolute cut off: {MTblood}")
         else:
-            plt.axvline(x = MTgut, color = 'green', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = MTgut, color = 'black', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - Absolute cut off (black): {MTgut}")
         
-        plt.title(t)
-        plt.savefig(f"{qc_path}/nUMI_filt_nGene__per_lineage_{t}.png", bbox_inches='tight')
+        plt.xlim(0,100)
+        plt.savefig(f"{qc_path}/raw_MT_per_lineage_{t}.png", bbox_inches='tight')
         plt.clf()
 
     # Filter on the basis of these thresholds
-    if use_absolute_MT == "yes":
+    if use_absolute_MT == "yes" and use_relative_mad == "no":
         blood_mask = (adata.obs['tissue'] == 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTblood)
         gut_tissue_mask = (adata.obs['tissue'] != 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTgut)
         adata['MT_perc_keep'] = blood_mask | gut_tissue_mask
@@ -613,8 +671,9 @@ def main():
         print("Defining MAD cut off: pct_counts_gene_group__mito_transcript")
         adata.obs['MT_perc_nMads'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
         adata.obs['MT_perc_keep'] = adata.obs['MT_perc_nMads'] < relative_nMAD_threshold # Direction aware
-        # Apply the absolute max still
-        adata.obs.loc[adata.obs['pct_counts_gene_group__mito_transcript'] > absolute_max_MT, 'MT_perc_keep'] = False
+        if use_absolute_MT == "yes":
+            # Apply the absolute max still
+            adata.obs.loc[adata.obs['pct_counts_gene_group__mito_transcript'] > absolute_max_MT, 'MT_perc_keep'] = False
         # Print filters
         for t in tissues:
             print(f"Max for {t}:")
@@ -622,7 +681,7 @@ def main():
                 this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
                 print(f"{l}: {this_thresh}")
 
-    
+        
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
     samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
@@ -633,7 +692,7 @@ def main():
     plt.xlabel('Cells/sample')
     plt.axvline(x = 500, color = 'red', linestyle = '--', alpha = 0.5)
     ax.set(xlim=(0, max(cells_sample.Ncells)))
-    plt.savefig(f"{qc_path}/postQC_cells_per_sample_all.png", bbox_inches='tight')
+    plt.savefig(f"{qc_path}/sample_cells_per_sample_all.png", bbox_inches='tight')
     plt.clf()
 
     # Also do this within tissue
@@ -644,7 +703,7 @@ def main():
         plt.xlabel('Cells/sample')
         plt.axvline(x = 500, color = 'red', linestyle = '--', alpha = 0.5)
         ax.set(xlim=(0, max(cells_sample.Ncells)))
-        plt.savefig(f"{qc_path}/postQC_cells_per_sample_{t}.png", bbox_inches='tight')
+        plt.savefig(f"{qc_path}/sample_cells_per_sample_{t}.png", bbox_inches='tight')
         plt.clf()
         
     # Have a look at those cells with high number of cells within each tissue
@@ -672,7 +731,7 @@ def main():
     plt.scatter(depth_count["Mean_nCounts"], depth_count["n_genes_by_counts"],  c=depth_count["High_cell_sample"], alpha=0.7)
     plt.xlabel('Mean counts / cell')
     plt.ylabel('Mean genes detected / cell')
-    plt.savefig(f"{qc_path}/postQC_mean_counts_ngenes_all.png", bbox_inches='tight')
+    plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_all.png", bbox_inches='tight')
     plt.clf()
 
     # Plot the distribution per tissue
@@ -684,7 +743,7 @@ def main():
 
     plt.legend()
     plt.xlabel('Mean nCounts/cell')
-    plt.savefig(qc_path + '/postQC_dist_mean_counts.png', bbox_inches='tight')
+    plt.savefig(qc_path + '/sample_dist_mean_counts.png', bbox_inches='tight')
     plt.clf()
 
     for t in tissues:
@@ -694,7 +753,7 @@ def main():
 
     plt.legend()
     plt.xlabel('Mean nCounts/cell')
-    plt.savefig(qc_path + '/postQC_dist_mean_nGenes.png', bbox_inches='tight')
+    plt.savefig(qc_path + '/sample_dist_mean_nGenes.png', bbox_inches='tight')
     plt.clf()
 
     # Within tissue
@@ -707,17 +766,18 @@ def main():
         if t == "blood":
             plt.axvline(x = min_mean_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_mean_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_mean_nCount_per_samp_blood}, min_mean_nGene: {min_mean_nGene_per_samp_blood}")
         else:
             plt.axvline(x = min_mean_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_mean_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_mean_nCount_per_samp_gut}, min_mean_nGene: {min_mean_nGene_per_samp_gut}")
         
-        plt.title(t)
-        plt.savefig(f"{qc_path}/postQC_mean_counts_ngenes_{t}.png", bbox_inches='tight')
+        plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_{t}.png", bbox_inches='tight')
         plt.clf()
 
     # These are clearly different across tissues
     # Either apply absolute thresholds or a relative cut off
-    if use_abs_per_samp == "yes":
+    if use_abs_per_samp == "yes" and use_relative_mad == "no":
         blood_keep = (depth_count['Mean_nCounts'] > min_mean_nCount_per_samp_blood) & (depth_count['n_genes_by_counts'] > min_mean_nGene_per_samp_blood)
         blood_keep = blood_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] == "blood"]['experiment_id'])
         blood_keep = blood_keep[blood_keep == True].index
@@ -742,7 +802,7 @@ def main():
             tissue_data = pd.DataFrame(nMads.loc[tissue])
             tissue_data['tissue'] = tissue
             result_list.append(tissue_data)
-
+            #
         result_df = pd.concat(result_list)
         result_df = result_df.reset_index()
         result_df = result_df.rename(columns = {'Mean_nCounts': 'Mean_nCounts_nMad', 'n_genes_by_counts': 'n_genes_by_counts_nMad'})
@@ -758,44 +818,14 @@ def main():
             print(f"for {t}:")
             this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['Mean_nCounts'])
             print(this_thresh)
-            
+        #
         print("For sample level samp_n_genes_by_counts")
         for t in tissues:
             print(f"for {t}:")
             this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['n_genes_by_counts'])
             print(this_thresh)
 
-
-        # 5. Final bit of cell/sample QC: see what blood cell categories are left and the strength in their annotations.
-        # There should be no epithelial or mesenchymal cells in the blood data! -However this may be an issue with keras
-    blood = adata[adata.obs['tissue'] == "blood"]
-    # Plot the distribution of the cell confidences across lineages and categories in blood cells
-    for c in cats:
-        data = blood.obs[blood.obs['category__machine'] == c]['label__machine_probability']
-        sns.distplot(data, hist=False, rug=True, label=c)
-
-    plt.legend()
-    plt.title("Blood")
-    plt.xlim(0, 1)
-    plt.xlabel('Keras annotation probability - max cell-type score')
-    plt.savefig(qc_path + '/postQC_dist_keras_conf_blood_category.png', bbox_inches='tight')
-    plt.clf()
-
-    for c in lins:
-        data = blood.obs[blood.obs['lineage'] == c]['label__machine_probability']
-        sns.distplot(data, hist=False, rug=True, label=c)
-
-    plt.legend()
-    plt.title("Blood")
-    plt.xlabel('Keras annotation probability')
-    plt.xlim(0, 1)
-    plt.savefig(qc_path + '/postQC_dist_keras_conf_blood_lineage.png', bbox_inches='tight')
-    plt.clf()
-
-    if filt_blood_keras == "yes":
-        adata = adata[~((adata.obs['tissue'] == 'blood') & (adata.obs['label__machine_probability'].astype('float') < 0.5))]
-
-    # Apply filters to the cells before expression normalisation
+    # 5. Apply filters to the cells before expression normalisation
     adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep'] & adata.obs['samples_keep']
     adata = adata[adata.obs['keep_high_QC'] == True ]
 
@@ -857,7 +887,8 @@ def main():
     sc.pl.pca(adata, save="True")
 
     # PLot Elbow plot
-    sc.pl.pca_variance_ratio(adata, log=True, save=True, n_pcs = 50)
+    sc.pl.pca_variance_ratio(adata, log=True, save=True, c="tissue", n_pcs = 50)
+    
 
     #  Determine the optimimum number of PCs
     # Extract PCs
