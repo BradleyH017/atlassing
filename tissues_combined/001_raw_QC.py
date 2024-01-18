@@ -393,13 +393,13 @@ def main():
 
     # Load the given files and perform initial formatting / filters
     adata = sc.read_h5ad(input_file)
-    # make sure we have counts
+    # make sure we have counts as .X and no others
     if "counts" in adata.layers.keys():
         adata.X = adata.layers['counts'].copy()
-    
+
     if "lognorm" in adata.layers.keys():
         del adata.layers["lognorm"]
-    
+
     print(f"Initial shape of the data is:{adata.shape}")
 
     # Discard other inflams if wanted to 
@@ -681,7 +681,7 @@ def main():
                 this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
                 print(f"{l}: {this_thresh}")
 
-        
+            
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
     samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
@@ -705,7 +705,7 @@ def main():
         ax.set(xlim=(0, max(cells_sample.Ncells)))
         plt.savefig(f"{qc_path}/sample_cells_per_sample_{t}.png", bbox_inches='tight')
         plt.clf()
-        
+
     # Have a look at those cells with high number of cells within each tissue
     high_samps = np.array(cells_sample.loc[cells_sample.Ncells > 10000, "sample"])
     low_samps = np.array(cells_sample.loc[cells_sample.Ncells < 500, "sample"])
@@ -849,7 +849,7 @@ def main():
     print("log1p")
 
     # identify highly variable genes and scale these ahead of PCA
-    sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes), batch_key='experiment_id')
+    sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))
     print("Found highly variable")
 
     # Check for intersection of IG, MT and RP genes in the HVGs
@@ -884,11 +884,11 @@ def main():
     sc.tl.pca(adata, svd_solver='arpack')
 
     # Plot PCA
-    sc.pl.pca(adata, save="True")
+    sc.pl.pca(adata, color="tissue", save="_tissue.png")
+    sc.pl.pca(adata, color="category__machine", save="_category.png")
 
     # PLot Elbow plot
-    sc.pl.pca_variance_ratio(adata, log=True, save=True, c="tissue", n_pcs = 50)
-    
+    sc.pl.pca_variance_ratio(adata, log=True, save=True, n_pcs = 50)
 
     #  Determine the optimimum number of PCs
     # Extract PCs
@@ -945,7 +945,6 @@ def main():
     model_default.train(use_gpu=True)
     SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
     adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
-
 
     # 3. scANVI
     # Performing this across lineage
