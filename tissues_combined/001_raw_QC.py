@@ -140,6 +140,14 @@ def parse_options():
         required=True,
         help=''
     )
+
+    parser.add_argument(
+        '-lineage_column', '--lineage_column',
+        action='store',
+        dest='lineage_column',
+        required=True,
+        help=''
+    )
     
     parser.add_argument(
         '-groups', '--relative_grouping',
@@ -292,56 +300,32 @@ def main():
     # Parse options
     inherited_options = parse_options()
     input_file = inherited_options.input_file
-    # input_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input.h5ad"
     outdir = inherited_options.outdir
-    # outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined"
     discard_other_inflams = inherited_options.discard_other_inflams
-    # discard_other_inflams = "yes"
     relative_grouping = inherited_options.relative_grouping
     relative_grouping = relative_grouping.split("|")
-    # relative_grouping = ["tissue", "lineage"]
     all_blood_immune = inherited_options.all_blood_immune
-    # all_blood_immune = "yes"
     min_nUMI = float(inherited_options.min_nUMI)
-    # min_nUMI = 300
     use_absolute_nUMI = inherited_options.use_absolute_nUMI
-    # use_absolute_nUMI = "yes"
     use_relative_mad = inherited_options.use_relative_mad
-    # use_relative_mad = "yes"
+    lineage_column = inherited_options.lineage_column
     relative_nMAD_threshold = float(inherited_options.relative_nMAD_threshold)
-    # relative_nMAD_threshold = 2.5
     relative_nUMI_log = inherited_options.relative_nUMI_log
-    # relative_nUMI_log = "yes"
     min_nGene = float(inherited_options.min_nGene)
-    # min_nGene = 100
     use_absolute_nGene = inherited_options.use_absolute_nGene
-    # use_absolute_nGene = "yes"
     relative_nGene_log = inherited_options.relative_nGene_log
-    # relative_nGene_log = "yes"
     MTgut = float(inherited_options.MT_thresh_gut)
-    # MTgut = 50
     MTblood = float(inherited_options.MT_thresh_blood)
-    # MTblood = 20
     use_absolute_MT = inherited_options.use_absolute_MT
-    # use_absolute_MT = "no"
     absolute_max_MT = float(inherited_options.absolute_max_MT)
-    # absolute_max_MT = 50
     min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
-    # min_mean_nCount_per_samp_blood = 3000
     min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
-    # min_mean_nCount_per_samp_gut = 7500
     min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
-    # min_mean_nGene_per_samp_blood = 1000
     min_mean_nGene_per_samp_gut = float(inherited_options.min_mean_nGene_per_samp_gut)
-    # min_mean_nGene_per_samp_gut = 1750
     use_abs_per_samp = inherited_options.use_abs_per_samp
-    # use_abs_per_samp = "no"
     filt_blood_keras = inherited_options.filt_blood_keras
-    # filt_blood_keras = "no"
     n_variable_genes = float(inherited_options.n_variable_genes)
-    # n_variable_genes = 4000
     remove_problem_genes = inherited_options.remove_problem_genes
-    # remove_problem_genes = "yes"
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file: {input_file}")
@@ -406,19 +390,10 @@ def main():
     if discard_other_inflams == "yes":
         adata = adata[adata.obs['disease_status'].isin(['healthy', 'cd'])]
 
-    # Append the annotation (category) and lineage
-    annot = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv")
-    annot['label__machine'] = annot['label__machine_retired']
-    adata.obs['cell'] = adata.obs.index
-    adata.obs = adata.obs.merge(annot[['category__machine', 'label__machine']], on='label__machine', how ='left')
-    adata.obs.set_index('cell', inplace=True)
-    adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['B_Cell', 'B_Cell_plasma', 'T_Cell', 'Myeloid']), 'Immune', "")
-    adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['Stem_cells', 'Secretory', 'Enterocyte']), 'Epithelial', adata.obs['lineage'])
-    adata.obs['lineage'] = np.where(adata.obs['category__machine']== 'Mesenchymal', 'Mesenchymal', adata.obs['lineage'])
-
     # Make all blood lineages immune (and categories 'blood')? 
     if all_blood_immune == "yes":
-        adata.obs.loc[adata.obs['tissue'] == 'blood', 'lineage'] = 'Immune'
+        adata.obs.loc[adata.obs['tissue'] == 'blood', lineage_column] = 'Immune'
+        adata.obs['category__machine'] = adata.obs['category__machine'].astype(str)
         adata.obs.loc[adata.obs['tissue'] == 'blood', 'category__machine'] = 'blood'
 
 
@@ -438,7 +413,7 @@ def main():
     adata.obs['total_counts'] = adata.obs['total_counts'].astype(int)
     tissues = np.unique(adata.obs['tissue'])
     cats = np.unique(adata.obs['category__machine'].astype(str))
-    lins = np.unique(adata.obs['lineage'])
+    lins = np.unique(adata.obs[lineage_column])
 
     plt.figure(figsize=(8, 6))
     fig,ax = plt.subplots(figsize=(8,6))
@@ -476,7 +451,7 @@ def main():
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
-            data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].total_counts)
+            data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].total_counts)
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             cutoff = np.median(data) - (relative_nMAD_threshold * mad)
@@ -513,10 +488,10 @@ def main():
         # print the results
         for t in tissues:
             print(f"Min for {t}:")
-            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
-                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
+                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
                 print(f"{l}: {this_thresh}")
-        
+
 
     # 2. nGene
     print("Filtration of cells with low nGenes")
@@ -555,7 +530,7 @@ def main():
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
-            data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].n_genes_by_counts)
+            data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].n_genes_by_counts)
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             cutoff = np.median(data) - (relative_nMAD_threshold * mad)
@@ -592,10 +567,10 @@ def main():
         # print the results
         for t in tissues:
             print(f"Min for {t}:")
-            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
-                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
+                this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
                 print(f"{l}: {this_thresh}")        
-
+    
 
     # 3. MT% 
     print("Filtration of cells with abnormal/low MT%")
@@ -641,7 +616,7 @@ def main():
         plt.figure(figsize=(8, 6))
         fig,ax = plt.subplots(figsize=(8,6))
         for l in lins:
-            data = adata.obs[(adata.obs.tissue == t) & (adata.obs.lineage == l)].pct_counts_gene_group__mito_transcript
+            data = adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].pct_counts_gene_group__mito_transcript
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             cutoff = np.median(data) + (relative_nMAD_threshold * mad)
@@ -677,8 +652,8 @@ def main():
         # Print filters
         for t in tissues:
             print(f"Max for {t}:")
-            for l in np.unique(adata.obs[adata.obs['tissue'] == t]['lineage']):
-                this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs['lineage'] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
+            for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
+                this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
                 print(f"{l}: {this_thresh}")
 
             
@@ -723,7 +698,7 @@ def main():
         # Also annotate the samples with low number of cells - Are these sequenced very deeply?
         if samp in low_samps:
             depth_count.iloc[s,2] = "Green"
-
+    
     depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
 
     # Plot
@@ -952,7 +927,7 @@ def main():
     scanvi_model = scvi.model.SCANVI.from_scvi_model(
         model,
         adata=adata,
-        labels_key="lineage",
+        labels_key=lineage_column,
         unlabeled_category="Unknown",
     )
     scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
@@ -970,9 +945,6 @@ def main():
     sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
 
     # Save pre-benchmark
-    if os.path.exists(objpath) == False:
-        os.mkdir(objpath)
-
     adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
     # Compute NN and UMAP using the recommended number of PCs
@@ -1011,7 +983,7 @@ def main():
         pre_integrated_embedding_obsm_key="X_pca"
     )   
     bm.benchmark()
-    
+
     # Get the results out
     df = bm.get_results(min_max_scale=False)
     print(df)
