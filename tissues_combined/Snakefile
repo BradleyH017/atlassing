@@ -50,7 +50,7 @@ rule qc_raw:
         #BSUB -R "select[mem>{resources.mem}] rusage[mem={resources.mem}] span[hosts=1]"
         #BSUB -J {wildcards.tissue}
 
-        tissues_combined/001_raw_QC_sm.py
+        python 001_raw_QC_sm.py
         --input_file {input}
         --tissue {wildcards.tissue}
         --discard_other_inflams {params.discard_other_inflams}
