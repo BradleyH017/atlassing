@@ -1,0 +1,78 @@
+rule qc_raw:
+    input:
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad"
+    output:
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/{tissue}/objects/adata_PCAd_batched.h5ad"
+    params:
+        discard_other_inflams="yes", 
+        all_blood_immune="yes",
+        min_nUMI=300,
+        use_absolute_nUMI="yes",
+        use_relative_mad="yes",
+        lineage_column="sum_majority_lineage",
+        relative_grouping="tissue|sum_majority_lineage",
+        relative_nMAD_threshold=3,
+        relative_nUMI_log="yes",
+        min_nGene=100,
+        use_absolute_nGene="yes",
+        relative_nGene_log="yes",
+        MT_thresh_gut=50,
+        MT_thresh_blood=20,
+        use_absolute_MT="yes",
+        absolute_max_MT=50,
+        min_mean_nCount_per_samp_blood=3000,
+        min_mean_nCount_per_samp_gut=5000,
+        min_mean_nGene_per_samp_blood=1000,
+        min_mean_nGene_per_samp_gut=750,
+        use_abs_per_samp="no",
+        filt_blood_keras="no",
+        n_variable_genes=4000,
+        remove_problem_genes="yes"
+    #conda:
+    #    "scvi-env_environment.yaml"
+    resources:
+        mem=60000,
+        queue='long',
+        mem_mb=60000,
+        mem_mib=60000,
+        disk_mb=60000,
+        tmpdir="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/tmp"
+    script:
+        """
+        #!/bin/bash
+        #BSUB -o sm_logs/snakemake_qc-%J-output.log
+        #BSUB -e sm_logs/snakemake_qc-%J-error.log 
+        #BSUB -q {resources.queue}
+        #BSUB -G team152
+        #BSUB -n 4
+        #BSUB -M {resources.mem}
+        #BSUB -a "memlimit=True"
+        #BSUB -R "select[mem>{resources.mem}] rusage[mem={resources.mem}] span[hosts=1]"
+        #BSUB -J {wildcards.tissue}
+
+        tissues_combined/001_raw_QC_sm.py
+        --input_file {input}
+        --tissue {wildcards.tissue}
+        --discard_other_inflams {params.discard_other_inflams}
+        --all_blood_immune {params.all_blood_immune}
+        --min_nUMI {params.min_nUMI}
+        --use_absolute_nUMI {params.use_absolute_nUMI}
+        --use_relative_mad {params.use_relative_mad}
+        --lineage_column {params.lineage_column}
+        --relative_grouping {params.relative_grouping}
+        --relative_nMAD_threshold {params.relative_nMAD_threshold}
+        --relative_nUMI_log {params.relative_nUMI_log}
+        --min_nGene {params.min_nGene}
+        --use_absolute_nGene {params.use_absolute_nGene}
+        --relative_nGene_log {params.relative_nGene_log}
+        --MT_thresh_gut {params.MT_thresh_gut}
+        --MT_thresh_blood {params.MT_thresh_blood}
+        --use_absolute_MT {params.use_absolute_MT}
+        --absolute_max_MT {params.absolute_max_MT}
+        --min_mean_nCount_per_samp_blood {params.min_mean_nCount_per_samp_blood}
+        --min_mean_nCount_per_samp_gut {params.min_mean_nCount_per_samp_gut}
+        --min_mean_nGene_per_samp_blood {params.min_mean_nGene_per_samp_blood}
+        --min_mean_nGene_per_samp_gut {params.min_mean_nGene_per_samp_gut}
+        --use_abs_per_samp {params.use_abs_per_samp}
+        """
+  
