@@ -76,256 +76,35 @@ def nmad_append(df, var, group=[]):
         vals = nmad_calc(df[var])
         return(vals)
 
-# Parse script options (ref, query, outdir)
-def parse_options():    
-    # Inherit options
-    parser = argparse.ArgumentParser(
-            description="""
-                QC of tissues together
-                """
-        )
-    
-    parser.add_argument(
-            '-i', '--input_file',
-            action='store',
-            dest='input_file',
-            required=True,
-            help=''
-        )
-    
-    parser.add_argument(
-            '-tissue', '--tissue',
-            action='store',
-            dest='tissue',
-            required=True,
-            help=''
-        )
-    
-    parser.add_argument(
-            '-d', '--discard_other_inflams',
-            action='store',
-            dest='discard_other_inflams',
-            required=True,
-            help=''
-        )
-
-    parser.add_argument(
-            '-abi', '--all_blood_immune',
-            action='store',
-            dest='all_blood_immune',
-            required=True,
-            help=''
-        )
-
-    parser.add_argument(
-        '-nUMI', '--min_nUMI',
-        action='store',
-        dest='min_nUMI',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-abs_nUMI', '--use_absolute_nUMI',
-        action='store',
-        dest='use_absolute_nUMI',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-use_rel_mad', '--use_relative_mad',
-        action='store',
-        dest='use_relative_mad',
-        required=True,
-        help=''
-    )
-
-    parser.add_argument(
-        '-lineage_column', '--lineage_column',
-        action='store',
-        dest='lineage_column',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-groups', '--relative_grouping',
-        action='store',
-        dest='relative_grouping',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-rel_nMAD_thresh', '--relative_nMAD_threshold',
-        action='store',
-        dest='relative_nMAD_threshold',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-rel_nUMI_log', '--relative_nUMI_log',
-        action='store',
-        dest='relative_nUMI_log',
-        required=True,
-        help=''
-    )    
-    
-    parser.add_argument(
-        '-nGene', '--min_nGene',
-        action='store',
-        dest='min_nGene',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-abs_nGene', '--use_absolute_nGene',
-        action='store',
-        dest='use_absolute_nGene',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-rel_nGene_log', '--relative_nGene_log',
-        action='store',
-        dest='relative_nGene_log',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-MTgut', '--MT_thresh_gut',
-        action='store',
-        dest='MT_thresh_gut',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-MTblood', '--MT_thresh_blood',
-        action='store',
-        dest='MT_thresh_blood',
-        required=True,
-        help=''
-    )
-
-    parser.add_argument(
-        '-abs_MT', '--use_absolute_MT',
-        action='store',
-        dest='use_absolute_MT',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-abs_max_MT', '--absolute_max_MT',
-        action='store',
-        dest='absolute_max_MT',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-samp_nCount_blood', '--min_mean_nCount_per_samp_blood',
-        action='store',
-        dest='min_mean_nCount_per_samp_blood',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-samp_nCount_gut', '--min_mean_nCount_per_samp_gut',
-        action='store',
-        dest='min_mean_nCount_per_samp_gut',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-samp_nGene_blood', '--min_mean_nGene_per_samp_blood',
-        action='store',
-        dest='min_mean_nGene_per_samp_blood',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-samp_nGene_gut', '--min_mean_nGene_per_samp_gut',
-        action='store',
-        dest='min_mean_nGene_per_samp_gut',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-use_abs_per_samp', '--use_abs_per_samp',
-        action='store',
-        dest='use_abs_per_samp',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-filt_blood_keras', '--filt_blood_keras',
-        action='store',
-        dest='filt_blood_keras',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-n_var', '--n_variable_genes',
-        action='store',
-        dest='n_variable_genes',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-rpg', '--remove_problem_genes',
-        action='store',
-        dest='remove_problem_genes',
-        required=True,
-        help=''
-    )
-
-    return parser.parse_args()
-
-
 def main():
     # Parse options
-    inherited_options = parse_options()
-    input_file = inherited_options.input_file
-    outdir = inherited_options.outdir
-    discard_other_inflams = inherited_options.discard_other_inflams
-    relative_grouping = inherited_options.relative_grouping
+    input_file = snakemake.input[0]
+    print(input_file)
+    discard_other_inflams = snakemake.params[0]
+    all_blood_immune = snakemake.params[1]
+    min_nUMI = float(snakemake.params[2])
+    use_absolute_nUMI = snakemake.params[3]
+    use_relative_mad = snakemake.params[4]
+    lineage_column = snakemake.params[5]
+    relative_grouping = snakemake.params[6]
     relative_grouping = relative_grouping.split("|")
-    all_blood_immune = inherited_options.all_blood_immune
-    min_nUMI = float(inherited_options.min_nUMI)
-    use_absolute_nUMI = inherited_options.use_absolute_nUMI
-    use_relative_mad = inherited_options.use_relative_mad
-    lineage_column = inherited_options.lineage_column
-    relative_nMAD_threshold = float(inherited_options.relative_nMAD_threshold)
-    relative_nUMI_log = inherited_options.relative_nUMI_log
-    min_nGene = float(inherited_options.min_nGene)
-    use_absolute_nGene = inherited_options.use_absolute_nGene
-    relative_nGene_log = inherited_options.relative_nGene_log
-    MTgut = float(inherited_options.MT_thresh_gut)
-    MTblood = float(inherited_options.MT_thresh_blood)
-    use_absolute_MT = inherited_options.use_absolute_MT
-    absolute_max_MT = float(inherited_options.absolute_max_MT)
-    min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
-    min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
-    min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
-    min_mean_nGene_per_samp_gut = float(inherited_options.min_mean_nGene_per_samp_gut)
-    use_abs_per_samp = inherited_options.use_abs_per_samp
-    filt_blood_keras = inherited_options.filt_blood_keras
-    n_variable_genes = float(inherited_options.n_variable_genes)
-    remove_problem_genes = inherited_options.remove_problem_genes
+    relative_nMAD_threshold = snakemake.params[7]
+    relative_nUMI_log = snakemake.params[8]
+    min_nGene = float(snakemake.params[9])
+    use_absolute_nGene = snakemake.params[10]
+    relative_nGene_log = snakemake.params[11]
+    MTgut = float(snakemake.params[12])
+    MTblood = float(snakemake.params[13])
+    use_absolute_MT = snakemake.params[14]
+    absolute_max_MT = float(snakemake.params[15])
+    min_mean_nCount_per_samp_blood = float(snakemake.params[16])
+    min_mean_nCount_per_samp_gut = float(snakemake.params[17])
+    min_mean_nGene_per_samp_blood = float(snakemake.params[18])
+    min_mean_nGene_per_samp_gut = float(snakemake.params[19])
+    use_abs_per_samp = snakemake.params[20]
+    filt_blood_keras = snakemake.params[21]
+    n_variable_genes = float(snakemake.params[22])
+    remove_problem_genes = snakemake.params[23]
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file: {input_file}")
@@ -352,6 +131,10 @@ def main():
     print(f"n_variable_genes:{n_variable_genes}")
     print(f"remove_problem_genes:{remove_problem_genes}")
     print("Parsed args")
+    
+    # Finally, derive and print the tissue arguments
+    tissue=snakemake.wildcards[0]
+    print(f"~~~~~~~ TISSUE:{tissue}")
 
     # Get basedir
     outdir = os.path.dirname(os.path.commonprefix([input_file]))
@@ -399,6 +182,7 @@ def main():
 
     # Make all blood lineages immune (and categories 'blood')? 
     if all_blood_immune == "yes":
+        adata.obs[lineage_column] = adata.obs[lineage_column].astype(str)
         adata.obs.loc[adata.obs['tissue'] == 'blood', lineage_column] = 'Immune'
         adata.obs['category__machine'] = adata.obs['category__machine'].astype(str)
         adata.obs.loc[adata.obs['tissue'] == 'blood', 'category__machine'] = 'blood'
