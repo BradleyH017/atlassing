@@ -13,6 +13,7 @@ gutbasedir = ["/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_ana
 blood_files = ["/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_analysis/2023_08_07/blood/results/celltype/adata_no_keras.h5ad", "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/yascp_analysis/blood/results/celltype/adata.h5ad"]
 outdir = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined"
 annot__file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv"
+compute_kong=False
 inputdir = f"{outdir}/input"
 if os.path.exists(inputdir) == False:
     os.mkdir(inputdir)
@@ -87,40 +88,59 @@ rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype_probability'
 rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype': 'label__machine'})
 adata = ad.concat([blood, TI, rectum])
 adata.var = gutdata[0].var.iloc[:,:6]
+del blood, TI, rectum, gutdata, blooddata
 
-# Compute average expresssion of Kong et al 2022 gene lists: https://www.sciencedirect.com/science/article/pii/S1074761323000122?via%3Dihub#bib24 ('Cell type identification and signatures)
-Kong_sets = {
-    'Kong_epi': ["EPCAM", "KRT8", "KRT18"],
-    'Kong_strom': ["CDH5", "COL1A1", "COL1A2", "COL6A2", "VWF"],
-    'Kong_immune':["PTPRC", "CD3D", "CD3G", "CD3E", "CD79A", "CD79B", "CD14", "FCGR3A", "CD68", "CD83", "CSF1R", "FCER1G"]  # CD16 renamed in our data compared to Kong to FCGR3A (and CD45 = PTPRC in our data)
-}
+# Add tissue to the index - may have duplications of sample / barcode for when we have correlated samples
+adata.obs.index = adata.obs.index + "_" + adata.obs['tissue']
+# Check these are now all unique?
+adata.shape[0] == len(np.unique(adata.obs.index))
 
-# Normalise data
-adata.layers['counts'] = adata.X
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
-adata.layers['lognorm'] = adata.X
+# Add the annotations to the adata object as it is (Lineage probability is the same as the lineage of the top probability)
+annot = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv")
+annot['label__machine'] = annot['label__machine_retired']
+adata.obs['cell'] = adata.obs.index
+adata.obs = adata.obs.merge(annot[['category__machine', 'label__machine']], on='label__machine', how ='left')
+adata.obs.set_index('cell', inplace=True)
+adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['B_Cell', 'B_Cell_plasma', 'T_Cell', 'Myeloid']), 'Immune', "")
+adata.obs['lineage'] = np.where(adata.obs['category__machine'].isin(['Stem_cells', 'Secretory', 'Enterocyte']), 'Epithelial', adata.obs['lineage'])
+adata.obs['lineage'] = np.where(adata.obs['category__machine']== 'Mesenchymal', 'Mesenchymal', adata.obs['lineage'])
 
-# Compute mean/cell
-temp = adata.X
-temp=pd.DataFrame.sparse.from_spmatrix(temp)
-temp.columns = adata.var['gene_symbols']
-mask = temp.columns.isin(np.concatenate(list(Kong_sets.values())))
-# Subset the DataFrame based on the boolean mask
-temp = temp.iloc[:,mask]
+# Compute kong?
+if compute_kong:
+    # Compute average expresssion of Kong et al 2022 gene lists: https://www.sciencedirect.com/science/article/pii/S1074761323000122?via%3Dihub#bib24 ('Cell type identification and signatures)
+    Kong_sets = {
+        'Kong_epi': ["EPCAM", "KRT8", "KRT18"],
+        'Kong_strom': ["CDH5", "COL1A1", "COL1A2", "COL6A2", "VWF"],
+        'Kong_immune':["PTPRC", "CD3D", "CD3G", "CD3E", "CD79A", "CD79B", "CD14", "FCGR3A", "CD68", "CD83", "CSF1R", "FCER1G"]  # CD16 renamed in our data compared to Kong to FCGR3A (and CD45 = PTPRC in our data)
+    }
 
-# Compute averages and save
-resdf = pd.DataFrame({'cell': adata.obs.index})
-for gene_set_name, gene_set_genes in Kong_sets.items():
-    print(f"Computing average for: {gene_set_name}")
-    gene_set_subset = temp.iloc[:,temp.columns.isin(gene_set_genes)]
-    resdf[f"{gene_set_name}_average"] = gene_set_subset.sum(axis=1) / len(gene_set_genes)
+    # Normalise data
+    adata.layers['counts'] = adata.X
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+    adata.layers['lognorm'] = adata.X
+
+    # Compute mean/cell
+    temp = adata.X
+    temp=pd.DataFrame.sparse.from_spmatrix(temp)
+    temp.columns = adata.var['gene_symbols']
+    mask = temp.columns.isin(np.concatenate(list(Kong_sets.values())))
+    # Subset the DataFrame based on the boolean mask
+    temp = temp.iloc[:,mask]
+
+    # Compute averages and save
+    resdf = pd.DataFrame({'cell': adata.obs.index})
+    for gene_set_name, gene_set_genes in Kong_sets.items():
+        print(f"Computing average for: {gene_set_name}")
+        gene_set_subset = temp.iloc[:,temp.columns.isin(gene_set_genes)]
+        resdf[f"{gene_set_name}_average"] = gene_set_subset.sum(axis=1) / len(gene_set_genes)
+
+    # Add annotation for which is the highest score per cell
+    resdf['Kong_highest_average'] = resdf.filter(like='_average').idxmax(axis=1)
 
 
-# Add annotation for which is the highest score per cell
-resdf['Kong_highest_average'] = resdf.filter(like='_average').idxmax(axis=1)
 
-# Now load all of the probabilities for the gut data
+# Now load all of the probabilities for the gut data - Need to make sure the cell ID not also incorporates the tissue! May be getting duplicated bar codes
 probs = []
 for set in range(0,4):
     if set < 2:
@@ -142,45 +162,73 @@ for set in range(0,4):
         temp_probs = temp.obs.loc[:,want]
         data.append(temp_probs)
         del temp, temp_probs
-
+    # Concat
     res = pd.concat(data)
+    res.index = res.index + "_" + tissue
     # Now add to the probs of the rest
     probs.append(res)
 
 
 keras = pd.concat(probs)
 keras = keras[keras.index.isin(adata.obs.index)]
-keras.to_csv(inputdir + "/keras_all_annot_probabilities.csv")
+keras.to_csv(inputdir + "/keras_all_annot_probabilities_gut.csv")
 
-# Merge with annotation file
-annot = pd.read_csv(annot__file)
-annot['label__machine'] = annot['label__machine_retired']
-adata.obs['cell'] = adata.obs.index
-adata.obs = adata.obs.merge(annot[['category__machine', 'label__machine']], on='label__machine', how ='left')
-adata.obs.set_index('cell', inplace=True)
+# Add category annotation onto the keras probabilities
+keras.columns = keras.columns.str.replace('probability__', '')
+keras['label__machine'] = keras.idxmax(axis=1)
+keras.reset_index(inplace=True)
+# Merge this with the annot
+keras = keras.merge(annot[['category__machine', 'label__machine']], on="label__machine", how="left")
+# Derive lineage annotation:
+lineages_categories = {"Immune": ['B_Cell', 'B_Cell_plasma', 'T_Cell', 'Myeloid'], 
+             "Epithelial": ['Stem_cells', 'Secretory', 'Enterocyte'], 
+             "Mesenchymal": "Mesenchymal"}
 
-# Make sure there are no duplicates !!!
-duplicated_mask = adata.obs.index.duplicated(keep='first')
-adata = adata[~duplicated_mask]
+# Make this for lineages to labels
+category_label_mapping = {}
+
+for category, values in lineages_categories.items():
+    if isinstance(values, list):
+        category_label_mapping[category] = [label for value in values for label in annot['label__machine'][annot['category__machine'].str.contains(value)].tolist()]
+    elif isinstance(values, str):
+        category_label_mapping[category] = annot['label__machine'][annot['category__machine'].str.contains(values)].tolist()
+
+# Convert the dictionary to a list
+lineages_labels = [(name, np.unique(sublist).tolist()) for name, sublist in category_label_mapping.items()]
+for lineage, labels in lineages_labels:
+    print(lineage)
+    temp = keras.iloc[:,keras.columns.isin(labels)]
+    keras[f'sum_{lineage}'] = temp.sum(axis=1)
+
+# Find majority lineage score
+sum_columns = keras.filter(like='sum_')
+keras['sum_majority_lineage'] = sum_columns.idxmax(axis=1)
+keras['sum_majority_lineage'] = keras['sum_majority_lineage'].str.replace('sum_', '')
+
+# Merge the desired columns with the anndata object
+#duplicated_mask = keras.cell.duplicated(keep='first')
+#keras = keras[~duplicated_mask]
+
+keras = keras.rename(columns={'index': 'cell'})
+adata.obs.reset_index('cell', inplace=True)
+adata.obs = adata.obs.merge(keras[["sum_Immune", "sum_Epithelial", "sum_Mesenchymal", "sum_majority_lineage", "cell"]], on="cell", how="left")
+adata.obs.set_index("cell", inplace=True)
+
 
 # Save the final object
 category_columns = adata.obs.select_dtypes(include='category').columns
 adata.obs[category_columns] = adata.obs[category_columns].astype(str)
 adata.obs.drop("Azimuth:predicted.celltype.l2.score", axis=1, inplace=True)
 adata.obs.drop("Azimuth:mapping.score", axis=1, inplace=True)
-adata.write(inputdir + "/adata_raw_input.h5ad")
+adata.obs.drop("patient_number", axis=1, inplace=True)
+adata.write(inputdir + "/adata_raw_input_all.h5ad")
 
-
+# Also save this per tissue
+tissues = np.unique(adata.obs['tissue'])
+for t in tissues:
+    print(t)
+    temp = adata[adata.obs['tissue'] == t]
+    temp.write_h5ad(f"{inputdir}/adata_raw_input_{t}.h5ad")
     
 
-
-# Load the probabilities for the gutdata only
-# Ultimate goal is to have 
-data = []
-for i in range(0,len(samples)):
-    print(samples[i])
-    temp = ad.read_h5ad(dir + "/" + samples[i] + "/" + samples[i] + "___cellbender_fpr0pt1-scrublet-ti_freeze003_prediction-predictions.h5ad")
-    want = temp.obs.columns.str.contains("probability__")
-    temp_probs = temp.obs.loc[:,want]
-    data.append(temp_probs)
-    del temp, temp_probs
+changed_lineage = adata.obs[adata.obs['lineage'].astype(str) != adata.obs['sum_majority_lineage'].astype(str)]
