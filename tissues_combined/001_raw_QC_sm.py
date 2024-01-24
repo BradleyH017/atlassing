@@ -700,17 +700,19 @@ def main():
     # 1. scVI
     print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
     #Trainer(accelerator="cuda")
-    scvi.settings.dl_pin_memory_gpu_training =  True
+    # See is a GPU is available - if so, use. If not, then adjust
+    use_gpu = torch.cuda.is_available()
+    scvi.settings.dl_pin_memory_gpu_training =  use_gpu
     scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
     model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
-    model.train(use_gpu=True)
+    model.train(use_gpu=use_gpu)
     SCVI_LATENT_KEY = "X_scVI"
     adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
 
     # 2. scVI - default_metrics
     print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
     model_default = scvi.model.SCVI(adata,  n_latent=30)
-    model_default.train(use_gpu=True)
+    model_default.train(use_gpu=use_gpu)
     SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
     adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
 
@@ -723,7 +725,7 @@ def main():
         labels_key=lineage_column,
         unlabeled_category="Unknown",
     )
-    scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=True)
+    scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=use_gpu)
     SCANVI_LATENT_KEY = "X_scANVI"
     adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
@@ -770,7 +772,7 @@ def main():
     bm = Benchmarker(
         adata,
         batch_key="experiment_id",
-        label_key="label",
+        label_key="label__machine",
         embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
         n_jobs=4,
         pre_integrated_embedding_obsm_key="X_pca"

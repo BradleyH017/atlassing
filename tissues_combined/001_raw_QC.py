@@ -86,9 +86,9 @@ def parse_options():
         )
     
     parser.add_argument(
-            '-i', '--input_file',
+            '-i', '--input_dir',
             action='store',
-            dest='input_file',
+            dest='input_dir',
             required=True,
             help=''
         )
@@ -97,6 +97,14 @@ def parse_options():
             '-o', '--outdir',
             action='store',
             dest='outdir',
+            required=True,
+            help=''
+        )
+    
+    parser.add_argument(
+            '-tissue', '--tissue',
+            action='store',
+            dest='tissue',
             required=True,
             help=''
         )
@@ -299,7 +307,7 @@ def parse_options():
 def main():
     # Parse options
     inherited_options = parse_options()
-    input_file = inherited_options.input_file
+    input_dir = inherited_options.input_dir
     outdir = inherited_options.outdir
     discard_other_inflams = inherited_options.discard_other_inflams
     relative_grouping = inherited_options.relative_grouping
@@ -354,7 +362,12 @@ def main():
     print(f"remove_problem_genes:{remove_problem_genes}")
     print("Parsed args")
 
-    # Define output directories    
+    # Define output directories
+    # Update the outdir path to include the tissue
+    outdir = f"{outdir}/{tissue}"
+    if os.path.exists(outdir) == False:
+        os.mkdir(outdir)
+
     figpath = f"{outdir}/figures"
     if os.path.exists(figpath) == False:
         os.mkdir(figpath)
@@ -376,6 +389,7 @@ def main():
     sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
 
     # Load the given files and perform initial formatting / filters
+    input_file = f"{input_dir}/adata_raw_input_{tissue}.h5ad"
     adata = sc.read_h5ad(input_file)
     # make sure we have counts as .X and no others
     if "counts" in adata.layers.keys():
@@ -421,12 +435,12 @@ def main():
         data = np.log10(adata.obs[adata.obs.tissue == t].total_counts)
         sns.distplot(data, hist=False, rug=True, label=t)
 
-    plt.legend()
-    plt.xlabel('log10(nUMI)')
-    plt.title(f"Absolute cut off (black): {min_nUMI}")
-    plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5)
-    plt.savefig(qc_path + '/raw_nUMI_per_tissue.png', bbox_inches='tight')
-    plt.clf()
+        plt.legend()
+        plt.xlabel('log10(nUMI)')
+        plt.title(f"Absolute cut off (black): {min_nUMI}")
+        plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5)
+        plt.savefig(qc_path + '/raw_nUMI_per_tissue.png', bbox_inches='tight')
+        plt.clf()
 
     # Plot per category, within tissue
     for t in tissues:
@@ -861,6 +875,8 @@ def main():
     # Plot PCA
     sc.pl.pca(adata, color="tissue", save="_tissue.png")
     sc.pl.pca(adata, color="category__machine", save="_category.png")
+    sc.pl.pca(adata, color="input", save="_input.png")
+    sc.pl.pca(adata, color=lineage_column, save="_lineage.png")
 
     # PLot Elbow plot
     sc.pl.pca_variance_ratio(adata, log=True, save=True, n_pcs = 50)
