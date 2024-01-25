@@ -230,5 +230,9 @@ for t in tissues:
     temp = adata[adata.obs['tissue'] == t]
     temp.write_h5ad(f"{inputdir}/adata_raw_input_{t}.h5ad")
     
+# And save for gut
+adata.obs['tissue'] = adata.obs['tissue'].astype(str)
+gut = adata[adata.obs['tissue'].isin(["ti", "rectum"])]
+gut.write_h5ad(f"{inputdir}/adata_raw_input_gut.h5ad")
 
 changed_lineage = adata.obs[adata.obs['lineage'].astype(str) != adata.obs['sum_majority_lineage'].astype(str)]
