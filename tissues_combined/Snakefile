@@ -1,39 +1,42 @@
+configfile: "config.yaml"
+print(config)
+
 rule qc_raw:
     input:
         "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/{tissue}/objects/adata_PCAd_batched.h5ad"
     params:
-        discard_other_inflams="yes", 
-        all_blood_immune="yes",
-        min_nUMI=300,
-        use_absolute_nUMI="yes",
-        use_relative_mad="yes",
-        lineage_column="sum_majority_lineage",
-        relative_grouping="tissue|sum_majority_lineage",
-        relative_nMAD_threshold=3,
-        relative_nUMI_log="yes",
-        min_nGene=100,
-        use_absolute_nGene="yes",
-        relative_nGene_log="yes",
-        MT_thresh_gut=50,
-        MT_thresh_blood=20,
-        use_absolute_MT="yes",
-        absolute_max_MT=50,
-        min_mean_nCount_per_samp_blood=3000,
-        min_mean_nCount_per_samp_gut=5000,
-        min_mean_nGene_per_samp_blood=1000,
-        min_mean_nGene_per_samp_gut=750,
-        use_abs_per_samp="no",
-        filt_blood_keras="no",
-        n_variable_genes=4000,
-        remove_problem_genes="yes"
+        discard_other_inflams=config["discard_other_inflams:"], 
+        all_blood_immune=config["all_blood_immune:"],
+        min_nUMI=config["min_nUMI:"],
+        use_absolute_nUMI=config["use_absolute_nUMI:"],
+        use_relative_mad=config["use_relative_mad:"],
+        lineage_column=config["lineage_column:"],
+        relative_grouping=config["relative_grouping:"],
+        relative_nMAD_threshold=config["relative_nMAD_threshold:"],
+        relative_nUMI_log=config["relative_nUMI_log:"],
+        min_nGene=config["min_nGene:"],
+        use_absolute_nGene=config["use_absolute_nGene:"],
+        relative_nGene_log=config["relative_nGene_log:"],
+        MT_thresh_gut=config["MT_thresh_gut:"],
+        MT_thresh_blood=config["MT_thresh_blood:"],
+        use_absolute_MT=config["use_absolute_MT:"],
+        absolute_max_MT=config["absolute_max_MT:"],
+        min_mean_nCount_per_samp_blood=config["min_mean_nCount_per_samp_blood:"],
+        min_mean_nCount_per_samp_gut=config["min_mean_nCount_per_samp_gut:"],
+        min_mean_nGene_per_samp_blood=config["min_mean_nGene_per_samp_blood:"],
+        min_mean_nGene_per_samp_gut=config["min_mean_nGene_per_samp_gut:"],
+        use_abs_per_samp=config["use_abs_per_samp"],
+        filt_blood_keras=config["filt_blood_keras"],
+        n_variable_genes=config["n_variable_genes"],
+        remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=400000,
-        queue='gpu-huge -gpu -',
-        mem_mb=400000,
-        mem_mib=400000,
-        disk_mb=400000,
+        mem=500000,
+        queue='gpu-basement -gpu',
+        mem_mb=500000,
+        mem_mib=500000,
+        disk_mb=500000,
         tmpdir="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/tmp"
     script:
         "001_raw_QC_sm.py"
