@@ -8,9 +8,6 @@ __version__ = '0.0.1'
 import os
 cwd = os.getcwd()
 print(cwd)
-os.chdir("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results")
-cwd = os.getcwd()
-print(cwd)
 
 # Load packages
 import sys
@@ -105,6 +102,9 @@ def main():
     filt_blood_keras = snakemake.params[21]
     n_variable_genes = float(snakemake.params[22])
     remove_problem_genes = snakemake.params[23]
+    batch_correction=snakemake.params[24]
+    batch_correction=batch_correction.split("|")
+    benchmark_batch_correction=snakemake.params[25]
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file: {input_file}")
@@ -130,15 +130,25 @@ def main():
     print(f"filt_blood_keras:{filt_blood_keras}")
     print(f"n_variable_genes:{n_variable_genes}")
     print(f"remove_problem_genes:{remove_problem_genes}")
+    print(f"batch_correction:{batch_correction}")
+    print(f"benchmark_batch_correction:{benchmark_batch_correction}")
     print("Parsed args")
     
     # Finally, derive and print the tissue arguments
     tissue=snakemake.wildcards[0]
     print(f"~~~~~~~ TISSUE:{tissue}")
+    
+    # Do we have a GPU?
+    use_gpu = torch.cuda.is_available()
+    print(f"Is there a GPU available?: {use_gpu}")
 
-    # Get basedir
-    outdir = os.path.dirname(os.path.commonprefix([input_file]))
-    outdir = os.path.dirname(os.path.commonprefix([outdir]))
+    # Get basedir - modified to run in current dir
+    # outdir = os.path.dirname(os.path.commonprefix([input_file]))
+    # outdir = os.path.dirname(os.path.commonprefix([outdir]))
+    outdir = "results"
+    if os.path.exists(outdir) == False:
+        os.mkdir(outdir)
+    
     # Update the outdir path to include the tissue
     outdir = f"{outdir}/{tissue}"
     if os.path.exists(outdir) == False:
@@ -697,37 +707,40 @@ def main():
     ####################################
     ######### Batch correction #########
     ####################################
-    # 1. scVI
-    print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
-    #Trainer(accelerator="cuda")
-    # See is a GPU is available - if so, use. If not, then adjust
-    use_gpu = torch.cuda.is_available()
-    scvi.settings.dl_pin_memory_gpu_training =  use_gpu
-    scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
-    model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
-    model.train(use_gpu=use_gpu)
-    SCVI_LATENT_KEY = "X_scVI"
-    adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
-
-    # 2. scVI - default_metrics
-    print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
-    model_default = scvi.model.SCVI(adata,  n_latent=30)
-    model_default.train(use_gpu=use_gpu)
-    SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
-    adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
-
-    # 3. scANVI
-    # Performing this across lineage
-    print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
-    scanvi_model = scvi.model.SCANVI.from_scvi_model(
-        model,
-        adata=adata,
-        labels_key=lineage_column,
-        unlabeled_category="Unknown",
-    )
-    scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=use_gpu)
-    SCANVI_LATENT_KEY = "X_scANVI"
-    adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
+    if "scVI" in batch_correction:
+        # 1. scVI
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
+        #Trainer(accelerator="cuda")
+        # See is a GPU is available - if so, use. If not, then adjust
+        scvi.settings.dl_pin_memory_gpu_training =  use_gpu
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
+        model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
+        model.train(use_gpu=use_gpu)
+        SCVI_LATENT_KEY = "X_scVI"
+        adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
+    
+    
+    if "scVI_default" in batch_correction:
+        # 2. scVI - default_metrics
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
+        model_default = scvi.model.SCVI(adata,  n_latent=30)
+        model_default.train(use_gpu=use_gpu)
+        SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
+        adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
+    
+    if "scANVI" in batch_correction:
+        # 3. scANVI
+        # Performing this across lineage
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
+        scanvi_model = scvi.model.SCANVI.from_scvi_model(
+            model,
+            adata=adata,
+            labels_key=lineage_column,
+            unlabeled_category="Unknown",
+        )
+        scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=use_gpu)
+        SCANVI_LATENT_KEY = "X_scANVI"
+        adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
     # Save pre-benchmark (& Harmony) - may be causing issues
     if os.path.exists(objpath) == False:
@@ -735,59 +748,64 @@ def main():
 
     adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
-    # 4. Harmony
-    print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-    sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
+    if "Harmony" in batch_correction:
+        # 4. Harmony (only if single tissue)
+        if tissue in ["blood", "ti", "rectum"]:
+            print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
+            sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
+            # Save pre-benchmark
+            adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
-    # Save pre-benchmark
-    adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
-    # Compute NN and UMAP using the recommended number of PCs
-    # Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
-    # NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
-    # Using non-corrected matrix
-    # Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here) - Do this based on all embeddings
-    colby = ["experiment_id", "category__machine", "label__machine"]
-    latents = ["X_pca", SCVI_LATENT_KEY, SCANVI_LATENT_KEY, 'X_pca_harmony', SCVI_LATENT_KEY_DEFAULT]
-    for l in latents:
-        print("Performing on UMAP embedding on {}".format(l))
-        # Calculate NN (using 350)
-        print("Calculating neighbours")
-        sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=l, key_added=l + "_nn")
-        # Perform UMAP embedding
-        sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
-        adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
-        # Save a plot
-        for c in colby:
-            if c != "experiment_id":
-                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
-            else:
-                sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
-        # Overwite file after each 
-        adata.write(objpath + "/adata_PCAd_batched.h5ad")
+    ## Compute NN and UMAP using the recommended number of PCs
+    ## Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
+    ## NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
+    ## Using non-corrected matrix
+    ## Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here) - Do this based on all embeddings
+    #colby = ["experiment_id", "category__machine", "label__machine"]
+    #latents = ["X_pca", "X_scVI", "X_scANVI", 'X_pca_harmony', "X_scVI_default"]
+    #latents = np.intersect1d(latents, adata.obsm.keys())
+    #print(f"latents: {latents}")
+    #for l in latents:
+    #    print("Performing on UMAP embedding on {}".format(l))
+    #    # Calculate NN (using 350)
+    #    print("Calculating neighbours")
+    #    sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=l, key_added=l + "_nn")
+    #    # Perform UMAP embedding
+    #    sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
+    #    adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
+    #    # Save a plot
+    #    for c in colby:
+    #        if c != "experiment_id":
+    #            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
+    #        else:
+    #            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+    #    # Overwite file after each 
+    #    adata.write(objpath + "/adata_PCAd_batched.h5ad")
 
     ####################################
     #### Benchmarking integration ######
     ####################################
-    bm = Benchmarker(
-        adata,
-        batch_key="experiment_id",
-        label_key="label__machine",
-        embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
-        n_jobs=4,
-        pre_integrated_embedding_obsm_key="X_pca"
-    )   
-    bm.benchmark()
+    if benchmark_batch_correction == "yes":
+        bm = Benchmarker(
+            adata,
+            batch_key="experiment_id",
+            label_key="label__machine",
+            embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
+            n_jobs=4,
+            pre_integrated_embedding_obsm_key="X_pca"
+        )   
+        bm.benchmark()
 
-    # Get the results out
-    df = bm.get_results(min_max_scale=False)
-    print(df)
-    # Save 
-    df.to_csv(tabpath + "/integration_benchmarking.csv")
-    df1 = df.drop('Metric Type')
-    top = df1[df1.Total == max(df1.Total.values)].index
-    print("The method with the greatest overall score is: ")
-    print(str(top.values))
+        # Get the results out
+        df = bm.get_results(min_max_scale=False)
+        print(df)
+        # Save 
+        df.to_csv(tabpath + "/integration_benchmarking.csv")
+        df1 = df.drop('Metric Type')
+        top = df1[df1.Total == max(df1.Total.values)].index
+        print("The method with the greatest overall score is: ")
+        print(str(top.values))
 
 
 
