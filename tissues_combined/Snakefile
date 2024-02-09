@@ -3,41 +3,138 @@ print(config)
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
+        "input_test/adata_raw_input_{tissue}.h5ad"
     output:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/{tissue}/objects/adata_PCAd_batched.h5ad"
+        "results/{tissue}/objects/adata_PCAd.h5ad",
+        "results/{tissue}/objects/adata_PCAd_batched.h5ad",
+        "results/{tissue}/tables/knee.txt"
     params:
-        discard_other_inflams=config["discard_other_inflams:"], 
-        all_blood_immune=config["all_blood_immune:"],
-        min_nUMI=config["min_nUMI:"],
-        use_absolute_nUMI=config["use_absolute_nUMI:"],
-        use_relative_mad=config["use_relative_mad:"],
-        lineage_column=config["lineage_column:"],
-        relative_grouping=config["relative_grouping:"],
-        relative_nMAD_threshold=config["relative_nMAD_threshold:"],
-        relative_nUMI_log=config["relative_nUMI_log:"],
-        min_nGene=config["min_nGene:"],
-        use_absolute_nGene=config["use_absolute_nGene:"],
-        relative_nGene_log=config["relative_nGene_log:"],
-        MT_thresh_gut=config["MT_thresh_gut:"],
-        MT_thresh_blood=config["MT_thresh_blood:"],
-        use_absolute_MT=config["use_absolute_MT:"],
-        absolute_max_MT=config["absolute_max_MT:"],
-        min_mean_nCount_per_samp_blood=config["min_mean_nCount_per_samp_blood:"],
-        min_mean_nCount_per_samp_gut=config["min_mean_nCount_per_samp_gut:"],
-        min_mean_nGene_per_samp_blood=config["min_mean_nGene_per_samp_blood:"],
-        min_mean_nGene_per_samp_gut=config["min_mean_nGene_per_samp_gut:"],
+        discard_other_inflams=config["discard_other_inflams"], 
+        all_blood_immune=config["all_blood_immune"],
+        min_nUMI=config["min_nUMI"],
+        use_absolute_nUMI=config["use_absolute_nUMI"],
+        use_relative_mad=config["use_relative_mad"],
+        lineage_column=config["lineage_column"],
+        relative_grouping=config["relative_grouping"],
+        relative_nMAD_threshold=config["relative_nMAD_threshold"],
+        relative_nUMI_log=config["relative_nUMI_log"],
+        min_nGene=config["min_nGene"],
+        use_absolute_nGene=config["use_absolute_nGene"],
+        relative_nGene_log=config["relative_nGene_log"],
+        MT_thresh_gut=config["MT_thresh_gut"],
+        MT_thresh_blood=config["MT_thresh_blood"],
+        use_absolute_MT=config["use_absolute_MT"],
+        absolute_max_MT=config["absolute_max_MT"],
+        min_mean_nCount_per_samp_blood=config["min_mean_nCount_per_samp_blood"],
+        min_mean_nCount_per_samp_gut=config["min_mean_nCount_per_samp_gut"],
+        min_mean_nGene_per_samp_blood=config["min_mean_nGene_per_samp_blood"],
+        min_mean_nGene_per_samp_gut=config["min_mean_nGene_per_samp_gut"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
-        remove_problem_genes=config["remove_problem_genes"]
+        remove_problem_genes=config["remove_problem_genes"],
+        batch_correction=config["batch_correction"],
+        benchmark_batch_correction=config["benchmark_batch_correction"]
     resources:
-        mem=500000,
-        queue='gpu-basement -gpu',
-        mem_mb=500000,
-        mem_mib=500000,
-        disk_mb=500000,
-        tmpdir="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/tmp"
-    script:
-        "001_raw_QC_sm.py"
+        mem=10000,
+        queue='normal',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        python 001_raw_QC_sm.py \
+        --input_file {input} \
+        --tissue {wildcards.tissue} \
+        --discard_other_inflams {params.discard_other_inflams} \
+        --all_blood_immune {params.all_blood_immune} \
+        --min_nUMI {params.min_nUMI} \
+        --use_absolute_nUMI {params.use_absolute_nUMI} \
+        --use_relative_mad {params.use_relative_mad} \
+        --lineage_column {params.lineage_column} \
+        --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
+        --relative_nUMI_log {params.relative_nUMI_log} \
+        --min_nGene {params.min_nGene} \
+        --use_absolute_nGene {params.use_absolute_nGene} \
+        --relative_nGene_log {params.relative_nGene_log} \
+        --MT_thresh_gut {params.MT_thresh_gut} \
+        --MT_thresh_blood {params.MT_thresh_blood} \
+        --use_absolute_MT {params.use_absolute_MT} \
+        --absolute_max_MT {params.absolute_max_MT} \
+        --min_mean_nCount_per_samp_blood {params.min_mean_nCount_per_samp_blood} \
+        --min_mean_nCount_per_samp_gut {params.min_mean_nCount_per_samp_gut} \
+        --min_mean_nGene_per_samp_blood {params.min_mean_nGene_per_samp_blood} \
+        --min_mean_nGene_per_samp_gut {params.min_mean_nGene_per_samp_gut} \
+        --use_abs_per_samp {params.use_abs_per_samp} \
+        --filt_blood_keras {params.filt_blood_keras} \
+        --n_variable_genes {params.n_variable_genes} \
+        --remove_problem_genes {params.remove_problem_genes} \
+        --batch_correction {params.batch_correction} \
+        --benchmark_batch_correction {params.benchmark_batch_correction}
+        """
   
+rule get_nn:
+    input:
+        "results/{tissue}/objects/adata_PCAd.h5ad",
+        "results/{tissue}/tables/knee.txt"
+    output:
+        "results/{tissue}/tables/optimum_nn.txt"
+    params:
+        use_matrix="X_pca"
+    resources:
+        mem=10000,
+        queue='long',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    conda:
+        "bbknn"
+    shell:
+        r"""
+        python 002_bbknn.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --knee_file {input[1]} \
+            --use_matrix {params.use_matrix}
+        """
+
+
+rule get_umap:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched.h5ad",
+        "results/{tissue}/tables/knee.txt",
+        "results/{tissue}/tables/optimum_nn.txt"
+    output:
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+    params:
+        use_matrix="X_pca_harmony,X_pca",
+        col_by="experiment_id,tissue,sum_majority_lineage,category__machine,label__machine"
+    resources:
+        mem=10000,
+        queue='long',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        python 003_umap_embedding.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --knee_file {input[1]} \
+            --use_matrix {params.use_matrix} \
+            --optimum_nn_file {input[2]} \
+            --col_by {params.col_by}
+        """
+
+
+# Define the rule all to specify the target file(s)
+rule all:
+    input:
+        "results/blood/objects/adata_PCAd_batched_umap.h5ad"

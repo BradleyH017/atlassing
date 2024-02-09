@@ -73,38 +73,275 @@ def nmad_append(df, var, group=[]):
         vals = nmad_calc(df[var])
         return(vals)
 
+# Parse script options (ref, query, outdir)
+def parse_options():    
+    # Inherit options
+    parser = argparse.ArgumentParser(
+            description="""
+                QC of tissues together
+                """
+        )
+    
+    parser.add_argument(
+            '-i', '--input_file',
+            action='store',
+            dest='input_file',
+            required=True,
+            help=''
+        )
+    
+    parser.add_argument(
+            '-tissue', '--tissue',
+            action='store',
+            dest='tissue',
+            required=True,
+            help=''
+        )
+    
+    parser.add_argument(
+            '-d', '--discard_other_inflams',
+            action='store',
+            dest='discard_other_inflams',
+            required=True,
+            help=''
+        )
+
+    parser.add_argument(
+            '-abi', '--all_blood_immune',
+            action='store',
+            dest='all_blood_immune',
+            required=True,
+            help=''
+        )
+
+    parser.add_argument(
+        '-nUMI', '--min_nUMI',
+        action='store',
+        dest='min_nUMI',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-abs_nUMI', '--use_absolute_nUMI',
+        action='store',
+        dest='use_absolute_nUMI',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-use_rel_mad', '--use_relative_mad',
+        action='store',
+        dest='use_relative_mad',
+        required=True,
+        help=''
+    )
+
+    parser.add_argument(
+        '-lineage_column_name', '--lineage_column',
+        action='store',
+        dest='lineage_column',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-groups', '--relative_grouping',
+        action='store',
+        dest='relative_grouping',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-rel_nMAD_thresh', '--relative_nMAD_threshold',
+        action='store',
+        dest='relative_nMAD_threshold',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-rel_nUMI_log', '--relative_nUMI_log',
+        action='store',
+        dest='relative_nUMI_log',
+        required=True,
+        help=''
+    )    
+    
+    parser.add_argument(
+        '-nGene', '--min_nGene',
+        action='store',
+        dest='min_nGene',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-abs_nGene', '--use_absolute_nGene',
+        action='store',
+        dest='use_absolute_nGene',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-rel_nGene_log', '--relative_nGene_log',
+        action='store',
+        dest='relative_nGene_log',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-MTgut', '--MT_thresh_gut',
+        action='store',
+        dest='MT_thresh_gut',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-MTblood', '--MT_thresh_blood',
+        action='store',
+        dest='MT_thresh_blood',
+        required=True,
+        help=''
+    )
+
+    parser.add_argument(
+        '-abs_MT', '--use_absolute_MT',
+        action='store',
+        dest='use_absolute_MT',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-abs_max_MT', '--absolute_max_MT',
+        action='store',
+        dest='absolute_max_MT',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-samp_nCount_blood', '--min_mean_nCount_per_samp_blood',
+        action='store',
+        dest='min_mean_nCount_per_samp_blood',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-samp_nCount_gut', '--min_mean_nCount_per_samp_gut',
+        action='store',
+        dest='min_mean_nCount_per_samp_gut',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-samp_nGene_blood', '--min_mean_nGene_per_samp_blood',
+        action='store',
+        dest='min_mean_nGene_per_samp_blood',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-samp_nGene_gut', '--min_mean_nGene_per_samp_gut',
+        action='store',
+        dest='min_mean_nGene_per_samp_gut',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-use_abs_per_samp', '--use_abs_per_samp',
+        action='store',
+        dest='use_abs_per_samp',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-filt_blood_keras', '--filt_blood_keras',
+        action='store',
+        dest='filt_blood_keras',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-n_var', '--n_variable_genes',
+        action='store',
+        dest='n_variable_genes',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-rpg', '--remove_problem_genes',
+        action='store',
+        dest='remove_problem_genes',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-bc', '--batch_correction',
+        action='store',
+        dest='batch_correction',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-bbc', '--benchmark_batch_correction',
+        action='store',
+        dest='benchmark_batch_correction',
+        required=True,
+        help=''
+    )
+
+    return parser.parse_args()
+
+
 def main():
     # Parse options
-    input_file = snakemake.input[0]
+    inherited_options = parse_options()
+    input_file = inherited_options.input_file
     print(input_file)
-    discard_other_inflams = snakemake.params[0]
-    all_blood_immune = snakemake.params[1]
-    min_nUMI = float(snakemake.params[2])
-    use_absolute_nUMI = snakemake.params[3]
-    use_relative_mad = snakemake.params[4]
-    lineage_column = snakemake.params[5]
-    relative_grouping = snakemake.params[6]
-    relative_grouping = relative_grouping.split("|")
-    relative_nMAD_threshold = snakemake.params[7]
-    relative_nUMI_log = snakemake.params[8]
-    min_nGene = float(snakemake.params[9])
-    use_absolute_nGene = snakemake.params[10]
-    relative_nGene_log = snakemake.params[11]
-    MTgut = float(snakemake.params[12])
-    MTblood = float(snakemake.params[13])
-    use_absolute_MT = snakemake.params[14]
-    absolute_max_MT = float(snakemake.params[15])
-    min_mean_nCount_per_samp_blood = float(snakemake.params[16])
-    min_mean_nCount_per_samp_gut = float(snakemake.params[17])
-    min_mean_nGene_per_samp_blood = float(snakemake.params[18])
-    min_mean_nGene_per_samp_gut = float(snakemake.params[19])
-    use_abs_per_samp = snakemake.params[20]
-    filt_blood_keras = snakemake.params[21]
-    n_variable_genes = float(snakemake.params[22])
-    remove_problem_genes = snakemake.params[23]
-    batch_correction=snakemake.params[24]
+    discard_other_inflams = inherited_options.discard_other_inflams
+    all_blood_immune = inherited_options.all_blood_immune
+    min_nUMI = float(inherited_options.min_nUMI)
+    use_absolute_nUMI = inherited_options.use_absolute_nUMI
+    use_relative_mad = inherited_options.use_relative_mad
+    lineage_column = inherited_options.lineage_column
+    relative_grouping = inherited_options.relative_grouping
+    relative_grouping = relative_grouping.split(",")
+    relative_nMAD_threshold = float(inherited_options.relative_nMAD_threshold)
+    relative_nUMI_log = inherited_options.relative_nUMI_log
+    min_nGene = float(inherited_options.min_nGene)
+    use_absolute_nGene = inherited_options.use_absolute_nGene
+    relative_nGene_log = inherited_options.relative_nGene_log
+    MTgut = float(inherited_options.MT_thresh_gut)
+    MTblood = float(inherited_options.MT_thresh_blood)
+    use_absolute_MT = inherited_options.use_absolute_MT
+    absolute_max_MT = float(inherited_options.absolute_max_MT)
+    min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
+    min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
+    min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
+    min_mean_nGene_per_samp_gut = float(inherited_options.min_mean_nGene_per_samp_gut)
+    use_abs_per_samp = inherited_options.use_abs_per_samp
+    filt_blood_keras = inherited_options.filt_blood_keras
+    n_variable_genes = float(inherited_options.n_variable_genes)
+    remove_problem_genes = inherited_options.remove_problem_genes
+    batch_correction=inherited_options.batch_correction
     batch_correction=batch_correction.split("|")
-    benchmark_batch_correction=snakemake.params[25]
+    benchmark_batch_correction=inherited_options.benchmark_batch_correction
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file: {input_file}")
@@ -135,7 +372,7 @@ def main():
     print("Parsed args")
     
     # Finally, derive and print the tissue arguments
-    tissue=snakemake.wildcards[0]
+    tissue=inherited_options.tissue
     print(f"~~~~~~~ TISSUE:{tissue}")
     
     # Do we have a GPU?
@@ -255,7 +492,7 @@ def main():
             data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].total_counts)
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
-            cutoff = np.median(data) - (relative_nMAD_threshold * mad)
+            cutoff = np.median(data) - (float(relative_nMAD_threshold) * mad)
             line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
             sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
             plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
@@ -709,7 +946,7 @@ def main():
     ####################################
     if "scVI" in batch_correction:
         # 1. scVI
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum params ~~~~~~~~~~~~~~~~~~~")
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum  ~~~~~~~~~~~~~~~~~~~")
         #Trainer(accelerator="cuda")
         # See is a GPU is available - if so, use. If not, then adjust
         scvi.settings.dl_pin_memory_gpu_training =  use_gpu
@@ -722,7 +959,7 @@ def main():
     
     if "scVI_default" in batch_correction:
         # 2. scVI - default_metrics
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default params ~~~~~~~~~~~~~~~~~~~")
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default  ~~~~~~~~~~~~~~~~~~~")
         model_default = scvi.model.SCVI(adata,  n_latent=30)
         model_default.train(use_gpu=use_gpu)
         SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
