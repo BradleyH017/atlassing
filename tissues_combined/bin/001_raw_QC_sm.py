@@ -860,6 +860,9 @@ def main():
     # Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
     sc.pp.log1p(adata)
     print("log1p")
+    
+    # Store this (for later, e.g 005 and plotting)
+    adata.layers['log1p_cp10k'] = adata.X.copy()
 
     # identify highly variable genes and scale these ahead of PCA
     sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))

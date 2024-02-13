@@ -46,7 +46,7 @@ rule qc_raw:
         "scvi-env"
     shell:
         r"""
-        python 001_raw_QC_sm.py \
+        python  bin/001_raw_QC_sm.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
@@ -95,7 +95,7 @@ rule get_nn:
         "bbknn"
     shell:
         r"""
-        python 002_bbknn.py \
+        python bin/002_bbknn.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --knee_file {input[1]} \
@@ -124,7 +124,7 @@ rule get_umap:
         "scvi-env"
     shell:
         r"""
-        python 003_umap_embedding.py \
+        python bin/003_umap_embedding.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --knee_file {input[1]} \
@@ -133,6 +133,78 @@ rule get_umap:
             --col_by {params.col_by}
         """
 
+# Define clustering resolutions
+clustering_resolutions = list(config["clustering_resolutions"])
+print(clustering_resolutions)
+
+rule cluster_array:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+    output:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}.csv"
+    params:
+        pref_matrix=config["pref_matrix"]
+    resources:
+        mem=10000,
+        queue='normal',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array
+        python bin/004_scanpy_cluster.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --pref_matrix {params.pref_matrix} \
+            --clustering_resolution {wildcards.clustering_resolution}
+        """
+
+#rule add_megagut:
+#    input:
+#        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+#    output:
+#        "results/{tissue}/tables/annotation/CellTypist/celltypist_megagut.csv",
+#        "results/{tissue}/figures/UMAP/CellTypist/umap_CellTypist_megagut.csv"
+#    resources:
+#        mem=10000,
+#        queue='normal',
+#        mem_mb=10000,
+#        mem_mib=10000,
+#        disk_mb=10000,
+#        tmpdir="tmp"
+#    conda:
+#        "scvi-env"
+#    shell:
+#        r"""
+#        mkdir -p results/{wildcards.tissue}/tables/annotation
+#        mkdir -p results/{wildcards.tissue}/tables/annotation/CellTypist
+#        results/{tissue}/figures/UMAP/CellTypist
+#        python 
+#        """
+
+rule test_clusters:
+    input:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}.csv" 
+    output:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}_MCC.csv" 
+    params:
+    resources:
+        mem=10000,
+        queue='normal',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    shell:
+        r"""
+        module load ISG/singularity/3.9.0
+        singularity exec -B /lustre -B /software /software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif bin/999-test_keras.py \
+            --tissue {wildcards.tissue}
+        """
 
 # Define the rule all to specify the target file(s)
 rule all:

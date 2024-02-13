@@ -1,0 +1,7 @@
+{
+    "__default__":
+    {
+        "output": "sm_logs/{rule}.{wildcards}.out",
+        "error": "sm_logs/{rule}.{wildcards}.err"
+    }
+}

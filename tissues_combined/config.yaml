@@ -25,3 +25,6 @@ n_variable_genes: 4000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
 batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by "|", e.g "scVI|scVI_default|scANVI|Harmony"
 benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
+clustering_resolutions: [0.1, 0.3] # What are the range of clustering resolutions to iterate over?
+pref_matrix: "X_pca_harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
+get_megagut: True # Should the script run to get the celltypist megagut annotations for these cells? Located in: /lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl

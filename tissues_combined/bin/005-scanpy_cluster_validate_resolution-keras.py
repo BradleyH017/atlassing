@@ -7,7 +7,7 @@ __version__ = '0.0.1'
 # Script has been taken from yascp (https://github.com/wtsi-hgi/yascp/blob/1d465f848a700b9d39c4c9a63356bd7b985f5a1c/bin/0057-scanpy_cluster_validate_resolution-keras.py#L4)
 
 
-print("~~~~~~~~~~~~ Running 0057-scanpy_cluster_validate_resolution-keras ~~~~~~~~~~~~~~~~~")
+print("~~~~~~~~~~~~ Running 005-scanpy_cluster_validate_resolution-keras ~~~~~~~~~~~~~~~~~")
 import argparse
 import os
 os.environ['NUMBA_CACHE_DIR']='/tmp'
@@ -41,6 +41,8 @@ from keras.wrappers.scikit_learn import KerasClassifier
 
 from tensorflow.python.client import device_lib
 import tensorflow as tf
+
+print("Loaded modules")
 
 # Check that we are working on GPU or CPU
 # print(device_lib.list_local_devices())  # list of DeviceAttributes

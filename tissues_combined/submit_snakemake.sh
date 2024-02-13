@@ -59,7 +59,7 @@ snakemake -j 10 \
     --cluster-config ${config_var} \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[model==Intel_Platinum && mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
     -s Snakefile \
-    results/{blood,rectum,ti}/objects/adata_PCAd_batched_umap.h5ad
+    results/blood/tables/clustering_array/leiden_{0.1,0.3}.csv
 
 # conda activate scvi-env # Must be in an environment with mamba installed
 # bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake.sh 
