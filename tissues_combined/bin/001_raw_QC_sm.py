@@ -44,6 +44,7 @@ import torch
 from scib_metrics.benchmark import Benchmarker
 from pytorch_lightning import Trainer
 import argparse
+import scipy as sp
 print("Loaded libraries")
 
 ########### Define custom functions used here ###############
@@ -863,6 +864,19 @@ def main():
     
     # Store this (for later, e.g 005 and plotting)
     adata.layers['log1p_cp10k'] = adata.X.copy()
+    # Save this 
+    sparse_matrix = sp.sparse.csc_matrix(adata.layers['log1p_cp10k'])
+    sp.sparse.save_npz(f"results/{tissue}/tables/log1p_cp10k_sparse.npz", sparse_matrix)
+    # Save index and columns
+    with open(f"results/{tissue}/tables/cells.txt", 'w') as file:
+        for index, row in adata.obs.iterrows():
+            file.write(str(index) + '\n')
+        file.write('\n')  # Add a newline after each row
+
+    with open(f"results/{tissue}/tables/genes.txt", 'w') as file:
+        for index, row in adata.var.iterrows():
+            file.write(str(index) + '\n')
+        file.write('\n')  # Add a newline after each row    
 
     # identify highly variable genes and scale these ahead of PCA
     sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))

@@ -1,4 +1,4 @@
-basedir: "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined" # Base directory
+# QC parameters
 discard_other_inflams: yes # Remove non CD inflammtation samples
 all_blood_immune: "yes" # Treat all the blood data as immune if using?
 min_nUMI: 300 # Minimum nUMI
@@ -11,7 +11,7 @@ relative_nUMI_log: "yes" # Use relative nUMI
 min_nGene: 100 # Min nGene
 use_absolute_nGene: "yes" # Use min nGene
 relative_nGene_log: "yes" # Also use a relative nGene?
-MT_thresh_gut: 50 # MT thresh for gut sample (rectum + TI)
+MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
 MT_thresh_blood: 20 # MT thresh for blood
 use_absolute_MT: "yes" # Use ansolute MT
 absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it
@@ -23,8 +23,12 @@ use_abs_per_samp: "yes" # Use these absolute metrics
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
 n_variable_genes: 4000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
-batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by "|", e.g "scVI|scVI_default|scANVI|Harmony"
+
+# Batch correction options
+batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony"
 benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
-clustering_resolutions: [0.1, 0.3] # What are the range of clustering resolutions to iterate over?
+
+# Clustering and validation options
+clustering_resolutions: [0.1, 0.3, 0.5, 0.8] # What are the range of clustering resolutions to iterate over?
 pref_matrix: "X_pca_harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
 get_megagut: True # Should the script run to get the celltypist megagut annotations for these cells? Located in: /lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl

@@ -7,7 +7,10 @@ rule qc_raw:
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/objects/adata_PCAd_batched.h5ad",
-        "results/{tissue}/tables/knee.txt"
+        "results/{tissue}/tables/knee.txt",
+        "results/{tissue}/tables/log1p_cp10k_sparse.npz",
+        "results/{tissue}/tables/genes.txt",
+        "results/{tissue}/tables/cells.txt"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -141,7 +144,7 @@ rule cluster_array:
     input:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
     output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}.csv"
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv"
     params:
         pref_matrix=config["pref_matrix"]
     resources:
@@ -156,6 +159,7 @@ rule cluster_array:
     shell:
         r"""
         mkdir -p results/{wildcards.tissue}/tables/clustering_array
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
         python bin/004_scanpy_cluster.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
@@ -188,10 +192,12 @@ rule cluster_array:
 
 rule test_clusters:
     input:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}.csv" 
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
+        "results/{tissue}/tables/log1p_cp10k_sparse.npz",
+        "results/{tissue}/tables/genes.txt",
+        "results/{tissue}/tables/cells.txt"
     output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}_MCC.csv" 
-    params:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-test_result.tsv.gz" 
     resources:
         mem=10000,
         queue='normal',
@@ -199,11 +205,21 @@ rule test_clusters:
         mem_mib=10000,
         disk_mb=10000,
         tmpdir="tmp"
+    singularity:
+        "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     shell:
         r"""
-        module load ISG/singularity/3.9.0
-        singularity exec -B /lustre -B /software /software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif bin/999-test_keras.py \
-            --tissue {wildcards.tissue}
+        python bin/005-scanpy_cluster_validate_resolution-keras.py \
+            --tissue {wildcards.tissue} \
+            --sparse_matrix_path {input[1]} \
+            --clusters_df {input[0]} \
+            --genes_f {input[2]} \
+            --cells_f {input[3]} \
+            --sparsity_l1 0.0001 \
+            --number_epoch 25 \
+            --batch_size 32 \
+            --train_size_fraction 0.67 \
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
         """
 
 # Define the rule all to specify the target file(s)

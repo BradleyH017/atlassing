@@ -47,6 +47,7 @@ source ~/.bashrc # activate base env
 
 #conda activate scvi-env
 # module load HGI/softpack/groups/hgi/snakemake/7.32.4
+module load ISG/singularity/3.9.0
 snakemake -j 10 \
     --latency-wait 90 \
     --rerun-incomplete \
@@ -57,9 +58,11 @@ snakemake -j 10 \
     --use-conda \
     --conda-frontend conda \
     --cluster-config ${config_var} \
+    --use-singularity \
+    --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[model==Intel_Platinum && mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
     -s Snakefile \
-    results/blood/tables/clustering_array/leiden_{0.1,0.3}.csv
+    results/{rectum,blood}/tables/clustering_array/leiden_{0.1,0.3,0.5,0.8}/base-test_result.tsv.gz
 
 # conda activate scvi-env # Must be in an environment with mamba installed
 # bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake.sh 

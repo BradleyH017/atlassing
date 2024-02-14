@@ -44,6 +44,8 @@ import tensorflow as tf
 
 print("Loaded modules")
 
+# Create custom h5 read in functions? (https://github.com/broadinstitute/CellBender/issues/128#issuecomment-1175336065):
+
 # Check that we are working on GPU or CPU
 # print(device_lib.list_local_devices())  # list of DeviceAttributes
 # tf.config.list_physical_devices('GPU')
@@ -70,18 +72,18 @@ def _create_colors(classes):
     color_norm = colors.Normalize(vmin=-n_cts / 3, vmax=n_cts)
     ct_arr = np.arange(n_cts)
     ct_colors = cm.YlGnBu(color_norm(ct_arr))
-
+    #
     return ct_colors
 
 
 def plot_roc(y_prob, y_test, classes):
     """Plot ROC curve. Based off of NaiveDE library."""
     ct_colors = _create_colors(classes)
-
+    #
     for i, cell_type in enumerate(classes):
         fpr, tpr, _ = metrics.roc_curve(y_test == cell_type, y_prob[:, i])
         plt.plot(fpr, tpr, c=ct_colors[i], lw=2)
-
+    #
     plt.plot([0, 1], [0, 1], color='k', ls=':')
     plt.xlabel('FPR')
     plt.ylabel('TPR')
@@ -90,7 +92,7 @@ def plot_roc(y_prob, y_test, classes):
 def class_report(y_true, y_pred, classes, y_pred_proba=None):
     """
     Build a text report showing the main classification metrics.
-
+    
     Replaces sklearn.metrics.classification_report.
 
     Derived from:
@@ -103,7 +105,7 @@ def class_report(y_true, y_pred, classes, y_pred_proba=None):
                 y_pred.shape
             )
         )
-
+    #
     # NOTE: Y may not have predictions for all classes
     model_report = pd.DataFrame(classification_report(
         y_true,
@@ -111,7 +113,7 @@ def class_report(y_true, y_pred, classes, y_pred_proba=None):
         classes,
         output_dict=True
     )).transpose()
-
+    #
     if not (y_pred_proba is None):
         fpr = dict()
         tpr = dict()
@@ -119,20 +121,20 @@ def class_report(y_true, y_pred, classes, y_pred_proba=None):
         aupc = dict()
         mcc = dict()
         for label_it, label in enumerate(model_report.index):
-            if label in classes:  # skip accuracy, macro avg, weighted avg
+            if label in classes.astype(str):  # skip accuracy, macro avg, weighted avg
                 fpr[label], tpr[label], _ = metrics.roc_curve(
-                    (y_true == label).astype(int),
+                    (y_true == int(label)).astype(int),
                     y_pred_proba[:, label_it]
                 )
                 roc_auc[label] = metrics.auc(fpr[label], tpr[label])
                 aupc[label] = metrics.average_precision_score(
-                    (y_true == label).astype(int),
+                    (y_true == int(label)).astype(int),
                     y_pred_proba[:, label_it],
                     average=None  # No need since iter over labels
                 )
                 mcc[label] = metrics.matthews_corrcoef(
-                    (y_true == label).astype(int),
-                    (y_pred == label).astype(int)
+                    (y_true == int(label)).astype(int),
+                    (y_pred == int(label)).astype(int)
                 )
             else:
                 fpr[label] = np.nan
@@ -140,29 +142,32 @@ def class_report(y_true, y_pred, classes, y_pred_proba=None):
                 roc_auc[label] = np.nan
                 aupc[label] = np.nan
                 mcc[label] = np.nan
+        #
         model_report['AUC'] = pd.Series(roc_auc)
         model_report['average_precision_score'] = pd.Series(aupc)
         model_report['MCC'] = pd.Series(mcc)
-
-    # Catch the case where true label not predicted in lr, perhaps because
-    # too few training cases.
-    for i in np.unique(y_true):
-        if i not in model_report.index:
-            print(
-                'Adding category ({}) from {}.'.format(
-                    i,
-                    'truth with no prediction to report'
+        #
+        # Catch the case where true label not predicted in lr, perhaps because
+        # too few training cases.
+        for i in np.unique(y_true):
+            if i not in model_report.index:
+                print(
+                    'Adding category ({}) from {}.'.format(
+                        i,
+                        'truth with no prediction to report'
+                    )
                 )
-            )
-            model_report = model_report.append(pd.Series(
-                [np.nan]*len(model_report.columns),
-                index=model_report.columns,
-                name=i
-            ))
-
-    model_report = model_report.sort_index()
-
-    return model_report
+                model_report = model_report.append(pd.Series(
+                    [np.nan]*len(model_report.columns),
+                    index=model_report.columns,
+                    name=i
+                ))
+        #
+        #model_report = model_report.sort_index()
+        #
+        model_report = model_report.dropna(how='all')
+        #
+        return model_report
 
 
 def keras_grid(
@@ -176,7 +181,7 @@ def keras_grid(
     # Run same proceedure on the test data
     y_encoded = encoder.transform(y)
     Y_onehot = np_utils.to_categorical(y_encoded)
-
+    #
     # Initial parameter sweep for different activation, optimizer, and loss.
     # NOTE: From 100k TI single cells, best settings were:
     # 'activation': 'softmax',
@@ -229,7 +234,7 @@ def keras_grid(
         X=X_std,
         y=Y_onehot
     )
-
+    #
     # Make a dataframe of the results of all of the models.
     cv_results = grid_result.cv_results_.copy()
     del cv_results['param_activation']
@@ -242,12 +247,12 @@ def keras_grid(
         df_grid_result,
         pd.DataFrame(cv_results)
     ], axis=1)
-
+    #
     print('Best: %f using %s' % (
         grid_result.best_score_,
         grid_result.best_params_
     ))
-
+    #
     return grid_result, df_grid_result
 
 
@@ -267,7 +272,7 @@ def fit_model_keras(
     # https://machinelearningmastery.com/multi-class-classification-tutorial-keras-deep-learning-library/
     # https://stackoverflow.com/questions/59643062/scikit-learn-vs-keras-tensorflow-for-multinomial-logistic-regression
     # https://medium.com/@luwei.io/logistic-regression-with-keras-d75d640d175e
-
+    #
     # Make the training and test dataset
     X_train, X_test, y_train, y_test = model_selection.train_test_split(
         X_std,
@@ -283,7 +288,7 @@ def fit_model_keras(
                 X_test.shape
             )
         )
-
+    #
     # One hot encode y (the cell type classes)
     # encode class values as integers
     # encoder = preprocessing.LabelEncoder()
@@ -294,7 +299,7 @@ def fit_model_keras(
     # Run same proceedure on the test data
     y_test_encoded = encoder.transform(y_test)
     Y_test_onehot = np_utils.to_categorical(y_test_encoded)
-
+    #
     # Training
     model = model_function(
         sparsity_l1__activity=sparsity_l1,
@@ -314,7 +319,7 @@ def fit_model_keras(
         # validation_split=0.33  # Frac of the training used for validation.
         validation_data=(X_test, Y_test_onehot)
     )
-
+    #
     # Train using KFold validation
     # from keras.wrappers.scikit_learn import KerasClassifier
     # from sklearn.model_selection import KFold
@@ -330,28 +335,28 @@ def fit_model_keras(
     # print("Baseline: %.2f%% (%.2f%%)" % (
     #     results.mean()*100, results.std()*100)
     # )
-
+    #
     # Make a classifier report
     classes = np.argmax(model.predict(X_test), axis=1)
     y_test_pred = encoder.inverse_transform(classes)
     y_test_proba = model.predict_proba(X_test)
     model_report = class_report(
-        y_test,
+        y_test.reshape(-1,),
         y_test_pred,
         encoder.classes_,
         y_test_proba
     )
     # Add the number of cells in each class (index) in the
     # (a) full dataset and (b) training dataset.
-    categories, counts = np.unique(y, return_counts=True)
+    categories, counts = np.unique(y.astype(str), return_counts=True)
     cat_counts = dict(zip(categories, counts))
     model_report['n_cells_full_dataset'] = model_report.index.map(cat_counts)
-    categories, counts = np.unique(y_train, return_counts=True)
+    categories, counts = np.unique(y_train.astype(str), return_counts=True)
     cat_counts = dict(zip(categories, counts))
     model_report['n_cells_training_dataset'] = model_report.index.map(
         cat_counts
     )
-
+    #
     # Get a matrix of predictions on the test set
     y_prob_df = pd.DataFrame(
         y_test_proba,
@@ -361,11 +366,11 @@ def fit_model_keras(
     y_prob_df['cell_label_true'] = y_test
     for i in ['cell_label_predicted', 'cell_label_true']:
         y_prob_df[i] = 'class__' + y_prob_df[i].astype(str)
-
+    #
     score = model.evaluate(X_test, Y_test_onehot, verbose=0)
     print('Test score:', score[0])
     print('Test accuracy:', score[1])
-
+    #
     return model, model_report, y_prob_df, history
 
 
@@ -376,6 +381,14 @@ def main():
             Fits logistic regression to predict labels.'
             """
     )
+    
+    parser.add_argument(
+        '-t', '--tissue',
+        action='store',
+        dest='tissue',
+        required=True,
+        help=''
+    )
 
     parser.add_argument(
         '-v', '--version',
@@ -384,13 +397,36 @@ def main():
     )
 
     parser.add_argument(
-        '-h5', '--h5_anndata',
+        '-sp', '--sparse_matrix_path',
         action='store',
-        dest='h5',
+        dest='sparse_matrix_path',
         required=True,
-        help='H5 AnnData file where clusters have been saved to cluster slot.'
+        help='sparse matrix to run keras on'
     )
-
+    
+    parser.add_argument(
+        '-cl', '--clusters_df',
+        action='store',
+        dest='clusters_df',
+        required=True,
+        help='Matrix with cells,clusters columns'
+    )
+    
+    parser.add_argument(
+        '-g', '--genes_f',
+        action='store',
+        dest='genes_f',
+        required=True,
+        help='genes file'
+    )
+    
+    parser.add_argument(
+        '-cf', '--cells_f',
+        action='store',
+        dest='cells_f',
+        required=True,
+        help='cell file'
+    )
 
 
     parser.add_argument(
@@ -487,6 +523,13 @@ def main():
             (default: keras_model-<params>)'
     )
     options = parser.parse_args()
+    tissue = options.tissue
+    print(f"tissue: {tissue}")
+    sparse_matrix_path = options.sparse_matrix_path
+    print(f"sparse_matrix_path: {sparse_matrix_path}")
+    clusters_df = options.clusters_df
+    print(f"clusters_df: {clusters_df}")
+    
 
     verbose = True
 
@@ -539,32 +582,38 @@ def main():
                 dict_add[_tmp[0]] = _tmp[1]
     print(dict_add)
 
-    # Load the AnnData file.
-    # This file should already have clusters identified and saved to the
-    # clusters slot.
-    adata = sc.read_h5ad(filename=options.h5)
+    # Load the expression and make dense
+    sparse = sp.sparse.load_npz(sparse_matrix_path)
+    dense = sparse.toarray()
+    # Create a pandas DataFrame from the dense matrix
+    X = pd.DataFrame(dense)
+    del dense
 
-    # Set X to cp10k
-    # adata.X = np.expm1(adata.layers['log1p_cp10k'])
-    # Set X to ln(cp10k+1)
-    adata.X = adata.layers['log1p_cp10k']
-    # Set X to raw counts
-    # adata.X = adata.layers['counts']
+    # Add genes to the columns and cells to the rows
+    genes = np.loadtxt(options.genes_f, dtype=str)
+    cells = np.loadtxt(options.cells_f, dtype=str)
+    X.columns = genes
+    X.cells = cells
 
-    # Add some info from adata to dict_add
-    for key, value in adata.uns['neighbors']['params'].items():
-        dict_add['neighbors__{}'.format(key)] = value
-    for key, value in adata.uns['cluster']['params'].items():
-        dict_add['cluster__{}'.format(key)] = value
+    # Load the clusters and add to 'y'
+    clusters = pd.read_csv(clusters_df)
+    leiden_column = [col for col in clusters.columns if col.startswith('leiden')]
+    y = clusters[leiden_column].values
+
+    ## Add some info from adata to dict_add
+    #for key, value in adata.uns['neighbors']['params'].items():
+    #    dict_add['neighbors__{}'.format(key)] = value
+    #for key, value in adata.uns['cluster']['params'].items():
+    #    dict_add['cluster__{}'.format(key)] = value
 
     # If train_size_cells, override the fraction so that the total number of
     # cells in the training set will be equal to train_size_cells.
     train_size_fraction = options.train_size_fraction
     if options.train_size_cells > 0:
-        if options.train_size_cells >= adata.n_obs:
+        if options.train_size_cells >= X.shape[0]:
             raise Exception('Invalid train_size_cells.')
         train_size_fraction = (
-            1 - ((adata.n_obs-options.train_size_cells)/adata.n_obs)
+            1 - ((X.shape[0]-options.train_size_cells)/X.shape[0])
         )
         if verbose:
             print('Set train_size_fraction to: {}.'.format(
@@ -572,13 +621,9 @@ def main():
             ))
     if verbose:
         print('Number cells training ({}) and testing ({}).'.format(
-            int(train_size_fraction*adata.n_obs),
-            int((1-train_size_fraction)*adata.n_obs)
+            int(train_size_fraction*X.shape[0]),
+            int((1-train_size_fraction)*X.shape[0])
         ))
-
-    # Set X and y
-    X = adata.X
-    y = adata.obs['cluster'].values
 
     # Set other variables
     sparsity_l1 = options.sparsity_l1
@@ -588,11 +633,13 @@ def main():
     # Center and scale the data
     if sp.sparse.issparse(X):
         X = X.todense()
+
     X_std = X
     scaler = preprocessing.StandardScaler(
         with_mean=True,
         with_std=True
     )
+
     X_std = scaler.fit_transform(X)
     if verbose:
         print('center={} scale={}'.format(
@@ -658,7 +705,7 @@ def main():
         # Example of adding additional layers
         # model.add(Dense(8, input_dim=4, activation='relu'))
         # model.add(Dense(3, activation='softmax'))
-
+        #
         # Metrics to check out over training epochs
         mets = [
             # loss,
@@ -680,7 +727,7 @@ def main():
             loss=loss,
             metrics=mets
         )
-
+        #
         return model
 
     # Now, either call a grid search or specific model fit
@@ -690,7 +737,7 @@ def main():
         if out_file_base == '':
             out_file_base = 'keras_model'
         out_file_base = '{}-grid_search'.format(out_file_base)
-
+        #
         # Call grid search of various parameters
         grid_result, df_grid_result = keras_grid(
             model_function=classification_model,
@@ -700,7 +747,7 @@ def main():
             n_epochs=n_epochs,
             batch_size=batch_size
         )
-
+        #
         # NOTE: This will fail because can't pickle KerasClassifier. This is
         # fine though becuase results are saved in tsv.gz format below.
         # Save the results
@@ -715,7 +762,7 @@ def main():
         #     'test-lr_model.joblib.gz'
         # )
         # print(lr)
-
+        #
         # Save the results of our search to tsv
         out_f = '{}-grid_result.tsv.gz'.format(out_file_base)
         df_grid_result.to_csv(
@@ -726,7 +773,7 @@ def main():
             na_rep='',
             compression=compression_opts
         )
-
+        #
         # Add a single columns that summarizes params
         param_columns = [
             col for col in df_grid_result.columns if 'param__' in col
@@ -734,7 +781,7 @@ def main():
         df_grid_result['params'] = df_grid_result[
             param_columns
         ].astype(str).apply(lambda x: '-'.join(x), axis=1)
-
+        #
         # Plot the distribution of accuracy across folds
         split_columns = [
             col for col in df_grid_result.columns if 'split' in col
@@ -775,7 +822,7 @@ def main():
             height=4,
             limitsize=False
         )
-
+        #
         # Plot the mean time and std err for fitting results
         gplt = plt9.ggplot(df_grid_result, plt9.aes(
             x='params',
@@ -811,7 +858,7 @@ def main():
             height=4,
             limitsize=False
         )
-
+    #
     else:
         # Get the out file base.
         out_file_base = options.of
@@ -832,7 +879,7 @@ def main():
                 str(sparsity_l1).replace('.', 'pt'),
                 str(train_size_fraction).replace('.', 'pt')
             )
-
+        #
         # Fit the specific model and save the results
         model, model_report, y_prob_df, history = fit_model_keras(
             model_function=classification_model,
@@ -845,14 +892,14 @@ def main():
             batch_size=batch_size,
             train_size_fraction=train_size_fraction
         )
-
+        #
         # Save the model, weights (coefficients), and bias (intercept)
         model.save(
             '{}.h5'.format(out_file_base),
             overwrite=True,
             include_optimizer=True
         )
-
+        #
         # Save the model and weights (coefficients) seperately
         # open('{}.json'.format(out_file_base), 'w').write(model.to_json())
         open('{}.yml'.format(out_file_base), 'w').write(model.to_yaml())
@@ -888,7 +935,7 @@ def main():
         )
         if verbose:
             print('Completed: save {}.'.format(out_f))
-
+        #
         # Save the test results - each row is a cell and the columns are the
         # prob of that cell belonging to a particular class.
         # Add in extra data
@@ -915,7 +962,7 @@ def main():
         # weight, bias = model.get_layer("output").get_weights()
         df_weights = pd.DataFrame.from_records(
             weight,
-            index=adata.var.index,  # index is gene
+            index=genes,  # index is gene
             columns=encoder.classes_
         )
         # Save the weights dataframe.
@@ -943,7 +990,7 @@ def main():
         # print(df_plt)
         # Add in catgories with no predictive model (e.g., becuase they were
         # too few in training).
-        for i in adata.obs['cluster'].cat.categories:
+        for i in np.unique(clusters[leiden_column]):
             if i not in df_plt.index:
                 df_plt = df_plt.append(pd.Series(
                     [0],
@@ -990,7 +1037,7 @@ def main():
         # metric measures.
         df_plt = model_report.fillna(0)
         for i in df_plt.index:
-            if i not in encoder.classes_:
+            if i not in encoder.classes_.astype(str):
                 df_plt = df_plt.drop(i)
         for i in ['AUC', 'f1-score', 'average_precision_score', 'MCC']:
             out_f = '{}-cluster_size_{}.png'.format(out_file_base, i)

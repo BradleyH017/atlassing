@@ -84,7 +84,7 @@ def main():
     annot.reset_index(inplace=True)
     
     # write to file
-    annot.to_csv(f"results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}.csv", index=False)
+    annot.to_csv(f"results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv", index=False)
 
 
 # Execute
