@@ -1,5 +1,7 @@
 # Decide tissue (s)
-tissue: "rectum" # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" 
+tissue: 
+- 'blood'
+- 'rectum' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" 
 
 # QC parameters
 discard_other_inflams: yes # Remove non CD inflammtation samples
