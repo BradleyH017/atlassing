@@ -138,7 +138,6 @@ rule get_umap:
 
 # Define clustering resolutions
 clustering_resolutions = list(config["clustering_resolutions"])
-print(clustering_resolutions)
 
 rule cluster_array:
     input:
@@ -167,29 +166,6 @@ rule cluster_array:
             --clustering_resolution {wildcards.clustering_resolution}
         """
 
-#rule add_megagut:
-#    input:
-#        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
-#    output:
-#        "results/{tissue}/tables/annotation/CellTypist/celltypist_megagut.csv",
-#        "results/{tissue}/figures/UMAP/CellTypist/umap_CellTypist_megagut.csv"
-#    resources:
-#        mem=10000,
-#        queue='normal',
-#        mem_mb=10000,
-#        mem_mib=10000,
-#        disk_mb=10000,
-#        tmpdir="tmp"
-#    conda:
-#        "scvi-env"
-#    shell:
-#        r"""
-#        mkdir -p results/{wildcards.tissue}/tables/annotation
-#        mkdir -p results/{wildcards.tissue}/tables/annotation/CellTypist
-#        results/{tissue}/figures/UMAP/CellTypist
-#        python 
-#        """
-
 rule test_clusters:
     input:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
@@ -197,7 +173,7 @@ rule test_clusters:
         "results/{tissue}/tables/genes.txt",
         "results/{tissue}/tables/cells.txt"
     output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-test_result.tsv.gz" 
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
         mem=10000,
         queue='normal',
@@ -222,7 +198,76 @@ rule test_clusters:
             --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
         """
 
+# New rule that depends on all base-model_report.tsv.gz files
+checkpoint all_keras_tests_complete:
+    input:
+        # Specify input files for the checkpoint (outputs of all instances of the second job)
+    output:
+        "results/{tissue}/tables/clustering_array/all_model_report_completed.txt"
+    shell:
+        """
+        touch {output}
+        """
+
+rule summarise_cluster_test:
+    input:
+        "results/{tissue}/tables/clustering_array/all_model_report_completed.txt",
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+    output:
+        "results/{tissue}/tables/clustering_array/summary/use_resolution.txt",
+        "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
+        "results/{tissue}/tables/optim_resolution.txt",
+        "results/{tissue}/tables/markers/markers_all_optim_clusters.txt.gz"
+    params:
+        MCC_thresh=config["MCC_thresh"],
+        pref_matrix=config["pref_matrix"]
+    resources:
+        mem=10000,
+        queue='normal',
+        mem_mb=10000,
+        mem_mib=10000,
+        disk_mb=10000,
+        tmpdir="tmp"
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
+        mkdir -p results/{wildcards.tissue}/tables/markers
+        mkdir -p results/{wildcards.tissue}/figures/markers
+        python bin/006-summarise_keras.py \
+            --tissue {wildcards.tissue} \
+            --h5_path {input[1]} \
+            --outpath results/{wildcards.tissue}/figures/clustering_array_summary/keras_accuracy \
+            --MCC_thresh {params.MCC_thresh} \
+            --pref_matrix {params.pref_matrix}
+        """
+
+#rule add_megagut:
+#    input:
+#        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+#    output:
+#        "results/{tissue}/tables/annotation/CellTypist/celltypist_megagut.csv",
+#        "results/{tissue}/figures/UMAP/CellTypist/umap_CellTypist_megagut.csv"
+#    resources:
+#        mem=10000,
+#        queue='normal',
+#        mem_mb=10000,
+#        mem_mib=10000,
+#        disk_mb=10000,
+#        tmpdir="tmp"
+#    conda:
+#        "scvi-env"
+#    shell:
+#        r"""
+#        mkdir -p results/{wildcards.tissue}/tables/annotation
+#        mkdir -p results/{wildcards.tissue}/tables/annotation/CellTypist
+#        results/{tissue}/figures/UMAP/CellTypist
+#        python 
+#        """
+
+
 # Define the rule all to specify the target file(s)
 rule all:
     input:
-        "results/blood/objects/adata_PCAd_batched_umap.h5ad"
+        expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue="rectum")
