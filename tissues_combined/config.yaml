@@ -1,7 +1,9 @@
 # Decide tissue (s)
 tissue: 
-- 'blood'
-- 'rectum' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" 
+ - 'rectum'
+ - 'blood' 
+ - 'ti'
+ - 'gut' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" or adjust this in line 13
 
 # QC parameters
 discard_other_inflams: yes # Remove non CD inflammtation samples
@@ -30,11 +32,19 @@ n_variable_genes: 4000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
 
 # Batch correction options
-batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony"
+batch_correction: "scVI" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony" ****NOTE: COULD PARRALLELISE THIS*****
 benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
+
+# What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
+col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna"
 
 # Clustering and validation options
 clustering_resolutions: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over?
-pref_matrix: "X_pca_harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
-get_megagut: True # Should the script run to get the celltypist megagut annotations for these cells? Located in: /lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl
-MCC_thresh: 0.5 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
+pref_matrix: "X_pca_scVI" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
+MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
+
+# Celltypist options:
+add_celltypist: True # Should the script run to get the celltypist megagut annotations for these cells? 
+celltypist_model: "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl" # Can be multiple, seperated by ","
+celltypist_model_name: "Megagut" # Name to add to cols. Correponding to above models
+

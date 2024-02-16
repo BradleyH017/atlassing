@@ -181,7 +181,7 @@ def parse_options():
         help=''
     )
     
-    options = parser.parse_args()
+    return parser.parse_args()
     
     
 def main():
@@ -261,15 +261,12 @@ def main():
     adata.obs['cluster'] = adata.obs['cluster'].astype('category')
 
     # Plot the clusters using the preferred matrix
-    sc.settings.figdir=f"results/{tissue}/figures/UMAP/"
+    sc.settings.figdir=f"results/{tissue}/figures/UMAP/annotation/"
     sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.logging.print_header()
     sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
     adata.obsm['X_umap'] = adata.obsm["UMAP_" + pref_matrix].copy()
     sc.pl.umap(adata, color = "cluster", save="_" + pref_matrix + "NN_optim_clusters.png")
-
-    # Save the clustered object
-    adata.write(f"results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad")
 
     # Find the markers of these clusters and save
     sc.tl.rank_genes_groups(adata, 'cluster', method='wilcoxon', key_added="cluster_markers", layer="log1p_cp10k")
@@ -290,7 +287,7 @@ def main():
 
     # Make a plot of these
     sc.settings.figdir=f"results/{tissue}/figures/markers/"
-    sc.pl.rank_genes_groups(adata, n_genes=25, gene_symbols="gene_symbols", sharey=False, save="_markers_all.png")
+    sc.pl.rank_genes_groups(adata, n_genes=25, gene_symbols="gene_symbols", key="cluster_markers", sharey=False, save="_markers_all.png")
 
     ## TO DO: Get the probabilities of all cells
     #test_results = pd.read_csv(f"results/{tissue}/tables/clustering_array/leiden_{optim_resolution}/base-test_result.tsv.gz", sep='\t', compression='gzip')
