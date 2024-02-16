@@ -48,6 +48,8 @@ source ~/.bashrc # activate base env
 #conda activate scvi-env
 # module load HGI/softpack/groups/hgi/snakemake/7.32.4
 module load ISG/singularity/3.9.0
+
+# Build dag
 snakemake -j 50 \
     --latency-wait 90 \
     --rerun-incomplete \
@@ -62,11 +64,26 @@ snakemake -j 50 \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[model==Intel_Platinum && mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
     -s Snakefile \
-    --until all
+    --until all \
+    --dag | dot -Tpng > dag.png
 
-#results/rectum/tables/clustering_array/leiden_{0.1,0.3,0.5,0.8,5.0}/base-model_report.tsv.gz
-    
-#results/rectum/objects/adata_PCAd_batched_umap_clustered.h5ad
+# Execute script
+snakemake -j 50 \
+    --latency-wait 90 \
+    --rerun-incomplete \
+    --keep-incomplete \
+    --keep-going \
+    --default-resources threads=1 mem_mb=2000 \
+    --directory ${workdir} \
+    --use-conda \
+    --conda-frontend conda \
+    --cluster-config ${config_var} \
+    --use-singularity \
+    --singularity-args "-B /lustre -B /software" \
+    --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[model==Intel_Platinum && mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
+    -s Snakefile \
+    --until all 
+
 
 # bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake.sh 
 
