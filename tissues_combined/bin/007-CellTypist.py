@@ -47,6 +47,22 @@ def parse_options():
         help=''
     )
     
+    parser.add_argument(
+            '-m', '--model',
+            action='store',
+            dest='model',
+            required=True,
+            help=''
+        )
+    
+    parser.add_argument(
+            '-mn', '--model_name',
+            action='store',
+            dest='model_name',
+            required=True,
+            help=''
+        )
+    
     return parser.parse_args()
 
 # Define main script
