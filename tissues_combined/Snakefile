@@ -5,7 +5,7 @@ rule all:
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/objects/adata_PCAd_batched.h5ad",
@@ -22,6 +22,8 @@ rule qc_raw:
         lineage_column=config["lineage_column"],
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
+        filter_nMad_sequentially=config["filter_nMad_sequentially"],
+        nMad_directionality=config["nMad_directionality"],
         relative_nUMI_log=config["relative_nUMI_log"],
         min_nGene=config["min_nGene"],
         use_absolute_nGene=config["use_absolute_nGene"],
@@ -41,11 +43,11 @@ rule qc_raw:
         batch_correction=config["batch_correction"],
         benchmark_batch_correction=config["benchmark_batch_correction"]
     resources:
-        mem=300000,
-        queue='gpu-normal -gpu -',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem=20000,
+        queue='long',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp"
     conda:
         "scvi-env"
@@ -59,6 +61,8 @@ rule qc_raw:
         --min_nUMI {params.min_nUMI} \
         --use_absolute_nUMI {params.use_absolute_nUMI} \
         --use_relative_mad {params.use_relative_mad} \
+        --filter_nMad_sequentially {params.filter_nMad_sequentially} \
+        --nMad_directionality {params.nMad_directionality} \
         --lineage_column {params.lineage_column} \
         --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --relative_nUMI_log {params.relative_nUMI_log} \
@@ -90,11 +94,11 @@ rule get_nn:
     params:
         use_matrix="X_pca"
     resources:
-        mem=300000,
-        queue='long',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp"
     conda:
         "bbknn"
@@ -116,14 +120,14 @@ rule get_umap:
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
     params:
-        use_matrix="X_pca_harmony,X_pca",
+        use_matrix=config["pref_matrix"],
         col_by=config["col_by"]
     resources:
-        mem=300000,
-        queue='long',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp"
     conda:
         "scvi-env"
@@ -149,12 +153,13 @@ rule cluster_array:
     params:
         pref_matrix=config["pref_matrix"]
     resources:
-        mem=300000,
-        queue='long',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
-        tmpdir="tmp"
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
+        tmpdir="tmp",
+        threads=8
     conda:
         "scvi-env"
     shell:
@@ -177,11 +182,11 @@ rule test_clusters:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
-        mem=180000,
-        queue='gpu-normal -gpu -',
-        mem_mb=180000,
-        mem_mib=180000,
-        disk_mb=180000,
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp"
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
@@ -221,11 +226,11 @@ rule summarise_cluster_test:
         MCC_thresh=config["MCC_thresh"],
         pref_matrix=config["pref_matrix"]
     resources:
-        mem=180000,
-        queue='long',
-        mem_mb=180000,
-        mem_mib=180000,
-        disk_mb=180000,
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp"
     conda:
         "scvi-env"
@@ -255,11 +260,11 @@ if config["add_celltypist"]:
             model_name=config["celltypist_model_name"],
             pref_matrix=config["pref_matrix"]
         resources:
-            mem=180000,
-            queue='long',
-            mem_mb=180000,
-            mem_mib=180000,
-            disk_mb=180000,
+            mem=20000,
+            queue='normal',
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
             tmpdir="tmp"
         conda:
             "scvi-env"

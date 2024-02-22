@@ -49,6 +49,10 @@ source ~/.bashrc # activate base env
 # module load HGI/softpack/groups/hgi/snakemake/7.32.4
 module load ISG/singularity/3.9.0
 
+# Copy config to results
+mkdir -p results
+cp $config_var results/
+
 # Build dag
 snakemake -j 50 \
     --latency-wait 90 \
