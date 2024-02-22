@@ -35,12 +35,11 @@ for t in tissues[1:]:
         gut_convoluted_samplename = tissue_samples
         del tissue_data
 
-
 # print shapes
 for i in range(0, 4): 
     print(f"adata shape: {gutdata[i].shape}")
     print(f"nsamples: {len(gut_exp[i])}")
-    
+
 # Make sure within site, there are no replicates (if there are, take the those from the second directory) [NOTE - Need to double check this is the right thing to do]
 if (len(np.intersect1d(gut_exp[0], gut_exp[1])) == 0) != True:
     remove = np.intersect1d(gut_exp[0], gut_exp[1])
@@ -78,12 +77,12 @@ if (len(np.intersect1d(blood_exp[0], blood_exp[1])) == 0) != True:
 
 
 # Put all together
-blood = ad.concat(blooddata)
+blood = ad.concat(blooddata, join="outer")
 blood.obs['label__machine_probability'] = np.nan
 blood.obs['label__machine'] = ""
-TI = ad.concat(gutdata[:2])
+TI = ad.concat(gutdata[:2], join="outer")
 TI.obs = TI.obs.rename(columns = {'Keras:predicted_celltype_probability': 'label__machine_probability', 'Keras:predicted_celltype': 'label__machine'})
-rectum = ad.concat(gutdata[2:4])
+rectum = ad.concat(gutdata[2:4], join="outer")
 rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype_probability': 'label__machine_probability'})
 rectum.obs = rectum.obs.rename(columns = {'Keras:predicted_celltype': 'label__machine'})
 adata = ad.concat([blood, TI, rectum])
@@ -94,6 +93,20 @@ del blood, TI, rectum, gutdata, blooddata
 adata.obs.index = adata.obs.index + "_" + adata.obs['tissue']
 # Check these are now all unique?
 adata.shape[0] == len(np.unique(adata.obs.index))
+
+# Append the post qc genotyping ID from the gut metadata
+mapping = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/2024_02_19_sanger_sample_id_to_Post_QC_Genotyping_ID.csv")
+mapping = mapping.rename(columns = {'sanger_sample_id': 'convoluted_samplename'})
+mapping.drop(columns=['patient_id'], inplace=True)
+mapping['Post_QC_Genotyping_ID'] = mapping['Post_QC_Genotyping_ID'].astype(str).str.strip()
+mapping = mapping[mapping['convoluted_samplename'].isin(adata.obs['convoluted_samplename'])]
+mapping.replace('nan', np.nan, inplace=True)
+mapping = mapping.dropna(subset="Post_QC_Genotyping_ID")
+adata.obs = adata.obs.reset_index()
+adata.obs = adata.obs.merge(mapping, on="convoluted_samplename", how="left")
+adata.obs.set_index("index", inplace=True)
+adata.obs['Post_QC_Genotyping_ID'] == adata.obs['Post_QC_Genotyping_ID'].astype(str)
+adata.obs.replace('nan', np.nan, inplace=True)
 
 # Add the annotations to the adata object as it is (Lineage probability is the same as the lineage of the top probability)
 annot = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv")
@@ -113,13 +126,11 @@ if compute_kong:
         'Kong_strom': ["CDH5", "COL1A1", "COL1A2", "COL6A2", "VWF"],
         'Kong_immune':["PTPRC", "CD3D", "CD3G", "CD3E", "CD79A", "CD79B", "CD14", "FCGR3A", "CD68", "CD83", "CSF1R", "FCER1G"]  # CD16 renamed in our data compared to Kong to FCGR3A (and CD45 = PTPRC in our data)
     }
-
     # Normalise data
     adata.layers['counts'] = adata.X
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
     adata.layers['lognorm'] = adata.X
-
     # Compute mean/cell
     temp = adata.X
     temp=pd.DataFrame.sparse.from_spmatrix(temp)
@@ -127,16 +138,14 @@ if compute_kong:
     mask = temp.columns.isin(np.concatenate(list(Kong_sets.values())))
     # Subset the DataFrame based on the boolean mask
     temp = temp.iloc[:,mask]
-
     # Compute averages and save
     resdf = pd.DataFrame({'cell': adata.obs.index})
     for gene_set_name, gene_set_genes in Kong_sets.items():
         print(f"Computing average for: {gene_set_name}")
         gene_set_subset = temp.iloc[:,temp.columns.isin(gene_set_genes)]
         resdf[f"{gene_set_name}_average"] = gene_set_subset.sum(axis=1) / len(gene_set_genes)
-
     # Add annotation for which is the highest score per cell
-    resdf['Kong_highest_average'] = resdf.filter(like='_average').idxmax(axis=1)
+    resdf['Kong_highest_average'] = resdf.filter(like='_average').idxmax()
 
 
 
@@ -229,10 +238,19 @@ for t in tissues:
     print(t)
     temp = adata[adata.obs['tissue'] == t]
     temp.write_h5ad(f"{inputdir}/adata_raw_input_{t}.h5ad")
-    
+
 # And save for gut
 adata.obs['tissue'] = adata.obs['tissue'].astype(str)
 gut = adata[adata.obs['tissue'].isin(["ti", "rectum"])]
 gut.write_h5ad(f"{inputdir}/adata_raw_input_gut.h5ad")
 
+# Also save a test set per tissue
+for t in tissues:
+    print(t)
+    temp = adata[adata.obs['tissue'] == t]
+    sc.pp.subsample(temp, 0.02)
+    temp.write_h5ad(f"/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{t}.h5ad")
+
+
 changed_lineage = adata.obs[adata.obs['lineage'].astype(str) != adata.obs['sum_majority_lineage'].astype(str)]
+changed_lineage.to_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/max_ct_not_e_sum_majority_lineage.csv")

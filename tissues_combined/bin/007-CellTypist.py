@@ -79,9 +79,11 @@ def main():
     fpath = inherited_options.h5_path
     pref_matrix = inherited_options.pref_matrix
     model = inherited_options.model
-    model = model.split(",")
+    #model = model.split(",")
+    print(f"model: {model}")
     model_name = inherited_options.model_name
-    model_name = model_name.split(",")
+    #model_name = model_name.split(",")
+    print(f"model_name: {model_name}")
 
     # Load in the data to be annotated (cell filtered, batches
     adata = ad.read_h5ad(fpath)
@@ -96,7 +98,7 @@ def main():
     # Copy the desired nearest neighbor matrix NN so that it is used in the model
     adata.uns['distances'] = adata.uns[f"{pref_matrix}_nn"]
 
-    # Run the model
+    # Run the model (majority voting)
     predictions = celltypist.annotate(adata, model = model, majority_voting = True)
 
     # Transform the anndata object to include these annotations

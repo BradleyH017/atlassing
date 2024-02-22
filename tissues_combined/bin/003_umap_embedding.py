@@ -112,7 +112,12 @@ def main():
     sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.logging.print_header()
     sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
-        
+    
+    # Define outdir for gene expression plots
+    exprfigpath = f"results/{tissue}/figures/UMAP/expr"
+    if os.path.exists(exprfigpath) == False:
+        os.mkdir(exprfigpath)
+    
     # Now compute UMAP for each embedding using these parameters
     use_matrix=np.intersect1d(list(adata.obsm.keys()), use_matrix)
     col_by = col_by.split(",")
@@ -129,10 +134,19 @@ def main():
         adata.obsm["UMAP_" + m] = adata.obsm["X_umap"]
         # Save a plot
         for c in col_by:
-            if c != "experiment_id":
-                sc.pl.umap(adata, color = c, save="_" + m + "_NN" + c + ".png")
+            print(c)
+            if c == "experiment_id":
+                sc.settings.figdir=figpath
+                sc.pl.umap(adata, color = c, save="_" + m + "_" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
             else:
-                sc.pl.umap(adata, color = c, save="_" + m + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+                if c in adata.var['gene_symbols'].values:
+                    ens=adata.var[adata.var['gene_symbols'] == c].index[0]
+                    sc.settings.figdir=exprfigpath
+                    sc.pl.umap(adata, color = ens, save="_" + m + "_" + c + ".png")
+                else:
+                    sc.settings.figdir=figpath
+                    sc.pl.umap(adata, color = c, save="_" + m + "_" + c + ".png")
+
         # Overwite file after each 
         adata.write(f"results/{tissue}/objects/adata_PCAd_batched_umap.h5ad")
     
