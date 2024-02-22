@@ -138,6 +138,22 @@ def parse_options():
         required=True,
         help=''
     )
+    
+    parser.add_argument(
+        '-filter_sequentially', '--filter_nMad_sequentially',
+        action='store',
+        dest='filter_nMad_sequentially',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-nmad_dir', '--nMad_directionality',
+        action='store',
+        dest='nMad_directionality',
+        required=True,
+        help=''
+    )
 
     parser.add_argument(
         '-lineage_column_name', '--lineage_column',
@@ -320,6 +336,8 @@ def main():
     min_nUMI = float(inherited_options.min_nUMI)
     use_absolute_nUMI = inherited_options.use_absolute_nUMI
     use_relative_mad = inherited_options.use_relative_mad
+    filter_nMad_sequentially = inherited_options.filter_nMad_sequentially
+    nMad_directionality = inherited_options.nMad_directionality
     lineage_column = inherited_options.lineage_column
     relative_grouping = inherited_options.relative_grouping
     relative_grouping = relative_grouping.split(",")
@@ -352,6 +370,8 @@ def main():
     print(f"use_absolute_nUMI:{use_absolute_nUMI}")
     print(f"relative_grouping:{relative_grouping}")
     print(f"relative_nMAD_threshold:{relative_nMAD_threshold}")
+    print(f"filter_nMad_sequentially: {filter_nMad_sequentially}")
+    print(f"nMad_directionality: {nMad_directionality}")
     print(f"relative_nUMI_log:{relative_nUMI_log}")
     print(f"min_nGene:{min_nGene}")
     print(f"use_absolute_nGene:{use_absolute_nGene}")
@@ -493,10 +513,18 @@ def main():
             data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].total_counts)
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
-            cutoff = np.median(data) - (float(relative_nMAD_threshold) * mad)
-            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
-            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
-            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            if nMad_directionality == "uni":
+                cutoff = np.median(data) - (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
+                plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            else:
+                cutoff_low = np.median(data) - (float(relative_nMAD_threshold) * mad)
+                cutoff_high = np.median(data) + (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
+                plt.axvline(x = cutoff_low, linestyle = '--', color = line_color, alpha = 0.5)
+                plt.axvline(x = cutoff_high, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
         plt.xlabel('log10(nUMI)')
@@ -519,7 +547,10 @@ def main():
         else:
             adata.obs['total_counts_nMAD'] = nmad_append(adata.obs, 'total_counts', relative_grouping)
         
-        adata.obs['total_counts_keep'] = adata.obs['total_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        if nMad_directionality == "uni":
+            adata.obs['total_counts_keep'] = adata.obs['total_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        else:
+            adata.obs['total_counts_keep'] = abs(adata.obs['total_counts_nMAD']) < relative_nMAD_threshold
         # However, can also apply the min threshold still:
         if use_absolute_nUMI == "yes": 
             adata.obs.loc[adata.obs['total_counts'] < min_nUMI, 'total_counts_keep'] = False
@@ -531,6 +562,9 @@ def main():
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
                 print(f"{l}: {this_thresh}")
 
+    # If filtering sequentially:
+    if filter_nMad_sequentially == "yes":
+        adata = adata[adata.obs['total_counts_keep'] == True]
 
     # 2. nGene
     print("Filtration of cells with low nGenes")
@@ -572,10 +606,18 @@ def main():
             data = np.log10(adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].n_genes_by_counts)
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
-            cutoff = np.median(data) - (relative_nMAD_threshold * mad)
-            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
-            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
-            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            if nMad_directionality == "uni":
+                cutoff = np.median(data) - (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff:.2f}')
+                plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            else:
+                cutoff_low = np.median(data) - (float(relative_nMAD_threshold) * mad)
+                cutoff_high = np.median(data) + (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
+                plt.axvline(x = cutoff_low, linestyle = '--', color = line_color, alpha = 0.5)
+                plt.axvline(x = cutoff_high, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
         plt.xlabel('log10(nGene)')
@@ -598,7 +640,11 @@ def main():
         else:
             adata.obs['n_genes_by_counts_nMAD'] = nmad_append(adata.obs, 'n_genes_by_counts', relative_grouping)
         
-        adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        if nMad_directionality == "uni":
+            adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts_nMAD'] > -(relative_nMAD_threshold) # Direction aware
+        else:
+            adata.obs['n_genes_by_counts_keep'] = abs(adata.obs['n_genes_by_counts_nMAD']) < relative_nMAD_threshold
+        
         # However, can also apply the min threshold still:
         if use_absolute_nGene == "yes": 
             adata.obs.loc[adata.obs['n_genes_by_counts'] < min_nGene, 'n_genes_by_counts_keep'] = False
@@ -610,6 +656,9 @@ def main():
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
                 print(f"{l}: {this_thresh}")        
     
+    # If filtering sequentially:
+    if filter_nMad_sequentially == "yes":
+        adata = adata[adata.obs['n_genes_by_counts_keep'] == True]
 
     # 3. MT% 
     print("Filtration of cells with abnormal/low MT%")
@@ -658,10 +707,18 @@ def main():
             data = adata.obs[(adata.obs.tissue == t) & (adata.obs[lineage_column] == l)].pct_counts_gene_group__mito_transcript
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
-            cutoff = np.median(data) + (relative_nMAD_threshold * mad)
-            line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
-            sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {cutoff:.2f}')
-            plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            if nMad_directionality == "uni":
+                cutoff = np.median(data) + (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {cutoff:.2f}')
+                plt.axvline(x = cutoff, linestyle = '--', color = line_color, alpha = 0.5)
+            else:
+                cutoff_low = np.median(data) - (float(relative_nMAD_threshold) * mad)
+                cutoff_high = np.median(data) + (float(relative_nMAD_threshold) * mad)
+                line_color = sns.color_palette("tab10")[int(np.where(lins == l)[0])]
+                sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {cutoff_low:.2f}-{cutoff_high:.2f}')
+                plt.axvline(x = cutoff_low, linestyle = '--', color = line_color, alpha = 0.5)
+                plt.axvline(x = cutoff_high, linestyle = '--', color = line_color, alpha = 0.5)
         
         plt.legend()
         plt.xlabel('MT%')
@@ -684,7 +741,12 @@ def main():
     else:
         print("Defining MAD cut off: pct_counts_gene_group__mito_transcript")
         adata.obs['MT_perc_nMads'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
-        adata.obs['MT_perc_keep'] = adata.obs['MT_perc_nMads'] < relative_nMAD_threshold # Direction aware
+        
+        if nMad_directionality == "uni":
+            adata.obs['MT_perc_keep'] = adata.obs['MT_perc_nMads'] < relative_nMAD_threshold # Direction aware
+        else:
+            adata.obs['MT_perc_keep'] = abs(adata.obs['MT_perc_nMads']) < relative_nMAD_threshold
+        
         if use_absolute_MT == "yes":
             # Apply the absolute max still
             adata.obs.loc[adata.obs['pct_counts_gene_group__mito_transcript'] > absolute_max_MT, 'MT_perc_keep'] = False
@@ -695,6 +757,9 @@ def main():
                 this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
                 print(f"{l}: {this_thresh}")
 
+    # If filtering sequentially:
+    if filter_nMad_sequentially == "yes":
+        adata = adata[adata.obs['MT_perc_keep'] == True]
             
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
@@ -865,19 +930,22 @@ def main():
     # Store this (for later, e.g 005 and plotting)
     adata.layers['log1p_cp10k'] = adata.X.copy()
     # Save this 
+    tissue=inherited_options.tissue
     sparse_matrix = sp.sparse.csc_matrix(adata.layers['log1p_cp10k'])
     sp.sparse.save_npz(f"results/{tissue}/tables/log1p_cp10k_sparse.npz", sparse_matrix)
+    print("Saved sparse matrix")
     # Save index and columns
     with open(f"results/{tissue}/tables/cells.txt", 'w') as file:
         for index, row in adata.obs.iterrows():
             file.write(str(index) + '\n')
-        file.write('\n')  # Add a newline after each row
 
+    print("Saved cells")
     with open(f"results/{tissue}/tables/genes.txt", 'w') as file:
         for index, row in adata.var.iterrows():
             file.write(str(index) + '\n')
-        file.write('\n')  # Add a newline after each row    
 
+    print("Saved genes")
+    
     # identify highly variable genes and scale these ahead of PCA
     sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))
     print("Found highly variable")
@@ -996,20 +1064,15 @@ def main():
         SCANVI_LATENT_KEY = "X_scANVI"
         adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
 
-    # Save pre-benchmark (& Harmony) - may be causing issues
+    if "Harmony" in batch_correction:
+        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
+        sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
+
+    # Save
     if os.path.exists(objpath) == False:
         os.mkdir(objpath)
 
     adata.write(objpath + "/adata_PCAd_batched.h5ad")
-
-    if "Harmony" in batch_correction:
-        # 4. Harmony (only if single tissue)
-        if tissue in ["blood", "ti", "rectum"]:
-            print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-            sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
-            # Save pre-benchmark
-            adata.write(objpath + "/adata_PCAd_batched.h5ad")
-
 
     ## Compute NN and UMAP using the recommended number of PCs
     ## Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
