@@ -1,50 +1,56 @@
 # Decide tissue (s)
 tissue: 
  - 'rectum'
- - 'blood' 
- - 'ti'
- - 'gut' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" or adjust this in line 13
+# - 'blood' 
+ - 'ti' 
+ - 'gut'
+ - 'all' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" or adjust this in line 13
 
 # QC parameters
 discard_other_inflams: yes # Remove non CD inflammtation samples
 all_blood_immune: "yes" # Treat all the blood data as immune if using?
-min_nUMI: 300 # Minimum nUMI
+min_nUMI: 400 # Minimum nUMI
 use_absolute_nUMI: "yes" # Use the min UMI cut off?
-use_relative_mad: "yes" # Use a relative MAD threshold
+use_relative_mad: "no" # Use a relative MAD threshold
 lineage_column: "sum_majority_lineage" # Which coloumn to use as lineage annotation
-relative_grouping: "tissue,sum_majority_lineage" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
+relative_grouping: "sum_majority_lineage" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
 relative_nMAD_threshold: 2.5 # Threshold of nMad
+filter_nMad_sequentially: "yes" # Define and filter the nMad thresholds sequentially?
+nMad_directionality: "uni" # Can be bi|uni. unidirectional means cells only removed for nMads above or below the median. bidirectional means cells removed for nMads exceeding threshold in either direction
 relative_nUMI_log: "yes" # Use relative nUMI
-min_nGene: 100 # Min nGene
+min_nGene: 250 # Min nGene
 use_absolute_nGene: "yes" # Use min nGene
 relative_nGene_log: "yes" # Also use a relative nGene?
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
 MT_thresh_blood: 20 # MT thresh for blood
 use_absolute_MT: "yes" # Use ansolute MT
 absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it
-min_mean_nCount_per_samp_blood: 3000 # Exclude samples with mean nCount than this value (blood). Samples with low means for these metrics tend to integrate badly
+use_MT_thresh_blood_gut_immune: "yes" # Use the absolute MT threshold for blood on the gut immune cells? 
+min_mean_nCount_per_samp_blood: 3000 # Exclude samples with mean nCount lower than this value (blood). Samples with low means for these metrics tend to integrate badly
 min_mean_nCount_per_samp_gut: 5000 # Same but gut
 min_mean_nGene_per_samp_blood: 1000 # Exclude samples with mean nCount than this value (blood)
 min_mean_nGene_per_samp_gut: 750 # Same but gut
 use_abs_per_samp: "yes" # Use these absolute metrics
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
-n_variable_genes: 4000 # Number of variable genes for PCA calculation
+n_variable_genes: 5000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
 
 # Batch correction options
-batch_correction: "scVI" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony" ****NOTE: COULD PARRALLELISE THIS*****
+batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony" ****NOTE: COULD PARRALLELISE THIS*****
 benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
 
 # What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
-col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna"
+col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript,EPCAM,KRT8,KRT18,CDH5,COL1A1,COL1A2,COL6A2,VWF,PTPRC,CD3D,CD3G,CD3E,CD79A,CD79B,CD14,FCGR3A,CD68,CD83,CSF1R,FCER1G"
 
 # Clustering and validation options
 clustering_resolutions: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over?
-pref_matrix: "X_pca_scVI" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
-MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
+pref_matrix: "X_Harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
+MCC_thresh: 0.5 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
 
 # Celltypist options:
 add_celltypist: True # Should the script run to get the celltypist megagut annotations for these cells? 
 celltypist_model: "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl" # Can be multiple, seperated by ","
-celltypist_model_name: "Megagut" # Name to add to cols. Correponding to above models
+celltypist_model_name: "Megagut" # Name to add to cols. Corresponding to above models
 
+# Threshold for subset of predicted cell-type annotations from keras:
+probability_threshold: 0.5 # Threshold at which to filter the anndata object after addition of probabilities for all cell types. If no filtration required, set this to 0

@@ -244,6 +244,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-blood_MT_gut', '--use_MT_thresh_blood_gut_immune',
+        action='store',
+        dest='use_MT_thresh_blood_gut_immune',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
         '-samp_nCount_blood', '--min_mean_nCount_per_samp_blood',
         action='store',
         dest='min_mean_nCount_per_samp_blood',
@@ -350,6 +358,7 @@ def main():
     MTblood = float(inherited_options.MT_thresh_blood)
     use_absolute_MT = inherited_options.use_absolute_MT
     absolute_max_MT = float(inherited_options.absolute_max_MT)
+    use_MT_thresh_blood_gut_immune = inherited_options.use_MT_thresh_blood_gut_immune
     min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
     min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
     min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
@@ -380,6 +389,7 @@ def main():
     print(f"MTblood:{MTblood}")
     print(f"use_absolute_MT:{use_absolute_MT}")
     print(f"absolute_max_MT:{absolute_max_MT}")
+    print(f"use_MT_thresh_blood_gut_immune: {use_MT_thresh_blood_gut_immune}")
     print(f"min_mean_nCount_per_samp_blood:{min_mean_nCount_per_samp_blood}")
     print(f"min_mean_nCount_per_samp_gut:{min_mean_nCount_per_samp_gut}")
     print(f"min_mean_nGene_per_samp_blood:{min_mean_nGene_per_samp_blood}")
@@ -443,6 +453,25 @@ def main():
         del adata.layers["lognorm"]
 
     print(f"Initial shape of the data is:{adata.shape}")
+
+    # Save the raw matrix and gene var before doing anything (need this later to re-annotate)
+    sparse_matrix = sp.sparse.csc_matrix(adata.X)
+    sp.sparse.save_npz(f"results/{tissue}/tables/raw_counts_sparse.npz", sparse_matrix)
+    print("Saved sparse matrix")
+    # Save index and columns
+    with open(f"results/{tissue}/tables/raw_cells.txt", 'w') as file:
+        for index, row in adata.obs.iterrows():
+            file.write(str(index) + '\n')
+
+    print("Saved cells")
+    with open(f"results/{tissue}/tables/raw_genes.txt", 'w') as file:
+        for index, row in adata.var.iterrows():
+            file.write(str(index) + '\n')
+            
+    print("Saved genes")
+    
+    # Also save the gene var df
+    adata.var.to_csv(f"results/{tissue}/tables/raw_gene.var.txt", sep = "\t")
 
     # Discard other inflams if wanted to 
     if discard_other_inflams == "yes":
@@ -538,7 +567,7 @@ def main():
     adata.obs['log10_total_counts'] = np.log10(adata.obs['total_counts'])
     if use_absolute_nUMI == "yes" and use_relative_mad == "no":
         # adata = adata[adata.obs['total_counts'] > min_nUMI]
-        adata.obs['total_counts_keep'] = adata[adata.obs['total_counts'] > min_nUMI]
+        adata.obs['total_counts_keep'] = adata.obs['total_counts'] > min_nUMI
 
     if use_relative_mad == "yes":
         print("Defining nMAD cut off: total_counts_keep")
@@ -563,7 +592,7 @@ def main():
                 print(f"{l}: {this_thresh}")
 
     # If filtering sequentially:
-    if filter_nMad_sequentially == "yes":
+    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
         adata = adata[adata.obs['total_counts_keep'] == True]
 
     # 2. nGene
@@ -631,7 +660,7 @@ def main():
     adata.obs['log10_n_genes_by_counts'] = np.log10(adata.obs['n_genes_by_counts'])
     if use_absolute_nGene == "yes" and use_relative_mad == "no":
         # adata = adata[adata.obs['total_counts'] > min_nUMI]
-        adata.obs['n_genes_by_counts_keep'] = adata[adata.obs['n_genes_by_counts'].astype(int) > min_nGene]
+        adata.obs['n_genes_by_counts_keep'] = adata.obs['n_genes_by_counts'].astype(int) > min_nGene
 
     if use_relative_mad == "yes":
         print("Defining nMAD cut off: total_counts_keep")
@@ -657,7 +686,7 @@ def main():
                 print(f"{l}: {this_thresh}")        
     
     # If filtering sequentially:
-    if filter_nMad_sequentially == "yes":
+    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
         adata = adata[adata.obs['n_genes_by_counts_keep'] == True]
 
     # 3. MT% 
@@ -728,6 +757,8 @@ def main():
         else:
             plt.axvline(x = MTgut, color = 'black', linestyle = '--', alpha = 0.5)
             plt.title(f"{t} - Absolute cut off (black): {MTgut}")
+            if use_MT_thresh_blood_gut_immune == "yes":
+                plt.axvline(x = MTblood, color = 'red', linestyle = '--', alpha = 0.5,  label=f"absolute cut off immune (red): {MTblood}")
         
         plt.xlim(0,100)
         plt.savefig(f"{qc_path}/raw_MT_per_lineage_{t}.png", bbox_inches='tight')
@@ -737,7 +768,7 @@ def main():
     if use_absolute_MT == "yes" and use_relative_mad == "no":
         blood_mask = (adata.obs['tissue'] == 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTblood)
         gut_tissue_mask = (adata.obs['tissue'] != 'blood') & (adata.obs['pct_counts_gene_group__mito_transcript'] < MTgut)
-        adata['MT_perc_keep'] = blood_mask | gut_tissue_mask
+        adata.obs['MT_perc_keep'] = blood_mask | gut_tissue_mask
     else:
         print("Defining MAD cut off: pct_counts_gene_group__mito_transcript")
         adata.obs['MT_perc_nMads'] = nmad_append(adata.obs, 'pct_counts_gene_group__mito_transcript', relative_grouping)
@@ -750,6 +781,10 @@ def main():
         if use_absolute_MT == "yes":
             # Apply the absolute max still
             adata.obs.loc[adata.obs['pct_counts_gene_group__mito_transcript'] > absolute_max_MT, 'MT_perc_keep'] = False
+            # Also apply additional absolute max to immune cells (same as absolute threshold for the blood)
+            if use_MT_thresh_blood_gut_immune == "yes":
+                adata.obs.loc[(adata.obs[lineage_column] == "Immune") & (adata.obs['pct_counts_gene_group__mito_transcript'] > MTblood), 'MT_perc_keep' ] = False
+                
         # Print filters
         for t in tissues:
             print(f"Max for {t}:")
@@ -758,7 +793,7 @@ def main():
                 print(f"{l}: {this_thresh}")
 
     # If filtering sequentially:
-    if filter_nMad_sequentially == "yes":
+    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
         adata = adata[adata.obs['MT_perc_keep'] == True]
             
     # 4. Remove samples with outlying sequencing depth
@@ -858,13 +893,13 @@ def main():
     # Either apply absolute thresholds or a relative cut off
     if use_abs_per_samp == "yes" and use_relative_mad == "no":
         blood_keep = (depth_count['Mean_nCounts'] > min_mean_nCount_per_samp_blood) & (depth_count['n_genes_by_counts'] > min_mean_nGene_per_samp_blood)
-        blood_keep = blood_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] == "blood"]['experiment_id'])
+        blood_keep = blood_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] == "blood"]['samp_tissue'])
         blood_keep = blood_keep[blood_keep == True].index
         gut_keep = (depth_count['Mean_nCounts'] > min_mean_nCount_per_samp_gut) & (depth_count['n_genes_by_counts'] > min_mean_nGene_per_samp_gut)
-        gut_keep = gut_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] != "blood"]['experiment_id'])
+        gut_keep = gut_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] != "blood"]['samp_tissue'])
         gut_keep = gut_keep[gut_keep == True].index
         both_keep = list(np.concatenate([blood_keep, gut_keep]))
-        adata['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
+        adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
     else:
         # Calculating relative threshold
         print("Calculating relative threshold: sample level mean nCells and depth")
@@ -1066,7 +1101,7 @@ def main():
 
     if "Harmony" in batch_correction:
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-        sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_pca_harmony')
+        sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_Harmony')
 
     # Save
     if os.path.exists(objpath) == False:

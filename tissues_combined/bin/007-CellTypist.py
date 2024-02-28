@@ -97,6 +97,7 @@ def main():
 
     # Copy the desired nearest neighbor matrix NN so that it is used in the model
     adata.uns['distances'] = adata.uns[f"{pref_matrix}_nn"]
+    # NOTE: TO DO: Also adjust X_scVI_nn_connectivities
 
     # Run the model (majority voting)
     predictions = celltypist.annotate(adata, model = model, majority_voting = True)

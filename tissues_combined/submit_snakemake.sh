@@ -38,7 +38,7 @@
 
 # Define some params
 config_var=config.yaml
-worfklow_prefix="mutli-tissue_qc"
+worfklow_prefix="multi-tissue_"
 group="team152"
 workdir=${PWD}
 

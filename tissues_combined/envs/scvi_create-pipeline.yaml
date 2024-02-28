@@ -1,0 +1,19 @@
+name: scvi-pipeline
+channels:
+  - pytorch-lts
+  - nvidia
+  - pytorch
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - anndata
+  - cudatoolkit=11.1.74=h6bb024c_0
+  - numpy
+  - scanpy=1.8.2
+  - pytorch=1.8.2=py3.9_cuda11.1_cudnn8.0.5_0
+  - pytorch-lightning=1.5.8=pyhd8ed1ab_0
+  - torchaudio=0.8.2=py39
+  - torchmetrics=1.2.1=pyhd8ed1ab_0
+  - torchvision=0.9.2=py39_cu111
+  - sklearn

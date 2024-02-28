@@ -1,7 +1,8 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
+        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]),
+        expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 rule qc_raw:
     input:
@@ -12,7 +13,11 @@ rule qc_raw:
         "results/{tissue}/tables/knee.txt",
         "results/{tissue}/tables/log1p_cp10k_sparse.npz",
         "results/{tissue}/tables/genes.txt",
-        "results/{tissue}/tables/cells.txt"
+        "results/{tissue}/tables/cells.txt",
+        "results/{tissue}/tables/raw_counts_sparse.npz",
+        "results/{tissue}/tables/raw_cells.txt",
+        "results/{tissue}/tables/raw_genes.txt",
+        "results/{tissue}/tables/raw_gene.var.txt"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -32,6 +37,7 @@ rule qc_raw:
         MT_thresh_blood=config["MT_thresh_blood"],
         use_absolute_MT=config["use_absolute_MT"],
         absolute_max_MT=config["absolute_max_MT"],
+        use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
         min_mean_nCount_per_samp_blood=config["min_mean_nCount_per_samp_blood"],
         min_mean_nCount_per_samp_gut=config["min_mean_nCount_per_samp_gut"],
         min_mean_nGene_per_samp_blood=config["min_mean_nGene_per_samp_blood"],
@@ -44,7 +50,7 @@ rule qc_raw:
         benchmark_batch_correction=config["benchmark_batch_correction"]
     resources:
         mem=20000,
-        queue='long',
+        queue='normal',
         mem_mb=20000,
         mem_mib=20000,
         disk_mb=20000,
@@ -53,7 +59,7 @@ rule qc_raw:
         "scvi-env"
     shell:
         r"""
-        python  bin/001_raw_QC_sm.py \
+        python  bin/001-raw_QC_sm.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
@@ -73,6 +79,7 @@ rule qc_raw:
         --MT_thresh_blood {params.MT_thresh_blood} \
         --use_absolute_MT {params.use_absolute_MT} \
         --absolute_max_MT {params.absolute_max_MT} \
+        --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
         --min_mean_nCount_per_samp_blood {params.min_mean_nCount_per_samp_blood} \
         --min_mean_nCount_per_samp_gut {params.min_mean_nCount_per_samp_gut} \
         --min_mean_nGene_per_samp_blood {params.min_mean_nGene_per_samp_blood} \
@@ -104,7 +111,7 @@ rule get_nn:
         "bbknn"
     shell:
         r"""
-        python bin/002_bbknn.py \
+        python bin/002-bbknn.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --knee_file {input[1]} \
@@ -120,7 +127,7 @@ rule get_umap:
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
     params:
-        use_matrix=config["pref_matrix"],
+        use_matrix=config["batch_correction"],
         col_by=config["col_by"]
     resources:
         mem=20000,
@@ -133,7 +140,7 @@ rule get_umap:
         "scvi-env"
     shell:
         r"""
-        python bin/003_umap_embedding.py \
+        python bin/003-umap_embedding.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --knee_file {input[1]} \
@@ -166,7 +173,7 @@ rule cluster_array:
         r"""
         mkdir -p results/{wildcards.tissue}/tables/clustering_array
         mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
-        python bin/004_scanpy_cluster.py \
+        python bin/004-scanpy_cluster.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --pref_matrix {params.pref_matrix} \
@@ -280,3 +287,59 @@ if config["add_celltypist"]:
                 --model {params.model} \
                 --model_name {params.model_name}
             """
+
+rule predict_all_cells:
+    input:
+        "results/{tissue}/tables/raw_counts_sparse.npz",
+        "results/{tissue}/tables/raw_genes.txt",
+        "results/{tissue}/tables/raw_cells.txt",
+        "results/{tissue}/tables/raw_gene.var.txt",
+        "results/{tissue}/tables/optim_resolution.txt"
+    output:
+        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
+    singularity:
+        "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
+    resources:
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
+        tmpdir="tmp"
+    shell:
+        r"""
+        python bin/008-predict_all_probabilities_keras.py \
+            --tissue {wildcards.tissue} \
+            --sparse_matrix_path {input[0]} \
+            --genes_f {input[1]} \
+            --cells_f {input[2]} \
+            --genes_var_f {input[3]} \
+            --optim_resolution_f {input[4]} \
+            --output_file "results/{wildcards.tissue}/tables/annotation/keras/optimum_res_all_cells_"
+        """
+
+rule add_predictions_filter:
+    input:
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad",
+        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
+    output:
+        "results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad"
+    conda:
+        "scvi-env"
+    params:
+        probability_threshold=config["probability_threshold"]
+    resources:
+        mem=20000,
+        queue='normal',
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
+        tmpdir="tmp"
+    shell:
+        r"""
+        python bin/009-add_all_predictions_adata_filter.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --prediction_file {input[1]} \
+            --probability_threshold {params.probability_threshold}
+        """
