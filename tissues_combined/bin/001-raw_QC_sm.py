@@ -1070,7 +1070,7 @@ def main():
         #Trainer(accelerator="cuda")
         # See is a GPU is available - if so, use. If not, then adjust
         scvi.settings.dl_pin_memory_gpu_training =  use_gpu
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="experiment_id")
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
         model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
         model.train(use_gpu=use_gpu)
         SCVI_LATENT_KEY = "X_scVI"
@@ -1080,6 +1080,7 @@ def main():
     if "scVI_default" in batch_correction:
         # 2. scVI - default_metrics
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default  ~~~~~~~~~~~~~~~~~~~")
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
         model_default = scvi.model.SCVI(adata,  n_latent=30)
         model_default.train(use_gpu=use_gpu)
         SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
@@ -1101,7 +1102,7 @@ def main():
 
     if "Harmony" in batch_correction:
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-        sc.external.pp.harmony_integrate(adata, 'experiment_id', basis='X_pca', adjusted_basis='X_Harmony')
+        sc.external.pp.harmony_integrate(adata, 'samp_tissue', basis='X_pca', adjusted_basis='X_Harmony')
 
     # Save
     if os.path.exists(objpath) == False:
@@ -1141,7 +1142,7 @@ def main():
     if benchmark_batch_correction == "yes":
         bm = Benchmarker(
             adata,
-            batch_key="experiment_id",
+            batch_key="samp_tissue",
             label_key="label__machine",
             embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
             n_jobs=4,
