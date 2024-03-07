@@ -6,7 +6,7 @@ rule all:
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad"
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/objects/adata_PCAd_batched.h5ad",
@@ -49,12 +49,13 @@ rule qc_raw:
         batch_correction=config["batch_correction"],
         benchmark_batch_correction=config["benchmark_batch_correction"]
     resources:
-        mem=20000,
-        queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem=500000,
+        queue='gpu-huge -gpu - ',
+        mem_mb=500000,
+        mem_mib=500000,
+        disk_mb=500000,
+        tmpdir="tmp",
+        threads=8
     conda:
         "scvi-env"
     shell:
@@ -101,12 +102,13 @@ rule get_nn:
     params:
         use_matrix="X_pca"
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     conda:
         "bbknn"
     shell:
@@ -130,12 +132,13 @@ rule get_umap:
         use_matrix=config["batch_correction"],
         col_by=config["col_by"]
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     conda:
         "scvi-env"
     shell:
@@ -160,11 +163,11 @@ rule cluster_array:
     params:
         pref_matrix=config["pref_matrix"]
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
         tmpdir="tmp",
         threads=8
     conda:
@@ -189,12 +192,13 @@ rule test_clusters:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     shell:
@@ -233,12 +237,13 @@ rule summarise_cluster_test:
         MCC_thresh=config["MCC_thresh"],
         pref_matrix=config["pref_matrix"]
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     conda:
         "scvi-env"
     shell:
@@ -267,12 +272,13 @@ if config["add_celltypist"]:
             model_name=config["celltypist_model_name"],
             pref_matrix=config["pref_matrix"]
         resources:
-            mem=20000,
+            mem=400000,
             queue='normal',
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
-            tmpdir="tmp"
+            mem_mb=400000,
+            mem_mib=400000,
+            disk_mb=400000,
+            tmpdir="tmp",
+            threads=8
         conda:
             "scvi-env"
         shell:
@@ -300,12 +306,13 @@ rule predict_all_cells:
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     shell:
         r"""
         python bin/008-predict_all_probabilities_keras.py \
@@ -329,12 +336,13 @@ rule add_predictions_filter:
     params:
         probability_threshold=config["probability_threshold"]
     resources:
-        mem=20000,
+        mem=400000,
         queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
-        tmpdir="tmp"
+        mem_mb=400000,
+        mem_mib=400000,
+        disk_mb=400000,
+        tmpdir="tmp",
+        threads=8
     shell:
         r"""
         python bin/009-add_all_predictions_adata_filter.py \
