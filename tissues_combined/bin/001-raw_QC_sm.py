@@ -314,22 +314,6 @@ def parse_options():
         required=True,
         help=''
     )
-    
-    parser.add_argument(
-        '-bc', '--batch_correction',
-        action='store',
-        dest='batch_correction',
-        required=True,
-        help=''
-    )
-    
-    parser.add_argument(
-        '-bbc', '--benchmark_batch_correction',
-        action='store',
-        dest='benchmark_batch_correction',
-        required=True,
-        help=''
-    )
 
     return parser.parse_args()
 
@@ -367,9 +351,6 @@ def main():
     filt_blood_keras = inherited_options.filt_blood_keras
     n_variable_genes = float(inherited_options.n_variable_genes)
     remove_problem_genes = inherited_options.remove_problem_genes
-    batch_correction=inherited_options.batch_correction
-    batch_correction=batch_correction.split("|")
-    benchmark_batch_correction=inherited_options.benchmark_batch_correction
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file: {input_file}")
@@ -398,8 +379,6 @@ def main():
     print(f"filt_blood_keras:{filt_blood_keras}")
     print(f"n_variable_genes:{n_variable_genes}")
     print(f"remove_problem_genes:{remove_problem_genes}")
-    print(f"batch_correction:{batch_correction}")
-    print(f"benchmark_batch_correction:{benchmark_batch_correction}")
     print("Parsed args")
     
     # Finally, derive and print the tissue arguments
@@ -469,7 +448,8 @@ def main():
             file.write(str(index) + '\n')
             
     print("Saved genes")
-    
+    del sparse_matrix
+        
     # Also save the gene var df
     adata.var.to_csv(f"results/{tissue}/tables/raw_gene.var.txt", sep = "\t")
 
@@ -684,7 +664,7 @@ def main():
             for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
                 this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
                 print(f"{l}: {this_thresh}")        
-    
+
     # If filtering sequentially:
     if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
         adata = adata[adata.obs['n_genes_by_counts_keep'] == True]
@@ -837,7 +817,7 @@ def main():
         # Also annotate the samples with low number of cells - Are these sequenced very deeply?
         if samp in low_samps:
             depth_count.iloc[s,2] = "Green"
-    
+
     depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
 
     # Plot
@@ -846,6 +826,7 @@ def main():
     plt.xlabel('Mean counts / cell')
     plt.ylabel('Mean genes detected / cell')
     plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_all.png", bbox_inches='tight')
+    plt.legend()
     plt.clf()
 
     # Plot the distribution per tissue
@@ -980,6 +961,7 @@ def main():
             file.write(str(index) + '\n')
 
     print("Saved genes")
+    del sparse_matrix
     
     # identify highly variable genes and scale these ahead of PCA
     sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))
@@ -1061,108 +1043,7 @@ def main():
     # Save object ahead of batch correction
     adata.write(objpath + "/adata_PCAd.h5ad")
 
-    ####################################
-    ######### Batch correction #########
-    ####################################
-    if "scVI" in batch_correction:
-        # 1. scVI
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum  ~~~~~~~~~~~~~~~~~~~")
-        #Trainer(accelerator="cuda")
-        # See is a GPU is available - if so, use. If not, then adjust
-        scvi.settings.dl_pin_memory_gpu_training =  use_gpu
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
-        model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
-        model.train(use_gpu=use_gpu)
-        SCVI_LATENT_KEY = "X_scVI"
-        adata.obsm[SCVI_LATENT_KEY] = model.get_latent_representation()
-    
-    
-    if "scVI_default" in batch_correction:
-        # 2. scVI - default_metrics
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default  ~~~~~~~~~~~~~~~~~~~")
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
-        model_default = scvi.model.SCVI(adata,  n_latent=30)
-        model_default.train(use_gpu=use_gpu)
-        SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
-        adata.obsm[SCVI_LATENT_KEY_DEFAULT] = model_default.get_latent_representation()
-    
-    if "scANVI" in batch_correction:
-        # 3. scANVI
-        # Performing this across lineage
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
-        scanvi_model = scvi.model.SCANVI.from_scvi_model(
-            model,
-            adata=adata,
-            labels_key=lineage_column,
-            unlabeled_category="Unknown",
-        )
-        scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=use_gpu)
-        SCANVI_LATENT_KEY = "X_scANVI"
-        adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
-
-    if "Harmony" in batch_correction:
-        print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-        sc.external.pp.harmony_integrate(adata, 'samp_tissue', basis='X_pca', adjusted_basis='X_Harmony')
-
-    # Save
-    if os.path.exists(objpath) == False:
-        os.mkdir(objpath)
-
-    adata.write(objpath + "/adata_PCAd_batched.h5ad")
-
-    ## Compute NN and UMAP using the recommended number of PCs
-    ## Would like to calculate the knee from the latent SCANVI factors, but not sure where this is stored or how to access
-    ## NOTE: Probably want to be doing a sweep of the NN parameter as have done for all of the data together
-    ## Using non-corrected matrix
-    ## Compute UMAP (Will also want to do a sweep of min_dist and spread parameters here) - Do this based on all embeddings
-    #colby = ["experiment_id", "category__machine", "label__machine"]
-    #latents = ["X_pca", "X_scVI", "X_scANVI", 'X_pca_harmony', "X_scVI_default"]
-    #latents = np.intersect1d(latents, adata.obsm.keys())
-    #print(f"latents: {latents}")
-    #for l in latents:
-    #    print("Performing on UMAP embedding on {}".format(l))
-    #    # Calculate NN (using 350)
-    #    print("Calculating neighbours")
-    #    sc.pp.neighbors(adata, n_neighbors=350, n_pcs=nPCs, use_rep=l, key_added=l + "_nn")
-    #    # Perform UMAP embedding
-    #    sc.tl.umap(adata, neighbors_key=l + "_nn", min_dist=0.5, spread=0.5)
-    #    adata.obsm["UMAP_" + l] = adata.obsm["X_umap"]
-    #    # Save a plot
-    #    for c in colby:
-    #        if c != "experiment_id":
-    #            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png")
-    #        else:
-    #            sc.pl.umap(adata, color = c, save="_" + l + "_NN" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
-    #    # Overwite file after each 
-    #    adata.write(objpath + "/adata_PCAd_batched.h5ad")
-
-    ####################################
-    #### Benchmarking integration ######
-    ####################################
-    if benchmark_batch_correction == "yes":
-        bm = Benchmarker(
-            adata,
-            batch_key="samp_tissue",
-            label_key="label__machine",
-            embedding_obsm_keys=["X_pca", SCVI_LATENT_KEY, SCVI_LATENT_KEY_DEFAULT, SCANVI_LATENT_KEY, 'X_pca_harmony'],
-            n_jobs=4,
-            pre_integrated_embedding_obsm_key="X_pca"
-        )   
-        bm.benchmark()
-
-        # Get the results out
-        df = bm.get_results(min_max_scale=False)
-        print(df)
-        # Save 
-        df.to_csv(tabpath + "/integration_benchmarking.csv")
-        df1 = df.drop('Metric Type')
-        top = df1[df1.Total == max(df1.Total.values)].index
-        print("The method with the greatest overall score is: ")
-        print(str(top.values))
-
-
 
 # Execute
 if __name__ == '__main__':
     main()
-    

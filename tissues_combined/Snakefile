@@ -9,7 +9,6 @@ rule qc_raw:
         "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
-        "results/{tissue}/objects/adata_PCAd_batched.h5ad",
         "results/{tissue}/tables/knee.txt",
         "results/{tissue}/tables/log1p_cp10k_sparse.npz",
         "results/{tissue}/tables/genes.txt",
@@ -45,15 +44,13 @@ rule qc_raw:
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
-        remove_problem_genes=config["remove_problem_genes"],
-        batch_correction=config["batch_correction"],
-        benchmark_batch_correction=config["benchmark_batch_correction"]
+        remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=500000,
-        queue='gpu-huge -gpu - ',
-        mem_mb=500000,
-        mem_mib=500000,
-        disk_mb=500000,
+        mem=850000,
+        queue='teramem',
+        mem_mb=850000,
+        mem_mib=850000,
+        disk_mb=850000,
         tmpdir="tmp",
         threads=8
     conda:
@@ -88,11 +85,38 @@ rule qc_raw:
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
-        --remove_problem_genes {params.remove_problem_genes} \
-        --batch_correction {params.batch_correction} \
-        --benchmark_batch_correction {params.benchmark_batch_correction}
+        --remove_problem_genes {params.remove_problem_genes}
         """
   
+rule batch_correct:
+    input:
+        "results/{tissue}/objects/adata_PCAd.h5ad"
+    output:
+        "results/{tissue}/objects/adata_PCAd_batched.h5ad"
+    params:
+        batch_correction=config["batch_correction"],
+        benchmark_batch_correction=config["benchmark_batch_correction"]
+    conda:
+        "scvi-env"
+    resources:
+        mem=460000,
+        queue='gpu-huge -gpu -',
+        mem_mb=460000,
+        mem_mib=460000,
+        disk_mb=460000,
+        tmpdir="tmp",
+        threads=8
+    shell:
+        r"""
+        python bin/001b-batch_correction.py \
+            --tissue {wildcards.tissue} \
+            --input_file {input[0]} \
+            --batch_correction {params.batch_correction} \
+            --benchmark_batch_correction {params.benchmark_batch_correction}
+
+        """
+
+
 rule get_nn:
     input:
         "results/{tissue}/objects/adata_PCAd.h5ad",

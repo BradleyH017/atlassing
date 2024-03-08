@@ -84,7 +84,7 @@ def main():
 
     # Batch correct 
     # NOTE: ************** (params neighbors_within_batch is for testing only) ***********
-    bbknn.bbknn(adata, batch_key='experiment_id', n_pcs=n_pcs, use_rep=use_matrix, neighbors_within_batch=1)
+    bbknn.bbknn(adata, batch_key='experiment_id', n_pcs=n_pcs, use_rep=use_matrix)
 
     # Extract the optimum NN defined by this and save
     optimum_nn = adata.uns['neighbors']['params']['n_neighbors']
