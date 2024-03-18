@@ -1,8 +1,8 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
+        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
 # Define memory increment function
@@ -285,6 +285,7 @@ else:
         params:
             activation=config["activation"],
             loss=config["loss"],
+            optimizer=config["optimizer"],
             sparsity_l1__activity=config["sparsity_l1__activity"],
             sparsity_l1__bias=config["sparsity_l1__bias"],
             sparsity_l1__kernel=config["sparsity_l1__kernel"],
@@ -295,7 +296,7 @@ else:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
 
-            echo -e "param__activation\t{param.activation}\nparam__loss\t{param.loss}\nsparsity_l1__activity\t{param.sparsity_l1__activity}\nsparsity_l1__bias\t{param.sparsity_l1__bias}\nsparsity_l1__kernel\t{param.sparsity_l1__kernel}\nsparsity_l2__activity\t{param.sparsity_l2__activity}\nsparsity_l2__bias\t{param.sparsity_l2__bias}\nsparsity_l2__kernel\t{param.sparsity_l2__kernel}" > {output}
+            echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > {output}
             """
 
 
@@ -305,7 +306,7 @@ rule test_clusters:
         "results/{tissue}/tables/log1p_cp10k_sparse.npz",
         "results/{tissue}/tables/genes.txt",
         "results/{tissue}/tables/cells.txt",
-        "results/{tissue}/tables/clustering_array/leiden_3.0/optimum_model_params.txt"
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv"
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
@@ -322,10 +323,10 @@ rule test_clusters:
         r"""
         python bin/005-scanpy_cluster_validate_resolution-keras.py \
             --tissue {wildcards.tissue} \
-            --sparse_matrix_path {input[2]} \
-            --clusters_df {input[1]} \
-            --genes_f {input[3]} \
-            --cells_f {input[4]} \
+            --sparse_matrix_path {input[1]} \
+            --clusters_df {input[4]} \
+            --genes_f {input[2]} \
+            --cells_f {input[3]} \
             --keras_param_file {input[0]} \
             --number_epoch 25 \
             --batch_size 32 \
@@ -377,7 +378,7 @@ rule summarise_cluster_test:
         """
 
 if config["add_celltypist"]:
-    rule add_megagut:
+    rule add_celltypist:
         input:
             "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad"
         output:

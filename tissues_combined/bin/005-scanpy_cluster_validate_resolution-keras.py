@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -261,8 +262,7 @@ def fit_model_keras(
     encoder,
     X_std,
     y,
-    sparsity_l1=0.01,
-    sparsity_l2=0.0,
+    keras_params,
     n_epochs=100,
     batch_size=32,
     train_size_fraction=0.67,
@@ -302,12 +302,15 @@ def fit_model_keras(
     #
     # Training
     model = model_function(
-        sparsity_l1__activity=sparsity_l1,
-        sparsity_l2__activity=sparsity_l2,
-        sparsity_l1__kernel=sparsity_l1,
-        sparsity_l2__kernel=sparsity_l2,
-        sparsity_l1__bias=sparsity_l1,
-        sparsity_l2__bias=sparsity_l2
+        optimizer=keras_params['optimizer'],
+        activation=keras_params['activation'],
+        loss=keras_params['loss'],
+        sparsity_l1__activity=keras_params['sparsity_l1__activity'],
+        sparsity_l2__activity=keras_params['sparsity_l2__activity'],
+        sparsity_l1__kernel=keras_params['sparsity_l1__kernel'],
+        sparsity_l2__kernel=keras_params['sparsity_l2__kernel'],
+        sparsity_l1__bias=keras_params['sparsity_l1__bias'],
+        sparsity_l2__bias=keras_params['sparsity_l2__bias']
     )
     history = model.fit(
         X_train,
@@ -430,13 +433,9 @@ def main():
 
 
     parser.add_argument(
-        '-s', '--sparsity_l1',
+        '-kpf', '--keras_param_file',
         action='store',
-        dest='sparsity_l1',
-        default=0.0001,
-        type=float,
-        help='Smaller values specify stronger regularization.\
-            (default: %(default)s)'
+        dest='keras_param_file',
     )
 
     parser.add_argument(
@@ -529,7 +528,28 @@ def main():
     print(f"sparse_matrix_path: {sparse_matrix_path}")
     clusters_df = options.clusters_df
     print(f"clusters_df: {clusters_df}")
+    keras_param_file = options.keras_param_file
+    print(f"keras_param_file: {keras_param_file}")
     
+    # Extract the parameters from the param file
+    keras_params_df = pd.read_csv(keras_param_file, sep = "\t", header=None)
+    keras_params_df.columns = ["param", "value"]
+    keras_params_df['param'] = keras_params_df['param'].str.replace('param__', '')
+    keras_params = {}
+    # Then, iterate over the DataFrame rows
+    for index, row in keras_params_df.iterrows():
+        # Get the values from the row
+        param = row['param']
+        value = row['value']
+        
+        # Check if the parameter is 'activation' or 'loss'
+        if param == 'activation' or param == 'loss' or param == 'optimizer':
+            # If it is, add it as a string variable
+            keras_params[param] = str(value)
+        else:
+            # Otherwise, add it as a float variable
+            keras_params[param] = float(value)
+
 
     verbose = True
 
@@ -626,7 +646,6 @@ def main():
         ))
 
     # Set other variables
-    sparsity_l1 = options.sparsity_l1
     n_epochs = options.number_epoch
     batch_size = options.batch_size
 
@@ -656,15 +675,15 @@ def main():
     # Define the model
     # NOTE: Defaults determined via grid search of 160k TI single cells
     def classification_model(
-        optimizer='sgd',
-        activation='softmax',
-        loss='categorical_crossentropy',
-        sparsity_l1__activity=0.0001,
-        sparsity_l2__activity=0.0,
-        sparsity_l1__kernel=0.0,
-        sparsity_l2__kernel=0.0,
-        sparsity_l1__bias=0.0,
-        sparsity_l2__bias=0.0
+        optimizer=keras_params['optimizer'],
+        activation=keras_params['activation'],
+        loss=keras_params['loss'],
+        sparsity_l1__activity=keras_params['sparsity_l1__activity'],
+        sparsity_l2__activity=keras_params['sparsity_l2__activity'],
+        sparsity_l1__kernel=keras_params['sparsity_l1__kernel'],
+        sparsity_l2__kernel=keras_params['sparsity_l2__kernel'],
+        sparsity_l1__bias=keras_params['sparsity_l1__bias'],
+        sparsity_l2__bias=keras_params['sparsity_l2__bias']
     ):
         # create model
         model = Sequential()
@@ -723,8 +742,8 @@ def main():
         # loss function, which is called “categorical_crossentropy” in Keras.
         # UPDATE: sgd works better emperically.
         model.compile(
-            optimizer=optimizer,  # adam, sgd
-            loss=loss,
+            optimizer=keras_params['optimizer'],  # adam, sgd
+            loss=keras_params['loss'],
             metrics=mets
         )
         #
@@ -876,7 +895,7 @@ def main():
             )
             out_file_base = '{}-sparsity_l1={}-train_size_fraction={}'.format(
                 out_file_base,
-                str(sparsity_l1).replace('.', 'pt'),
+                str(keras_params['sparsity_l1__activity']).replace('.', 'pt'),
                 str(train_size_fraction).replace('.', 'pt')
             )
         #
@@ -886,8 +905,7 @@ def main():
             encoder=encoder,
             X_std=X_std,
             y=y,
-            sparsity_l1=sparsity_l1,
-            sparsity_l2=0.0,
+            keras_params=keras_params,
             n_epochs=n_epochs,
             batch_size=batch_size,
             train_size_fraction=train_size_fraction
@@ -917,8 +935,6 @@ def main():
             else:
                 is_cluster.append(False)
         model_report['is_cluster'] = is_cluster
-        # Add in extra data
-        model_report['sparsity_l1'] = sparsity_l1
         if dict_add:
             for key, value in dict_add.items():
                 model_report[key] = value
@@ -939,7 +955,6 @@ def main():
         # Save the test results - each row is a cell and the columns are the
         # prob of that cell belonging to a particular class.
         # Add in extra data
-        y_prob_df['sparsity_l1'] = sparsity_l1
         if dict_add:
             for key, value in dict_add.items():
                 y_prob_df[key] = value
@@ -1093,3 +1108,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

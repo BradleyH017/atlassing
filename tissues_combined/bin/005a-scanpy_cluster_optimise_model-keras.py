@@ -185,7 +185,7 @@ def keras_grid(
     # activation: 'softmax' - Each nput vector is handled independently, the vector of values is converted into a probablity from 0-1 (exactly what we want). The result can be interpretted as a probability distribution (https://keras.io/api/layers/activations/)
     # loss: 'categorical_crossentropy' - As our data is not binary, much be one of category_crossentropy or sparse_categorical_crossentropy (https://keras.io/2.15/api/). 
     # # sparse_categorical_crossentropy is for classes that are not one-hot-encoded (e.g, can be part of multiple classes), so not appropraite.
-    # optimizer: ['adam', 'sgd', 'RMSprop'] - Adam supposed to generally work well for most problems. sgd used n original TI model and is a simple model, rmsprop is suitable for problems with sparse data or non-stationary objectives
+    # optimizer: ['adam', 'sgd', 'RMSprop'] - Adam supposed to generally work well for most problems. sgd used in original TI model and is a simple model, rmsprop is suitable for problems with sparse data or non-stationary objectives
     # sparsity_l1/2_activity: Using same params as tried originally
     # sparsity_l1/2_kernal: Using same params as tried originally
     # sparsity_l1/2_bias: Using same params as tried originally
@@ -193,30 +193,16 @@ def keras_grid(
         activation=['softmax'],
         optimizer=['sgd'],
         loss=['categorical_crossentropy'],
-        sparsity_l2__activity=[0.0, 1e-6],
-        sparsity_l1__activity=[0.1, 1e-4, 1e-10, 0.0],
-        sparsity_l2__kernel=[0.0, 1e-6],
-        sparsity_l1__kernel=[0.1, 1e-4, 1e-10, 0.0],
-        sparsity_l2__bias=[0.0, 1e-6],
-        sparsity_l1__bias=[0.1, 1e-4, 1e-10, 0.0]
+        sparsity_l2__activity=[0.0, 0.01, 1e-6],
+        sparsity_l1__activity=[0.1, 0.01, 1e-4, 1e-10, 0.0],
+        sparsity_l2__kernel=[0.0, 0.01, 1e-6],
+        sparsity_l1__kernel=[0.1, 0.01, 1e-4, 1e-10, 0.0],
+        sparsity_l2__bias=[0.0, 0.01, 1e-6],
+        sparsity_l1__bias=[0.1, 0.01, 1e-4, 1e-10, 0.0]
     )
     n_splits = 5
-    
-    ###############################
-    # Overwrite this for testing
-    param_grid = dict(
-        activation=['softmax'],
-        optimizer=['sgd'],
-        loss=['categorical_crossentropy'],
-        sparsity_l2__activity=[1e-6],
-        sparsity_l1__activity=[0.1],
-        sparsity_l2__kernel=[0.0],
-        sparsity_l1__kernel=[1e-4],
-        sparsity_l2__bias=[0.0],
-        sparsity_l1__bias=[0.1, 1e-4]
-    )
-    n_splits = 3
-    #################################
+
+    ########### TESTING ############
     
     grid = GridSearchCV(
         estimator=KerasClassifier(build_fn=model_function),

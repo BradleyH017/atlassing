@@ -1,6 +1,6 @@
 # Decide tissue (s)
 tissue: 
-# - 'rectum'
+- 'rectum'
 - 'blood' 
 # - 'ti' 
 # - 'gut'
@@ -36,7 +36,7 @@ n_variable_genes: 5000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
 
 # Batch correction options
-batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony" ****NOTE: COULD PARRALLELISE THIS*****
+batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony"
 benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
 
 # Determine to get optimum NN from bbknn? # If false, will use number of nearest neighbours decided a priori
@@ -49,10 +49,22 @@ col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__mach
 # Optimise run parameters?
 optimise_run_params: True
 
+# Otherwise, what are the keras hyperparameters to use? Currently: these are from Leland and not neccessarily optimised for use on the different datasets together or independently
+# Don't use quotes around these
+activation: softmax
+loss: categorical_crossentropy
+optimizer: sgd
+sparsity_l1__activity: 0.01
+sparsity_l1__kernel: 0.01
+sparsity_l1__bias: 0.01
+sparsity_l2__activity: 0.0
+sparsity_l2__kernel: 0.0
+sparsity_l2__bias: 0.0
+
 # Clustering and validation options
 clustering_resolutions: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over?
 pref_matrix: "X_Harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
-MCC_thresh: 0.5 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
+MCC_thresh: 0.25 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
 
 # Celltypist options:
 add_celltypist: True # Should the script run to get the celltypist megagut annotations for these cells? 
