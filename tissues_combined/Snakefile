@@ -1,8 +1,9 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]),
-        expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+
 
 # Define memory increment function
 def increment_memory(base_memory):
@@ -241,7 +242,7 @@ if config["optimise_run_params"]:
             "results/{tissue}/tables/genes.txt",
             "results/{tissue}/tables/cells.txt"
         output:
-            "results/{tissue}/tables/clustering_array/leiden_3.0/optimum_model_params.txt" 
+            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt" 
         resources:
             mem=increment_memory(20000),
             queue='long',
@@ -254,7 +255,9 @@ if config["optimise_run_params"]:
             "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
         shell:
             r"""
-            python bin/005-scanpy_cluster_validate_resolution-keras.py \
+            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
+
+            python bin/005a-scanpy_cluster_optimise_model-keras.py \
                 --tissue {wildcards.tissue} \
                 --sparse_matrix_path {input[1]} \
                 --clusters_df {input[0]} \
@@ -268,7 +271,7 @@ if config["optimise_run_params"]:
 else:
     rule make_dummy_keras_params:
         output:
-            "results/{tissue}/tables/clustering_array/leiden_3.0/optimum_model_params.txt" 
+            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
         resources:
             mem=5000,
             queue='normal',
@@ -280,16 +283,25 @@ else:
         conda:
             "scvi-env"
         params:
-            # List params here
+            activation=config["activation"],
+            loss=config["loss"],
+            sparsity_l1__activity=config["sparsity_l1__activity"],
+            sparsity_l1__bias=config["sparsity_l1__bias"],
+            sparsity_l1__kernel=config["sparsity_l1__kernel"],
+            sparsity_l2__activity=config["sparsity_l2__activity"],
+            sparsity_l2__bias=config["sparsity_l2__bias"],
+            sparsity_l2__kernel=config["sparsity_l2__kernel"]
         shell:
             r"""
-            echo "" > {output}
+            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
+
+            echo -e "param__activation\t{param.activation}\nparam__loss\t{param.loss}\nsparsity_l1__activity\t{param.sparsity_l1__activity}\nsparsity_l1__bias\t{param.sparsity_l1__bias}\nsparsity_l1__kernel\t{param.sparsity_l1__kernel}\nsparsity_l2__activity\t{param.sparsity_l2__activity}\nsparsity_l2__bias\t{param.sparsity_l2__bias}\nsparsity_l2__kernel\t{param.sparsity_l2__kernel}" > {output}
             """
 
 
 rule test_clusters:
     input:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
+        "results/{tissue}/tables/keras-grid_search/keras-use_params.txt",
         "results/{tissue}/tables/log1p_cp10k_sparse.npz",
         "results/{tissue}/tables/genes.txt",
         "results/{tissue}/tables/cells.txt",
@@ -310,11 +322,11 @@ rule test_clusters:
         r"""
         python bin/005-scanpy_cluster_validate_resolution-keras.py \
             --tissue {wildcards.tissue} \
-            --sparse_matrix_path {input[1]} \
-            --clusters_df {input[0]} \
-            --genes_f {input[2]} \
-            --cells_f {input[3]} \
-            --sparsity_l1 0.0001 \
+            --sparse_matrix_path {input[2]} \
+            --clusters_df {input[1]} \
+            --genes_f {input[3]} \
+            --cells_f {input[4]} \
+            --keras_param_file {input[0]} \
             --number_epoch 25 \
             --batch_size 32 \
             --train_size_fraction 0.67 \

@@ -201,6 +201,23 @@ def keras_grid(
         sparsity_l1__bias=[0.1, 1e-4, 1e-10, 0.0]
     )
     n_splits = 5
+    
+    ###############################
+    # Overwrite this for testing
+    param_grid = dict(
+        activation=['softmax'],
+        optimizer=['sgd'],
+        loss=['categorical_crossentropy'],
+        sparsity_l2__activity=[1e-6],
+        sparsity_l1__activity=[0.1],
+        sparsity_l2__kernel=[0.0],
+        sparsity_l1__kernel=[1e-4],
+        sparsity_l2__bias=[0.0],
+        sparsity_l1__bias=[0.1, 1e-4]
+    )
+    n_splits = 3
+    #################################
+    
     grid = GridSearchCV(
         estimator=KerasClassifier(build_fn=model_function),
         param_grid=param_grid,
@@ -255,12 +272,6 @@ def main():
     )
 
     parser.add_argument(
-        '-v', '--version',
-        action='version',
-        version='%(prog)s {version}'.format(version=__version__)
-    )
-
-    parser.add_argument(
         '-sp', '--sparse_matrix_path',
         action='store',
         dest='sparse_matrix_path',
@@ -312,6 +323,16 @@ def main():
             weights at the end of each ne.\
             (default: %(default)s)'
     )
+    
+    parser.add_argument(
+        '-tsf', '--train_size_fraction',
+        action='store',
+        dest='train_size_fraction',
+        default=0.67,
+        type=float,
+        help='Fraction of the data to use for training set.\
+            (default: %(default)s)'
+    )
 
     parser.add_argument(
         '-of', '--output_file',
@@ -336,329 +357,291 @@ def main():
     # clusters_df = f"results/{tissue}/tables/clustering_array/leiden_3.0/clusters.csv"
     # genes_f=f"results/{tissue}/tables/genes.txt"
     # cells_f=f"results/{tissue}/tables/cells.txt"
+    # out_f=f"results/{tissue}/tables/keras-grid_search/keras-"
 
 
-verbose = True
+    verbose = True
 
-# Set GPU memory limits
-gpus = tf.config.list_physical_devices('GPU')
-print(gpus)
-if gpus:
-    # For TF v1
-    # config = tf.ConfigProto()
-    # config.gpu_options.allow_growth = True
-    # session = tf.Session(config=config)
+    # Set GPU memory limits
+    gpus = tf.config.list_physical_devices('GPU')
+    print(gpus)
+    if gpus:
+        # For TF v1
+        # config = tf.ConfigProto()
+        # config.gpu_options.allow_growth = True
+        # session = tf.Session(config=config)
 
-    # For TF v2
-    try:
-        # Method 1:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
+        # For TF v2
+        try:
+            # Method 1:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
 
-        # Method 2:
-        # Restrict TensorFlow to only allocate 1GB of memory on the first
-        # GPU
-        # tf.config.experimental.set_virtual_device_configuration(
-        #     gpus[0],
-        #     [tf.config.experimental.VirtualDeviceConfiguration(
-        #         memory_limit=options.memory_limit*1024
-        #     )])
-        # logical_gpus = tf.config.list_logical_devices('GPU')
-        # print(
-        #     len(gpus),
-        #     "Physical GPUs,",
-        #     len(logical_gpus),
-        #     "Logical GPUs"
-        # )
-    except RuntimeError as e:
-        # Virtual devices must be set before GPUs have been initialized
-        print(e)
-else:
-    _ = 'running without gpus'
-    # raise Exception('ERROR: no GPUs detected.')
+            # Method 2:
+            # Restrict TensorFlow to only allocate 1GB of memory on the first
+            # GPU
+            # tf.config.experimental.set_virtual_device_configuration(
+            #     gpus[0],
+            #     [tf.config.experimental.VirtualDeviceConfiguration(
+            #         memory_limit=options.memory_limit*1024
+            #     )])
+            # logical_gpus = tf.config.list_logical_devices('GPU')
+            # print(
+            #     len(gpus),
+            #     "Physical GPUs,",
+            #     len(logical_gpus),
+            #     "Logical GPUs"
+            # )
+        except RuntimeError as e:
+            # Virtual devices must be set before GPUs have been initialized
+            print(e)
+    else:
+        _ = 'running without gpus'
+        # raise Exception('ERROR: no GPUs detected.')
 
-# Get additional data we are going to append to the output model info
-dict_add = {}
-if options.dict_add != '':
-    for item in options.dict_add.split(':::'):
-        _tmp = item.split('::')
-        if len(_tmp) != 2:
-            raise Exception('ERROR: check dict_add.')
-        else:
-            dict_add[_tmp[0]] = _tmp[1]
-print(dict_add)
+    # Load the expression and make dense
+    sparse = sp.sparse.load_npz(sparse_matrix_path)
+    dense = sparse.toarray()
+    # Create a pandas DataFrame from the dense matrix
+    X = pd.DataFrame(dense)
+    del dense
 
-# Load the expression and make dense
-sparse = sp.sparse.load_npz(sparse_matrix_path)
-dense = sparse.toarray()
-# Create a pandas DataFrame from the dense matrix
-X = pd.DataFrame(dense)
-del dense
+    # Add genes to the columns and cells to the rows
+    genes = np.loadtxt(options.genes_f, dtype=str)
+    cells = np.loadtxt(options.cells_f, dtype=str)
+    X.columns = genes
+    X.index = cells
 
-# Add genes to the columns and cells to the rows
-genes = np.loadtxt(options.genes_f, dtype=str)
-cells = np.loadtxt(options.cells_f, dtype=str)
-X.columns = genes
-X.index = cells
+    # Load the clusters and add to 'y'
+    clusters = pd.read_csv(clusters_df)
+    leiden_column = [col for col in clusters.columns if col.startswith('leiden')]
+    y = clusters[leiden_column].values
+        
+    # If the dataset is greater than 100k cells, subset to only include these cells in the grid search
+    max_cells=1e5
+    if len(cells) > max_cells:
+        # Generate a vector of random indices for sampling
+        random_indices = pd.Series(range(len(cells))).sample(n=max_cells, replace=False)
+        X = X.iloc[random_indices]
+        y = y[random_indices]
 
-# Load the clusters and add to 'y'
-clusters = pd.read_csv(clusters_df)
-leiden_column = [col for col in clusters.columns if col.startswith('leiden')]
-y = clusters[leiden_column].values
-    
-# If the dataset is greater than 100k cells, subset to only include these cells in the grid search
-max_cells=1e5
-if len(cells) > max_cells:
-    # Generate a vector of random indices for sampling
-    random_indices = pd.Series(range(len(cells))).sample(n=max_cells, replace=False)
-    X = X.iloc[random_indices]
-    y = y[random_indices]
-    
+    # Set other variables
+    n_epochs = options.number_epoch
+    batch_size = options.batch_size
 
-## Add some info from adata to dict_add
-#for key, value in adata.uns['neighbors']['params'].items():
-#    dict_add['neighbors__{}'.format(key)] = value
-#for key, value in adata.uns['cluster']['params'].items():
-#    dict_add['cluster__{}'.format(key)] = value
+    # Center and scale the data
+    if sp.sparse.issparse(X):
+        X = X.todense()
 
-# If train_size_cells, override the fraction so that the total number of
-# cells in the training set will be equal to train_size_cells.
-train_size_fraction = options.train_size_fraction
-if options.train_size_cells > 0:
-    if options.train_size_cells >= X.shape[0]:
-        raise Exception('Invalid train_size_cells.')
-    train_size_fraction = (
-        1 - ((X.shape[0]-options.train_size_cells)/X.shape[0])
+    X_std = X
+    scaler = preprocessing.StandardScaler(
+        with_mean=True,
+        with_std=True
     )
+
+    X_std = scaler.fit_transform(X)
     if verbose:
-        print('Set train_size_fraction to: {}.'.format(
-            train_size_fraction
+        print('center={} scale={}'.format(
+            True,
+            True
         ))
-if verbose:
-    print('Number cells training ({}) and testing ({}).'.format(
-        int(train_size_fraction*X.shape[0]),
-        int((1-train_size_fraction)*X.shape[0])
-    ))
 
-# Set other variables
-sparsity_l1 = options.sparsity_l1
-n_epochs = options.number_epoch
-batch_size = options.batch_size
+    # One hot encode y (the cell type classes)
+    # encode class values as integers
+    encoder = preprocessing.LabelEncoder()
+    encoder.fit(y)
+    print('Found {} clusters'.format(len(encoder.classes_)))
 
-# Center and scale the data
-if sp.sparse.issparse(X):
-    X = X.todense()
+    # Define the model
+    # NOTE: Defaults determined via grid search of 160k TI single cells
+    def classification_model(
+        optimizer='sgd',
+        activation='softmax',
+        loss='categorical_crossentropy',
+        sparsity_l1__activity=0.0001,
+        sparsity_l2__activity=0.0,
+        sparsity_l1__kernel=0.0,
+        sparsity_l2__kernel=0.0,
+        sparsity_l1__bias=0.0,
+        sparsity_l2__bias=0.0
+    ):
+        # create model
+        model = Sequential()
+        # Use a “softmax” activation function in the output layer. This is to
+        # ensure the output values are in the range of 0 and 1 and may be used
+        # as predicted probabilities.
+        #
+        # https://developers.google.com/machine-learning/crash-course/multi-class-neural-networks/softmax
+        # Softmax assigns decimal probabilities to each class in a multi-class
+        # problem. Those decimal probabilities must add up to 1.0. This
+        # additional constraint helps training converge more quickly than it
+        # otherwise would. Softmax is implemented through a neural network
+        # layer just before the output layer. The Softmax layer must have the
+        # same number of nodes as the output layer.
+        # Softmax assumes that each example is a member of exactly one class.
+        #
+        # Softmax should be used for multi-class prediction with single label
+        # https://developers.google.com/machine-learning/crash-course/multi-class-neural-networks/video-lecture
+        # NOTE: input dimension = number of features your data has
+        model.add(Dense(
+            len(encoder.classes_),  # output dim is number of classes
+            use_bias=True,  # intercept
+            activation=activation,  # softmax, sigmoid
+            activity_regularizer=L1L2(
+                l1=sparsity_l1__activity,
+                l2=sparsity_l2__activity
+            ),
+            kernel_regularizer=L1L2(
+                l1=sparsity_l1__kernel,
+                l2=sparsity_l2__kernel
+            ),
+            bias_regularizer=L1L2(
+                l1=sparsity_l1__bias,
+                l2=sparsity_l2__bias
+            ),
+            input_dim=X.shape[1]
+        ))
+        # Example of adding additional layers
+        # model.add(Dense(8, input_dim=4, activation='relu'))
+        # model.add(Dense(3, activation='softmax'))
+        #
+        # Metrics to check out over training epochs
+        mets = [
+            # loss,
+            keras.metrics.CategoricalAccuracy(name='categorical_accuracy'),
+            # keras.metrics.TruePositives(name='tp'),
+            # keras.metrics.FalsePositives(name='fp'),
+            # keras.metrics.TrueNegatives(name='tn'),
+            # keras.metrics.FalseNegatives(name='fn'),
+            # keras.metrics.Precision(name='precision'),
+            # keras.metrics.Recall(name='recall'),
+            # keras.metrics.AUC(name='auc'),
+            keras.metrics.BinaryAccuracy(name='accuracy')
+        ]
+        # Use Adam gradient descent optimization algorithm with a logarithmic
+        # loss function, which is called “categorical_crossentropy” in Keras.
+        # UPDATE: sgd works better emperically.
+        model.compile(
+            optimizer=optimizer,  # adam, sgd
+            loss=loss,
+            metrics=mets
+        )
+        #
+        return model
+        
+    # Get the out file base.
+    out_file_base = options.of
 
-X_std = X
-scaler = preprocessing.StandardScaler(
-    with_mean=True,
-    with_std=True
-)
-
-X_std = scaler.fit_transform(X)
-if verbose:
-    print('center={} scale={}'.format(
-        True,
-        True
-    ))
-
-# One hot encode y (the cell type classes)
-# encode class values as integers
-encoder = preprocessing.LabelEncoder()
-encoder.fit(y)
-print('Found {} clusters'.format(len(encoder.classes_)))
-
-# Define the model
-# NOTE: Defaults determined via grid search of 160k TI single cells
-def classification_model(
-    optimizer='sgd',
-    activation='softmax',
-    loss='categorical_crossentropy',
-    sparsity_l1__activity=0.0001,
-    sparsity_l2__activity=0.0,
-    sparsity_l1__kernel=0.0,
-    sparsity_l2__kernel=0.0,
-    sparsity_l1__bias=0.0,
-    sparsity_l2__bias=0.0
-):
-    # create model
-    model = Sequential()
-    # Use a “softmax” activation function in the output layer. This is to
-    # ensure the output values are in the range of 0 and 1 and may be used
-    # as predicted probabilities.
     #
-    # https://developers.google.com/machine-learning/crash-course/multi-class-neural-networks/softmax
-    # Softmax assigns decimal probabilities to each class in a multi-class
-    # problem. Those decimal probabilities must add up to 1.0. This
-    # additional constraint helps training converge more quickly than it
-    # otherwise would. Softmax is implemented through a neural network
-    # layer just before the output layer. The Softmax layer must have the
-    # same number of nodes as the output layer.
-    # Softmax assumes that each example is a member of exactly one class.
-    #
-    # Softmax should be used for multi-class prediction with single label
-    # https://developers.google.com/machine-learning/crash-course/multi-class-neural-networks/video-lecture
-    # NOTE: input dimension = number of features your data has
-    model.add(Dense(
-        len(encoder.classes_),  # output dim is number of classes
-        use_bias=True,  # intercept
-        activation=activation,  # softmax, sigmoid
-        activity_regularizer=L1L2(
-            l1=sparsity_l1__activity,
-            l2=sparsity_l2__activity
-        ),
-        kernel_regularizer=L1L2(
-            l1=sparsity_l1__kernel,
-            l2=sparsity_l2__kernel
-        ),
-        bias_regularizer=L1L2(
-            l1=sparsity_l1__bias,
-            l2=sparsity_l2__bias
-        ),
-        input_dim=X.shape[1]
-    ))
-    # Example of adding additional layers
-    # model.add(Dense(8, input_dim=4, activation='relu'))
-    # model.add(Dense(3, activation='softmax'))
-    #
-    # Metrics to check out over training epochs
-    mets = [
-        # loss,
-        keras.metrics.CategoricalAccuracy(name='categorical_accuracy'),
-        # keras.metrics.TruePositives(name='tp'),
-        # keras.metrics.FalsePositives(name='fp'),
-        # keras.metrics.TrueNegatives(name='tn'),
-        # keras.metrics.FalseNegatives(name='fn'),
-        # keras.metrics.Precision(name='precision'),
-        # keras.metrics.Recall(name='recall'),
-        # keras.metrics.AUC(name='auc'),
-        keras.metrics.BinaryAccuracy(name='accuracy')
-    ]
-    # Use Adam gradient descent optimization algorithm with a logarithmic
-    # loss function, which is called “categorical_crossentropy” in Keras.
-    # UPDATE: sgd works better emperically.
-    model.compile(
-        optimizer=optimizer,  # adam, sgd
-        loss=loss,
-        metrics=mets
+    # Call grid search of various parameters
+    grid_result, df_grid_result = keras_grid(
+        model_function=classification_model,
+        encoder=encoder,
+        X_std=X_std,
+        y=y,
+        n_epochs=n_epochs,
+        batch_size=batch_size
+    )
+
+    out_f = '{}-grid_result.tsv.gz'.format(out_file_base)
+    df_grid_result.to_csv(
+        out_f,
+        sep='\t',
+        index=False,
+        quoting=csv.QUOTE_NONNUMERIC,
+        na_rep='',
+        compression=compression_opts
     )
     #
-    return model
+    # Add a single columns that summarizes params
+    param_columns = [
+        col for col in df_grid_result.columns if 'param__' in col
+    ]
+    df_grid_result['params'] = df_grid_result[
+        param_columns
+    ].astype(str).apply(lambda x: '-'.join(x), axis=1)
+    #
+    # Plot the distribution of accuracy across folds
+    split_columns = [
+        col for col in df_grid_result.columns if 'split' in col
+    ]
+    split_columns = [
+        col for col in split_columns if '_test_score' in col
+    ]
+    df_plt = pd.melt(
+        df_grid_result,
+        id_vars=['params'],
+        value_vars=split_columns
+    )
+    gplt = plt9.ggplot(df_plt, plt9.aes(
+        x='params',
+        y='value'
+    ))
+    gplt = gplt + plt9.theme_bw()
+    gplt = gplt + plt9.geom_boxplot(alpha=0.8)
+    gplt = gplt + plt9.geom_jitter(alpha=0.75)
+    gplt = gplt + plt9.scale_y_continuous(
+        # trans='log10',
+        # labels=comma_labels,
+        minor_breaks=0
+        # limits=[0, 1]
+    )
+    gplt = gplt + plt9.labs(
+        x='Parameters',
+        y='Score',
+        title=''
+    )
+    gplt = gplt + plt9.theme(
+        axis_text_x=plt9.element_text(angle=-45, hjust=0)
+    )
+    gplt.save(
+        '{}-score.png'.format(out_file_base),
+        #dpi=300,
+        width=10,
+        height=4,
+        limitsize=False
+    )
+    #
+    # Plot the mean time and std err for fitting results
+    gplt = plt9.ggplot(df_grid_result, plt9.aes(
+        x='params',
+        y='mean_fit_time'
+    ))
+    gplt = gplt + plt9.theme_bw()
+    gplt = gplt + plt9.geom_point()
+    gplt = gplt + plt9.geom_errorbar(
+        plt9.aes(
+            ymin='mean_fit_time-std_fit_time',
+            ymax='mean_fit_time+std_fit_time'
+        ),
+        width=0.2,
+        position=plt9.position_dodge(0.05)
+    )
+    gplt = gplt + plt9.scale_y_continuous(
+        # trans='log10',
+        # labels=comma_labels,
+        minor_breaks=0
+    )
+    gplt = gplt + plt9.labs(
+        x='Parameters',
+        y='Mean fit time',
+        title=''
+    )
+    gplt = gplt + plt9.theme(
+        axis_text_x=plt9.element_text(angle=-45, hjust=0)
+    )
+    gplt.save(
+        '{}-fit_time.png'.format(out_file_base),
+        #dpi=300,
+        width=10,
+        height=4,
+        limitsize=False
+    )
 
-# Now, either call a grid search or specific model fit
-if options.grid_search:
-    
-    
-# Get the out file base.
-out_file_base = options.of
-
-#
-# Call grid search of various parameters
-grid_result, df_grid_result = keras_grid(
-    model_function=classification_model,
-    encoder=encoder,
-    X_std=X_std,
-    y=y,
-    n_epochs=n_epochs,
-    batch_size=batch_size
-)
-
-out_f = '{}-grid_result.tsv.gz'.format(out_file_base)
-df_grid_result.to_csv(
-    out_f,
-    sep='\t',
-    index=False,
-    quoting=csv.QUOTE_NONNUMERIC,
-    na_rep='',
-    compression=compression_opts
-)
-#
-# Add a single columns that summarizes params
-param_columns = [
-    col for col in df_grid_result.columns if 'param__' in col
-]
-df_grid_result['params'] = df_grid_result[
-    param_columns
-].astype(str).apply(lambda x: '-'.join(x), axis=1)
-#
-# Plot the distribution of accuracy across folds
-split_columns = [
-    col for col in df_grid_result.columns if 'split' in col
-]
-split_columns = [
-    col for col in split_columns if '_test_score' in col
-]
-df_plt = pd.melt(
-    df_grid_result,
-    id_vars=['params'],
-    value_vars=split_columns
-)
-gplt = plt9.ggplot(df_plt, plt9.aes(
-    x='params',
-    y='value'
-))
-gplt = gplt + plt9.theme_bw()
-gplt = gplt + plt9.geom_boxplot(alpha=0.8)
-gplt = gplt + plt9.geom_jitter(alpha=0.75)
-gplt = gplt + plt9.scale_y_continuous(
-    # trans='log10',
-    # labels=comma_labels,
-    minor_breaks=0
-    # limits=[0, 1]
-)
-gplt = gplt + plt9.labs(
-    x='Parameters',
-    y='Score',
-    title=''
-)
-gplt = gplt + plt9.theme(
-    axis_text_x=plt9.element_text(angle=-45, hjust=0)
-)
-gplt.save(
-    '{}-score.png'.format(out_file_base),
-    #dpi=300,
-    width=10,
-    height=4,
-    limitsize=False
-)
-#
-# Plot the mean time and std err for fitting results
-gplt = plt9.ggplot(df_grid_result, plt9.aes(
-    x='params',
-    y='mean_fit_time'
-))
-gplt = gplt + plt9.theme_bw()
-gplt = gplt + plt9.geom_point()
-gplt = gplt + plt9.geom_errorbar(
-    plt9.aes(
-        ymin='mean_fit_time-std_fit_time',
-        ymax='mean_fit_time+std_fit_time'
-    ),
-    width=0.2,
-    position=plt9.position_dodge(0.05)
-)
-gplt = gplt + plt9.scale_y_continuous(
-    # trans='log10',
-    # labels=comma_labels,
-    minor_breaks=0
-)
-gplt = gplt + plt9.labs(
-    x='Parameters',
-    y='Mean fit time',
-    title=''
-)
-gplt = gplt + plt9.theme(
-    axis_text_x=plt9.element_text(angle=-45, hjust=0)
-)
-gplt.save(
-    '{}-fit_time.png'.format(out_file_base),
-    #dpi=300,
-    width=10,
-    height=4,
-    limitsize=False
-)
-    
+    # Save a file that indicates what the params to take forward are. This should be derived from the test with the best score
+    best_params = df_grid_result.iloc[0,:]
+    pd.DataFrame(best_params[0:9]).to_csv(f"{out_file_base}use_params.txt", sep = "\t", header=None)
 
 
 if __name__ == '__main__':
