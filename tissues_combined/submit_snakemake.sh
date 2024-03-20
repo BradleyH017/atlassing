@@ -80,6 +80,7 @@ snakemake -j 50 \
     --default-resources threads=1 mem_mb=2000 \
     --directory ${workdir} \
     --use-conda \
+    --restart-times 3 \
     --conda-frontend conda \
     --cluster-config ${config_var} \
     --use-singularity \
@@ -90,4 +91,5 @@ snakemake -j 50 \
 
 
 # bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake.sh 
+
 

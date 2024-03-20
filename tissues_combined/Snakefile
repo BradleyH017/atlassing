@@ -1,8 +1,8 @@
 configfile: "config.yaml"
 rule all:
     input:
-        #expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
-        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
 # Define memory increment function
@@ -13,7 +13,7 @@ def increment_memory(base_memory):
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad"
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt",
@@ -53,13 +53,13 @@ rule qc_raw:
         n_variable_genes=config["n_variable_genes"],
         remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=20000,
-        queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
+        mem=750000,
+        queue='teramem',
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
         tmpdir="tmp",
-        threads=1
+        threads=8
     conda:
         "scvi-env"
     shell:
@@ -106,13 +106,13 @@ rule batch_correct:
     conda:
         "scvi-env"
     resources:
-        mem=20000,
-        queue='normal',
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
+        mem=300000,
+        queue='gpu-huge -gpu -',
+        mem_mb=300000,
+        mem_mib=300000,
+        disk_mb=300000,
         tmpdir="tmp",
-        threads=1
+        threads=8
     shell:
         r"""
         python bin/001b-batch_correction.py \
@@ -183,11 +183,11 @@ rule get_umap:
         use_matrix=config["batch_correction"],
         col_by=config["col_by"]
     resources:
-        mem=increment_memory(20000),
-        queue='normal',
-        mem_mb=increment_memory(20000),
-        mem_mib=increment_memory(20000),
-        disk_mb=increment_memory(20000),
+        mem=increment_memory(350000),
+        queue='long',
+        mem_mb=increment_memory(350000),
+        mem_mib=increment_memory(350000),
+        disk_mb=increment_memory(350000),
         tmpdir="tmp",
         threads=32
     conda:
@@ -214,11 +214,11 @@ rule cluster_array:
     params:
         pref_matrix=config["pref_matrix"]
     resources:
-        mem=increment_memory(20000),
+        mem=increment_memory(350000),
         queue='long',
-        mem_mb=increment_memory(20000),
-        mem_mib=increment_memory(20000),
-        disk_mb=increment_memory(20000),
+        mem_mb=increment_memory(350000),
+        mem_mib=increment_memory(350000),
+        disk_mb=increment_memory(350000),
         tmpdir="tmp",
         threads=16
     conda:
@@ -235,6 +235,9 @@ rule cluster_array:
         """
 
 if config["optimise_run_params"]:
+    def get_mem_mb(wildcards, attempt):
+        return attempt * 300000
+
     rule run_params_optimisation:
         input:
             "results/{tissue}/tables/clustering_array/leiden_3.0/clusters.csv",
@@ -244,13 +247,13 @@ if config["optimise_run_params"]:
         output:
             "results/{tissue}/tables/keras-grid_search/keras-use_params.txt" 
         resources:
-            mem=increment_memory(20000),
+            mem=get_mem_mb,
             queue='long',
-            mem_mb=increment_memory(20000),
-            mem_mib=increment_memory(20000),
-            disk_mb=increment_memory(20000),
+            mem_mb=get_mem_mb,
+            mem_mib=get_mem_mb,
+            disk_mb=get_mem_mb,
             tmpdir="tmp",
-            threads=1
+            threads=50 # Aids parallelisation. For 10k cells, using 20 threads and ~35Gb memory
         singularity:
             "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
         shell:
