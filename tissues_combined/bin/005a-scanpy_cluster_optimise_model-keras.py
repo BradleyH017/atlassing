@@ -193,12 +193,12 @@ def keras_grid(
         activation=['softmax'],
         optimizer=['sgd'],
         loss=['categorical_crossentropy'],
-        sparsity_l2__activity=[0.0, 0.01, 1e-6],
-        sparsity_l1__activity=[0.1, 0.01, 1e-4, 1e-10, 0.0],
-        sparsity_l2__kernel=[0.0, 0.01, 1e-6],
-        sparsity_l1__kernel=[0.1, 0.01, 1e-4, 1e-10, 0.0],
-        sparsity_l2__bias=[0.0, 0.01, 1e-6],
-        sparsity_l1__bias=[0.1, 0.01, 1e-4, 1e-10, 0.0]
+        sparsity_l2__activity=[0.0, 0.01, 1e-4],
+        sparsity_l1__activity=[0.0, 0.01, 1e-4],
+        sparsity_l2__kernel=[0.0, 0.01, 1e-4],
+        sparsity_l1__kernel=[0.0, 0.01, 1e-4],
+        sparsity_l2__bias=[0.0, 0.01, 1e-4],
+        sparsity_l1__bias=[0.0, 0.01, 1e-4]
     )
     n_splits = 5
 
@@ -207,7 +207,7 @@ def keras_grid(
     grid = GridSearchCV(
         estimator=KerasClassifier(build_fn=model_function),
         param_grid=param_grid,
-        n_jobs=1,
+        n_jobs=-2, # Leave all but one available core for parallelisation
         cv=n_splits  # Number of cross validation.
     )
     # NOTE: We could pass batch_size and epochs here, but we get results much
@@ -405,7 +405,7 @@ def main():
     y = clusters[leiden_column].values
         
     # If the dataset is greater than 100k cells, subset to only include these cells in the grid search
-    max_cells=1e5
+    max_cells=100000
     if len(cells) > max_cells:
         # Generate a vector of random indices for sampling
         random_indices = pd.Series(range(len(cells))).sample(n=max_cells, replace=False)
