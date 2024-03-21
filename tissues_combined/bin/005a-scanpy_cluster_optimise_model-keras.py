@@ -626,7 +626,8 @@ def main():
     )
 
     # Save a file that indicates what the params to take forward are. This should be derived from the test with the best score
-    best_params = df_grid_result.iloc[0,:]
+    best_params = df_grid_result[df_grid_result['rank_test_score'] == 1]
+    best_params = best_params.iloc[0,:]
     pd.DataFrame(best_params[0:9]).to_csv(f"{out_file_base}use_params.txt", sep = "\t", header=None)
 
 
