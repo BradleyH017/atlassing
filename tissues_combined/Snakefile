@@ -1,8 +1,8 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
+        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
 # Define memory increment function
@@ -236,7 +236,7 @@ rule cluster_array:
 
 if config["optimise_run_params"]:
     def get_mem_mb(wildcards, attempt):
-        return attempt * 300000
+        return attempt * 750000
 
     rule run_params_optimisation:
         input:
@@ -248,12 +248,12 @@ if config["optimise_run_params"]:
             "results/{tissue}/tables/keras-grid_search/keras-use_params.txt" 
         resources:
             mem=get_mem_mb,
-            queue='long',
+            queue='teramem',
             mem_mb=get_mem_mb,
             mem_mib=get_mem_mb,
             disk_mb=get_mem_mb,
             tmpdir="tmp",
-            threads=50 # Aids parallelisation. For 10k cells, using 20 threads and ~35Gb memory
+            threads=20 # Aids parallelisation. For 10k cells, using 20 threads and ~35Gb memory
         singularity:
             "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
         shell:
@@ -313,13 +313,13 @@ rule test_clusters:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
-        mem=increment_memory(20000),
+        mem=increment_memory(500000),
         queue='long',
-        mem_mb=increment_memory(20000),
-        mem_mib=increment_memory(20000),
-        disk_mb=increment_memory(20000),
+        mem_mb=increment_memory(500000),
+        mem_mib=increment_memory(500000),
+        disk_mb=increment_memory(500000),
         tmpdir="tmp",
-        threads=1
+        threads=10
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     shell:
