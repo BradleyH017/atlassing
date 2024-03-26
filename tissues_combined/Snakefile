@@ -1,8 +1,9 @@
 configfile: "config.yaml"
 rule all:
     input:
+        expand("results/{tissue}/tables/batch_correction/{method}_matrix.npz", tissue=config["tissue"], method=config["batch_correction_methods"])
         #expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
-        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
 # Define memory increment function
@@ -13,7 +14,7 @@ def increment_memory(base_memory):
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad" # all - "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt",
@@ -53,13 +54,13 @@ rule qc_raw:
         n_variable_genes=config["n_variable_genes"],
         remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=750000,
-        queue='teramem',
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
+        mem=20000, # all = 750000
+        queue='long', # all = teramem
+        mem_mb=20000,
+        mem_mib=20000,
+        disk_mb=20000,
         tmpdir="tmp",
-        threads=8
+        threads=4 # all = 8
     conda:
         "scvi-env"
     shell:
@@ -94,34 +95,118 @@ rule qc_raw:
         --n_variable_genes {params.n_variable_genes} \
         --remove_problem_genes {params.remove_problem_genes}
         """
-  
-rule batch_correct:
-    input:
-        "results/{tissue}/objects/adata_PCAd.h5ad"
-    output:
-        "results/{tissue}/objects/adata_PCAd_batched.h5ad"
-    params:
-        batch_correction=config["batch_correction"],
-        benchmark_batch_correction=config["benchmark_batch_correction"]
-    conda:
-        "scvi-env"
-    resources:
-        mem=300000,
-        queue='gpu-huge -gpu -',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
-        tmpdir="tmp",
-        threads=8
-    shell:
-        r"""
-        python bin/001b-batch_correction.py \
-            --tissue {wildcards.tissue} \
-            --input_file {input[0]} \
-            --batch_correction {params.batch_correction} \
-            --benchmark_batch_correction {params.benchmark_batch_correction}
 
-        """
+# Get the batch methods to use
+batch_methods = list(config["batch_correction_methods"])
+
+if "scVI" in batch_methods:
+    rule scVI:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scVI_matrix.npz"
+        conda:
+            "scvi-env"
+        resources:
+            mem=20000, # All = 300000
+            queue='long', # All = gpu-huge -gpu -
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=2 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction scVI
+            
+            """
+
+if "scVI_default" in batch_methods:
+    rule scVI_default:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scVI_default_matrix.npz"
+        conda:
+            "scvi-env"
+        resources:
+            mem=20000, # All = 300000
+            queue='long', # All = gpu-huge -gpu -
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=2 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction scVI_default
+            
+            """
+
+if "Harmony" in batch_methods:
+    rule Harmony:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/Harmony_matrix.npz"
+        conda:
+            "scvi-env"
+        resources:
+            mem=20000, # All = 300000
+            queue='long', # All = gpu-huge -gpu -
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=2 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction Harmony
+            """
+
+if "scANVI" in batch_methods:
+    rule scANVI:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scANVI_matrix.npz"
+        params:
+            scANVI_col=config["scANVI_annot_column"]
+        conda:
+            "scvi-env"
+        resources:
+            mem=20000, # All = 300000
+            queue='long', # All = gpu-huge -gpu -
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=2 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --scANVI_col {params.scANVI_col} \
+                --batch_correction scANVI
+            """
 
 if config["use_bbknn"]:
     rule get_nn:
@@ -171,6 +256,8 @@ else:
             echo {params.nn} > {output}
             """
 
+# Either benchmark batch correction and make a dummy file for the best result or make a dummy one of these from the choice in the config and gather anyway
+# TO DO
 
 rule get_umap:
     input:
@@ -180,7 +267,7 @@ rule get_umap:
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
     params:
-        use_matrix=config["batch_correction"],
+        use_matrix=config["pref_matrix"],
         col_by=config["col_by"]
     resources:
         mem=increment_memory(350000),
@@ -240,7 +327,7 @@ if config["optimise_run_params"]:
 
     rule run_params_optimisation:
         input:
-            "results/{tissue}/tables/clustering_array/leiden_3.0/clusters.csv",
+            "results/{tissue}/tables/clustering_array/leiden_1.5/clusters.csv",
             "results/{tissue}/tables/log1p_cp10k_sparse.npz",
             "results/{tissue}/tables/genes.txt",
             "results/{tissue}/tables/cells.txt"
@@ -302,7 +389,6 @@ else:
             echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > {output}
             """
 
-
 rule test_clusters:
     input:
         "results/{tissue}/tables/keras-grid_search/keras-use_params.txt",
@@ -313,11 +399,11 @@ rule test_clusters:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
-        mem=increment_memory(500000),
-        queue='long',
-        mem_mb=increment_memory(500000),
-        mem_mib=increment_memory(500000),
-        disk_mb=increment_memory(500000),
+        mem=increment_memory(750000),
+        queue='teramem',
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000), # Gut needs 750, all needs even more
         tmpdir="tmp",
         threads=10
     singularity:
