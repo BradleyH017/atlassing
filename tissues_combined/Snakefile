@@ -1,9 +1,9 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/batch_correction/{method}_matrix.npz", tissue=config["tissue"], method=config["batch_correction_methods"])
+        #expand("results/{tissue}/tables/batch_correction/best_batch_method.txt", tissue=config["tissue"])
         #expand("results/{tissue}/tables/keras-grid_search/keras-use_params.txt", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
 # Define memory increment function
@@ -107,6 +107,8 @@ if "scVI" in batch_methods:
             "results/{tissue}/tables/batch_correction/scVI_matrix.npz"
         conda:
             "scvi-env"
+        params:
+            batch_column=config["batch_column"]
         resources:
             mem=20000, # All = 300000
             queue='long', # All = gpu-huge -gpu -
@@ -122,7 +124,8 @@ if "scVI" in batch_methods:
             python bin/001b-batch_correction.py \
                 --tissue {wildcards.tissue} \
                 --input_file {input[0]} \
-                --batch_correction scVI
+                --batch_correction scVI \
+                --batch_column {params.batch_column}
             
             """
 
@@ -134,6 +137,8 @@ if "scVI_default" in batch_methods:
             "results/{tissue}/tables/batch_correction/scVI_default_matrix.npz"
         conda:
             "scvi-env"
+        params:
+            batch_column=config["batch_column"]
         resources:
             mem=20000, # All = 300000
             queue='long', # All = gpu-huge -gpu -
@@ -149,7 +154,8 @@ if "scVI_default" in batch_methods:
             python bin/001b-batch_correction.py \
                 --tissue {wildcards.tissue} \
                 --input_file {input[0]} \
-                --batch_correction scVI_default
+                --batch_correction scVI_default \
+                --batch_column {params.batch_column}
             
             """
 
@@ -161,6 +167,8 @@ if "Harmony" in batch_methods:
             "results/{tissue}/tables/batch_correction/Harmony_matrix.npz"
         conda:
             "scvi-env"
+        params:
+            batch_column=config["batch_column"]
         resources:
             mem=20000, # All = 300000
             queue='long', # All = gpu-huge -gpu -
@@ -176,7 +184,8 @@ if "Harmony" in batch_methods:
             python bin/001b-batch_correction.py \
                 --tissue {wildcards.tissue} \
                 --input_file {input[0]} \
-                --batch_correction Harmony
+                --batch_correction Harmony \
+                --batch_column {params.batch_column}
             """
 
 if "scANVI" in batch_methods:
@@ -186,7 +195,8 @@ if "scANVI" in batch_methods:
         output:
             "results/{tissue}/tables/batch_correction/scANVI_matrix.npz"
         params:
-            scANVI_col=config["scANVI_annot_column"]
+            scANVI_col=config["scANVI_annot_column"],
+            batch_column=config["batch_column"]
         conda:
             "scvi-env"
         resources:
@@ -205,7 +215,80 @@ if "scANVI" in batch_methods:
                 --tissue {wildcards.tissue} \
                 --input_file {input[0]} \
                 --scANVI_col {params.scANVI_col} \
-                --batch_correction scANVI
+                --batch_correction scANVI \
+                --batch_column {params.batch_column}
+            """
+
+# Either benchmark batch correction and make a dummy file for the best result or make a dummy one of these from the choice in the config and gather anyway
+# Gather input files
+def gather_batches_within_tissue(wildcards):
+    return expand("results/{tissue}/tables/batch_correction/{batch}_matrix.npz",
+                  tissue=wildcards.tissue,
+                  batch=config["batch_correction_methods"])
+
+if config["benchmark_batch_correction"]:
+    rule batch_correction_benchmarking:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad",
+            gather_batches_within_tissue
+        output:
+            "results/{tissue}/tables/batch_correction/benchmark.csv",
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+            "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
+            "results/{tissue}/tables/batch_correction/var_explained_pre_post_batch.csv"
+        params:
+            methods=config["batch_correction_methods"],
+            label_integration=config["scANVI_annot_column"],
+            batch_column=config["batch_column"],
+            var_explained_cols=config["var_explained_cols"]
+        conda:
+            "scvi-env"
+        resources:
+            mem=20000, # All = 300000
+            queue='long', # All = gpu-huge -gpu -
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=2 # all = 8
+        shell:
+            r"""
+            methods_combined="$(echo "{params.methods}" | sed 's/ /,/g')"
+            echo $methods_combined
+
+            python bin/001c-batch_correction_benchmarking.py \
+                --input_file {input[0]} \
+                --tissue {wildcards.tissue} \
+                --methods $methods_combined \
+                --use_label {params.label_integration} \
+                --batch_column {params.batch_column} \
+                --var_explained_cols {params.var_explained_cols}
+            """
+else:
+    rule make_dummy_best_batch_file:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+            "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+        params:
+            methods=config["pref_matrix"]
+        resources:
+            mem=20000,
+            queue='normal',
+            mem_mb=20000,
+            mem_mib=20000,
+            disk_mb=20000,
+            tmpdir="tmp",
+            threads=1
+        shell:
+            r"""
+            echo {params.method} >> {output}
+
+            python bin/0001d-combine_adata_batch.py \
+                --input_file {input[0]} \
+                --tissue {wildcards.tissue} \
+                --pref_matrix {params.methods}
             """
 
 if config["use_bbknn"]:
@@ -256,18 +339,16 @@ else:
             echo {params.nn} > {output}
             """
 
-# Either benchmark batch correction and make a dummy file for the best result or make a dummy one of these from the choice in the config and gather anyway
-# TO DO
 
 rule get_umap:
     input:
         "results/{tissue}/objects/adata_PCAd_batched.h5ad",
         "results/{tissue}/tables/knee.txt",
-        "results/{tissue}/tables/optimum_nn.txt"
+        "results/{tissue}/tables/optimum_nn.txt",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
     params:
-        use_matrix=config["pref_matrix"],
         col_by=config["col_by"]
     resources:
         mem=increment_memory(350000),
@@ -285,7 +366,7 @@ rule get_umap:
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
             --knee_file {input[1]} \
-            --use_matrix {params.use_matrix} \
+            --use_matrix {input[3]} \
             --optimum_nn_file {input[2]} \
             --col_by {params.col_by}
         """
@@ -295,19 +376,18 @@ clustering_resolutions = list(config["clustering_resolutions"])
 
 rule cluster_array:
     input:
-        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv"
-    params:
-        pref_matrix=config["pref_matrix"]
     resources:
-        mem=increment_memory(350000),
+        mem=increment_memory(20000), #All - 350000
         queue='long',
-        mem_mb=increment_memory(350000),
-        mem_mib=increment_memory(350000),
-        disk_mb=increment_memory(350000),
+        mem_mb=increment_memory(20000),
+        mem_mib=increment_memory(20000),
+        disk_mb=increment_memory(20000),
         tmpdir="tmp",
-        threads=16
+        threads=2 # All 16
     conda:
         "scvi-env"
     shell:
@@ -317,13 +397,13 @@ rule cluster_array:
         python bin/004-scanpy_cluster.py \
             --tissue {wildcards.tissue} \
             --fpath {input[0]} \
-            --pref_matrix {params.pref_matrix} \
+            --pref_matrix {input[1]} \
             --clustering_resolution {wildcards.clustering_resolution}
         """
 
 if config["optimise_run_params"]:
     def get_mem_mb(wildcards, attempt):
-        return attempt * 750000
+        return attempt * 35000 # All 750000
 
     rule run_params_optimisation:
         input:
@@ -340,7 +420,7 @@ if config["optimise_run_params"]:
             mem_mib=get_mem_mb,
             disk_mb=get_mem_mb,
             tmpdir="tmp",
-            threads=20 # Aids parallelisation. For 10k cells, using 20 threads and ~35Gb memory
+            threads=20 # Aids parallelisation. For all , use 20 threads and 35Gb memory 
         singularity:
             "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
         shell:
@@ -363,11 +443,11 @@ else:
         output:
             "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
         resources:
-            mem=5000,
+            mem=1000,
             queue='normal',
-            mem_mb=5000,
-            mem_mib=5000,
-            disk_mb=5000,
+            mem_mb=1000,
+            mem_mib=1000,
+            disk_mb=1000,
             tmpdir="tmp",
             threads=1
         conda:
@@ -399,13 +479,13 @@ rule test_clusters:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz" 
     resources:
-        mem=increment_memory(750000),
+        mem=increment_memory(20000),
         queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000), # Gut needs 750, all needs even more
+        mem_mb=increment_memory(20000),
+        mem_mib=increment_memory(20000),
+        disk_mb=increment_memory(20000), # Gut needs 750, all needs even more
         tmpdir="tmp",
-        threads=10
+        threads=10 # All use 10
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     shell:
@@ -435,14 +515,14 @@ def gather_within_tissue(wildcards):
 rule summarise_cluster_test:
     input:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
         gather_within_tissue
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
         "results/{tissue}/tables/optim_resolution.txt",
         "results/{tissue}/tables/markers/markers_all_optim_clusters.txt.gz"
     params:
-        MCC_thresh=config["MCC_thresh"],
-        pref_matrix=config["pref_matrix"]
+        MCC_thresh=config["MCC_thresh"]
     resources:
         mem=20000,
         queue='normal',
@@ -463,21 +543,21 @@ rule summarise_cluster_test:
             --h5_path {input[0]} \
             --outpath results/{wildcards.tissue}/figures/clustering_array_summary/keras_accuracy \
             --MCC_thresh {params.MCC_thresh} \
-            --pref_matrix {params.pref_matrix}
+            --pref_matrix {input[1]}
         """
 
 if config["add_celltypist"]:
     rule add_celltypist:
         input:
-            "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad"
+            "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt"
         output:
             "results/{tissue}/tables/annotation/CellTypist/CellTypist_prob_matrix.csv",
             "results/{tissue}/tables/annotation/CellTypist/CellTypist_decision_matrix.csv",
             "results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv"
         params:
             model=config["celltypist_model"],
-            model_name=config["celltypist_model_name"],
-            pref_matrix=config["pref_matrix"]
+            model_name=config["celltypist_model_name"]
         resources:
             mem=20000,
             queue='normal',
@@ -496,7 +576,7 @@ if config["add_celltypist"]:
             python bin/007-CellTypist.py \
                 --tissue {wildcards.tissue} \
                 --h5_path {input[0]} \
-                --pref_matrix {params.pref_matrix} \
+                --pref_matrix {input[1]} \
                 --model {params.model} \
                 --model_name {params.model_name}
             """
