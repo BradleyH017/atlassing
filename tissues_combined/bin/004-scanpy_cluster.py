@@ -66,7 +66,9 @@ def main():
     print(f"fpath: {fpath}")
     clustering_resolution = float(inherited_options.clustering_resolution)
     print(f"clustering_resolution: {clustering_resolution}")
-    pref_matrix = inherited_options.pref_matrix # Should be a single value
+    use_matrix_f = inherited_options.pref_matrix
+    with open(use_matrix_f, 'r') as file:
+        pref_matrix = file.read().strip() # Should be a single value
     print(f"pref_matrix: {pref_matrix}")
 
     # Load the data

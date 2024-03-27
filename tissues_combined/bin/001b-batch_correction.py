@@ -82,6 +82,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-col', '--batch_column',
+        action='store',
+        dest='batch_column',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
         '-sacol', '--scANVI_col',
         action='store',
         dest='scANVI_col',
@@ -97,6 +105,7 @@ def main():
     input_file = inherited_options.input_file
     batch_correction=inherited_options.batch_correction
     batch_correction=batch_correction.split("|")
+    batch_column=inherited_options.batch_column
     
     # Derive and print the tissue arguments
     tissue=inherited_options.tissue
@@ -121,7 +130,7 @@ def main():
         #Trainer(accelerator="cuda")
         # See is a GPU is available - if so, use. If not, then adjust
         scvi.settings.dl_pin_memory_gpu_training =  use_gpu
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
         model.train(use_gpu=use_gpu)
         SCVI_LATENT_KEY = "X_scVI"
@@ -133,7 +142,7 @@ def main():
     if "scVI_default" in batch_correction:
         # 2. scVI - default_metrics
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default  ~~~~~~~~~~~~~~~~~~~")
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model_default = scvi.model.SCVI(adata,  n_latent=30)
         model_default.train(use_gpu=use_gpu)
         SCVI_LATENT_KEY_DEFAULT = "X_scVI_default"
@@ -143,14 +152,14 @@ def main():
 
     if "Harmony" in batch_correction:
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with Harmony ~~~~~~~~~~~~~~~~~~~")
-        sc.external.pp.harmony_integrate(adata, 'samp_tissue', basis='X_pca', adjusted_basis='X_Harmony')
+        sc.external.pp.harmony_integrate(adata, batch_column, basis='X_pca', adjusted_basis='X_Harmony')
         sparse_matrix = sp.sparse.csc_matrix(adata.obsm['X_Harmony'])
         sp.sparse.save_npz(f"results/{tissue}/tables/batch_correction/Harmony_matrix.npz", sparse_matrix)
     
     if "scANVI" in batch_correction:
         # 3. scANVI
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
-        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key="samp_tissue")
+        scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
         scanvi_model = scvi.model.SCANVI.from_scvi_model(
             model,
@@ -161,7 +170,7 @@ def main():
         scanvi_model.train(max_epochs=20, n_samples_per_label=100, use_gpu=use_gpu)
         SCANVI_LATENT_KEY = "X_scANVI"
         adata.obsm[SCANVI_LATENT_KEY] = scanvi_model.get_latent_representation(adata)
-        sparse_matrix = sp.sparse.csc_matrix(adata.obsm['SCANVI_LATENT_KEY'])
+        sparse_matrix = sp.sparse.csc_matrix(adata.obsm[SCANVI_LATENT_KEY])
         sp.sparse.save_npz(f"results/{tissue}/tables/batch_correction/scANVI_matrix.npz", sparse_matrix)
     
 

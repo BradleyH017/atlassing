@@ -549,6 +549,8 @@ def main():
         else:
             # Otherwise, add it as a float variable
             keras_params[param] = float(value)
+    
+    print(f"keras_params = {keras_params}")
 
 
     verbose = True

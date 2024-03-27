@@ -190,7 +190,9 @@ def main():
     fpath = inherited_options.h5_path
     outpath = inherited_options.outpath
     MCC_thresh = float(inherited_options.MCC_thresh)
-    pref_matrix = inherited_options.pref_matrix
+    use_matrix_f = inherited_options.pref_matrix
+    with open(use_matrix_f, 'r') as file:
+        pref_matrix = file.read().strip()
 
     ########## TESTING #########
     #tissue = "blood"

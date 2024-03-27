@@ -11,6 +11,8 @@ import pandas as pd
 import os
 import matplotlib as mp
 import argparse
+import scipy as sp
+
 
 def parse_options():    
     # Inherit options
@@ -80,9 +82,9 @@ def main():
     print(f"fpath: {fpath}")
     knee_file = inherited_options.knee_file
     print(f"knee_file: {knee_file}")
-    use_matrix = inherited_options.use_matrix
-    use_matrix = use_matrix.split(",")
-    use_matrix = ["X_" + sub for sub in use_matrix] 
+    use_matrix_f = inherited_options.use_matrix
+    with open(use_matrix_f, 'r') as file:
+        use_matrix = file.read().strip()
     print(f"use_matrix: {use_matrix}")
     optimum_nn_file = inherited_options.optimum_nn_file
     print(f"optimum_nn_file: {optimum_nn_file}")
@@ -125,27 +127,26 @@ def main():
     print(f"col_by: {col_by}")
     print(f"figpath: {figpath}")
     # Calculate NN
-    for m in use_matrix:
-        print("Calculating neighbours")
-        sc.pp.neighbors(adata, n_neighbors=optimum_nn, n_pcs=n_pcs, use_rep=m, key_added= m + "_nn")
-        # Perform UMAP embedding
-        sc.tl.umap(adata, neighbors_key=m + "_nn", min_dist=0.5, spread=0.5)
-        adata.obsm["UMAP_" + m] = adata.obsm["X_umap"]
-        
-        # Save a plot
-        for c in col_by:
-            print(c)
-            if c in adata.var['gene_symbols'].values:
-                    ens=adata.var[adata.var['gene_symbols'] == c].index[0]
-                    sc.settings.figdir=exprfigpath
-                    sc.pl.umap(adata, color = ens, save="_" + m + "_" + c + ".png")
-            elif c == "experiment_id":
-                    sc.settings.figdir=figpath
-                    sc.pl.umap(adata, color = c, save="_" + m + "_" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
-                
-            elif c in adata.obs.columns:
-                    sc.settings.figdir=figpath
-                    sc.pl.umap(adata, color = c, save="_" + m + "_" + c + ".png")
+    print("Calculating neighbours")
+    sc.pp.neighbors(adata, n_neighbors=optimum_nn, n_pcs=n_pcs, use_rep=use_matrix, key_added= use_matrix + "_nn")
+    # Perform UMAP embedding
+    sc.tl.umap(adata, neighbors_key=use_matrix + "_nn", min_dist=0.5, spread=0.5)
+    adata.obsm["UMAP_" + use_matrix] = adata.obsm["X_umap"]
+    
+    # Save a plot
+    for c in col_by:
+        print(c)
+        if c in adata.var['gene_symbols'].values:
+                ens=adata.var[adata.var['gene_symbols'] == c].index[0]
+                sc.settings.figdir=exprfigpath
+                sc.pl.umap(adata, color = ens, save="_" + use_matrix + "_" + c + ".png")
+        elif c == "experiment_id":
+                sc.settings.figdir=figpath
+                sc.pl.umap(adata, color = c, save="_" + use_matrix + "_" + c + ".png", palette=list(mp.colors.CSS4_COLORS.values()))
+            
+        elif c in adata.obs.columns:
+                sc.settings.figdir=figpath
+                sc.pl.umap(adata, color = c, save="_" + use_matrix + "_" + c + ".png")
 
     # Overwite file after each 
     adata.write(f"results/{tissue}/objects/adata_PCAd_batched_umap.h5ad")
