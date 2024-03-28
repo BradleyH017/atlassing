@@ -150,7 +150,7 @@ def main():
         batch_key=batch_column,
         label_key=use_label,
         embedding_obsm_keys=obs_keys,
-        n_jobs=2,
+        n_jobs=-1,
         pre_integrated_embedding_obsm_key="X_pca"
     )   
     bm.benchmark()
@@ -174,12 +174,20 @@ def main():
     adata.write(f"results/{tissue}/objects/adata_PCAd_batched.h5ad")
     
     # Finally, also calculate the variance explained by each numerous variables and how this changes pre/post correction
+    var_explained_cols = np.intersect1d(var_explained_cols, adata.obs.columns)
     var_df = pd.DataFrame(index=var_explained_cols, columns=obs_keys)
     print("Computing variance explained")
-    for v in vars_check:
+    for v in var_explained_cols:
         for m in obs_keys:
-            print(f"{v} - {m}")
-            var_df.loc[v, m] = scib_metrics.utils.principal_component_regression(adata.obsm[m], adata.obs[v], categorical=True)
+            if v in adata.obs.columns:
+                print(f"{v} - {m}")
+                if pd.api.types.is_numeric_dtype(adata.obs[v]):
+                    print("Numeric")
+                    var_df.loc[v, m] = scib_metrics.utils.principal_component_regression(adata.obsm[m], adata.obs[v], categorical=False)
+                else:
+                    print("Categorical")
+                    var_df.loc[v, m] = scib_metrics.utils.principal_component_regression(adata.obsm[m], adata.obs[v], categorical=True)
+            
             
     var_df.to_csv(f"results/{tissue}/tables/batch_correction/var_explained_pre_post_batch.csv")
 
