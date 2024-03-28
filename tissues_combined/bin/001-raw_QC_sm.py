@@ -244,6 +244,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-minMT', '--min_MT',
+        action='store',
+        dest='min_MT',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
         '-blood_MT_gut', '--use_MT_thresh_blood_gut_immune',
         action='store',
         dest='use_MT_thresh_blood_gut_immune',
@@ -342,6 +350,8 @@ def main():
     MTblood = float(inherited_options.MT_thresh_blood)
     use_absolute_MT = inherited_options.use_absolute_MT
     absolute_max_MT = float(inherited_options.absolute_max_MT)
+    min_MT = inherited_options.min_MT
+    min_MT = float(min_MT)
     use_MT_thresh_blood_gut_immune = inherited_options.use_MT_thresh_blood_gut_immune
     min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
     min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
@@ -776,6 +786,11 @@ def main():
     if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
         adata = adata[adata.obs['MT_perc_keep'] == True]
             
+    
+    # Remove on the basis of low MT%
+    adata = adata[adata.obs['pct_counts_gene_group__mito_transcript'] > min_MT]        
+    print(f"Number of cells with MT > min_MT = {adata.shape[0]}")
+    
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
     samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
@@ -1011,7 +1026,7 @@ def main():
     # Extract PCs
     pca_variance=pd.DataFrame({'x':list(range(1, 51, 1)), 'y':adata.uns['pca']['variance']})
     # Identify 'knee'
-    knee=kd.KneeLocator(x=list(range(1, 51, 1)), y=adata.uns['pca']['variance'], curve="convex", direction = "decreasing")
+    knee=kd.KneeLocator(x=list(range(1, 51, 1)), y=adata.uns['pca']['variance_ratio'], curve="convex", direction = "decreasing")
     knee_point = knee.knee
     elbow_point = knee.elbow
     print('Knee: ', knee_point) 
