@@ -124,18 +124,18 @@ def class_report(y_true, y_pred, classes, y_pred_proba=None):
         for label_it, label in enumerate(model_report.index):
             if label in classes.astype(str):  # skip accuracy, macro avg, weighted avg
                 fpr[label], tpr[label], _ = metrics.roc_curve(
-                    (y_true == int(label)).astype(int),
+                    (y_true == label).astype(int),
                     y_pred_proba[:, label_it]
                 )
                 roc_auc[label] = metrics.auc(fpr[label], tpr[label])
                 aupc[label] = metrics.average_precision_score(
-                    (y_true == int(label)).astype(int),
+                    (y_true == label).astype(int),
                     y_pred_proba[:, label_it],
                     average=None  # No need since iter over labels
                 )
                 mcc[label] = metrics.matthews_corrcoef(
-                    (y_true == int(label)).astype(int),
-                    (y_pred == int(label)).astype(int)
+                    (y_true == label).astype(int),
+                    (y_pred == label).astype(int)
                 )
             else:
                 fpr[label] = np.nan
@@ -293,11 +293,11 @@ def fit_model_keras(
     # encode class values as integers
     # encoder = preprocessing.LabelEncoder()
     # encoder.fit(y_train)
-    y_train_encoded = encoder.transform(y_train)
+    y_train_encoded = encoder.transform(np.ravel(y_train))
     # convert integers to dummy variables (i.e. one hot encoded)
     Y_train_onehot = np_utils.to_categorical(y_train_encoded)
     # Run same proceedure on the test data
-    y_test_encoded = encoder.transform(y_test)
+    y_test_encoded = encoder.transform(np.ravel(y_test))
     Y_test_onehot = np_utils.to_categorical(y_test_encoded)
     #
     # Training
@@ -344,7 +344,7 @@ def fit_model_keras(
     y_test_pred = encoder.inverse_transform(classes)
     y_test_proba = model.predict_proba(X_test)
     model_report = class_report(
-        y_test.reshape(-1,),
+        y_test,
         y_test_pred,
         encoder.classes_,
         y_test_proba
@@ -370,9 +370,9 @@ def fit_model_keras(
     for i in ['cell_label_predicted', 'cell_label_true']:
         y_prob_df[i] = 'class__' + y_prob_df[i].astype(str)
     #
-    score = model.evaluate(X_test, Y_test_onehot, verbose=0)
-    print('Test score:', score[0])
-    print('Test accuracy:', score[1])
+    #score = model.evaluate(X_test, Y_test_onehot, verbose=0)
+    #print('Test score:', score[0])
+    #print('Test accuracy:', score[1])
     #
     return model, model_report, y_prob_df, history
 
@@ -615,11 +615,14 @@ def main():
     genes = np.loadtxt(options.genes_f, dtype=str)
     cells = np.loadtxt(options.cells_f, dtype=str)
     X.columns = genes
-    X.cells = cells
+    X.index = cells
 
     # Load the clusters and add to 'y'
-    clusters = pd.read_csv(clusters_df)
-    leiden_column = [col for col in clusters.columns if col.startswith('leiden')]
+    clusters = pd.read_csv(clusters_df, dtype=object)
+    clusters.set_index("cell",inplace=True)
+    leiden_column = [col for col in clusters.columns if col.startswith('leiden')][0]
+    clusters[leiden_column] = clusters[leiden_column].astype(str)
+    clusters[leiden_column] = clusters[leiden_column].astype('category')
     y = clusters[leiden_column].values
 
     ## Add some info from adata to dict_add
