@@ -98,9 +98,9 @@ def parse_options():
     )
     
     parser.add_argument(
-        '-vsc', '--variable_scVI',
+        '-cvo', '--correct_variable_only',
         action='store',
-        dest='variable_scVI',
+        dest='correct_variable_only',
         required=False,
         help=''
     )
@@ -114,7 +114,7 @@ def main():
     batch_correction=inherited_options.batch_correction
     batch_correction=batch_correction.split("|")
     batch_column=inherited_options.batch_column
-    variable_scVI=inherited_options.variable_scVI
+    correct_variable_only=inherited_options.correct_variable_only
     
     # Derive and print the tissue arguments
     tissue=inherited_options.tissue
@@ -133,14 +133,14 @@ def main():
 
     print("Set up outdirs")
     
+    if correct_variable_only:
+            adata = adata[:,adata.var['highly_variable'] == True].copy()
+    
     if "scVI" in batch_correction:
         # 1. scVI
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - optimum  ~~~~~~~~~~~~~~~~~~~")
         #Trainer(accelerator="cuda")
         # See is a GPU is available - if so, use. If not, then adjust
-        if variable_scVI:
-            adata = adata[:,adata.var['highly_variable'] == True].copy()
-        
         scvi.settings.dl_pin_memory_gpu_training =  use_gpu
         scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
@@ -154,9 +154,6 @@ def main():
     if "scVI_default" in batch_correction:
         # 2. scVI - default_metrics
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scVI - Default  ~~~~~~~~~~~~~~~~~~~")
-        if variable_scVI:
-            adata = adata[:,adata.var['highly_variable'] == True].copy()
-        
         scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model_default = scvi.model.SCVI(adata,  n_latent=30)
         model_default.train(use_gpu=use_gpu)
@@ -174,9 +171,6 @@ def main():
     if "scANVI" in batch_correction:
         # 3. scANVI
         print("~~~~~~~~~~~~~~~~~~~ Batch correcting with scANVI ~~~~~~~~~~~~~~~~~~~")
-        if variable_scVI:
-            adata = adata[:,adata.var['highly_variable'] == True].copy()
-        
         scvi.model.SCVI.setup_anndata(adata, layer="counts", batch_key=batch_column)
         model = scvi.model.SCVI(adata, n_layers=2, n_latent=30, gene_likelihood="nb")
         scanvi_model = scvi.model.SCANVI.from_scvi_model(
