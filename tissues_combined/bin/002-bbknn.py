@@ -90,7 +90,10 @@ def main():
     optimum_nn = adata.uns['neighbors']['params']['n_neighbors']
 
     # Save the optimum NN
-    savetxt(f"results/{tissue}/tables/optimum_nn.txt", asarray([[optimum_nn]]), delimiter='\t')
+    savetxt(f"results/{tissue}/tables/optimum_nn_bbknn.txt", asarray([[optimum_nn]]), delimiter='\t')
+    
+    # Save the matrix
+    
 
 
 # Execute
