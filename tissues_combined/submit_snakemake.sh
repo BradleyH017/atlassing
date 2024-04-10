@@ -43,11 +43,17 @@ group="team152"
 workdir=${PWD}
 
 # Submit the Snakefile to the cluster using snakemake
-source ~/.bashrc # activate base env
+#source ~/.bashrc # activate base env - farm5
+module load HGI/common/conda
+#conda init
+source activate sm7
+
 
 #conda activate scvi-env
 # module load HGI/softpack/groups/hgi/snakemake/7.32.4
-module load ISG/singularity/3.9.0
+#module load ISG/singularity/3.9.0 # farm5
+module load ISG/singularity/3.11.4 # farm22
+
 
 # Copy config to results
 mkdir -p results
