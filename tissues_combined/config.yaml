@@ -1,15 +1,15 @@
 # Decide tissue (s)
 tissue: 
-- 'rectum'
-- 'blood' 
-# - 'ti' 
-# - 'gut'
-# - 'all' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" or adjust this in line 13
+#- 'rectum'
+#- 'blood' 
+#- 'ti' 
+#- 'gut'
+- 'all' # This is what the pipeline will be ran on. Make sure the input h5 looks like: input_test/adata_raw_input_{tissue}.h5ad" or adjust this in line 13
 
 # QC parameters
 discard_other_inflams: yes # Remove non CD inflammtation samples
 all_blood_immune: "yes" # Treat all the blood data as immune if using?
-min_nUMI: 400 # Minimum nUMI
+min_nUMI: 500 # Minimum nUMI
 use_absolute_nUMI: "yes" # Use the min UMI cut off?
 use_relative_mad: "no" # Use a relative MAD threshold
 lineage_column: "sum_majority_lineage" # Which coloumn to use as lineage annotation
@@ -24,30 +24,40 @@ relative_nGene_log: "yes" # Also use a relative nGene?
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
 MT_thresh_blood: 20 # MT thresh for blood
 use_absolute_MT: "yes" # Use ansolute MT
+min_MT: 0.5 # Minmum MT% - epithelial cells with 0 (!) seem to be seperating in the embedding. If don't want to apply this, set to 0
 absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it
-use_MT_thresh_blood_gut_immune: "yes" # Use the absolute MT threshold for blood on the gut immune cells? 
-min_mean_nCount_per_samp_blood: 3000 # Exclude samples with mean nCount lower than this value (blood). Samples with low means for these metrics tend to integrate badly
-min_mean_nCount_per_samp_gut: 5000 # Same but gut
-min_mean_nGene_per_samp_blood: 1000 # Exclude samples with mean nCount than this value (blood)
-min_mean_nGene_per_samp_gut: 750 # Same but gut
+use_MT_thresh_blood_gut_immune: "no" # Use the absolute MT threshold for blood on the gut immune cells? 
+min_mean_nCount_per_samp_blood: 4000 # Exclude samples with mean nCount lower than this value (blood). Samples with low means for these metrics tend to integrate badly
+min_mean_nCount_per_samp_gut: 7000 # Same but gut
+min_mean_nGene_per_samp_blood: 1200 # Exclude samples with mean nGene than this value (blood)
+min_mean_nGene_per_samp_gut: 1200 # Same but gut
 use_abs_per_samp: "yes" # Use these absolute metrics
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
 n_variable_genes: 5000 # Number of variable genes for PCA calculation
-remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
+remove_problem_genes: "no" # Remover MT/RP/IG genes from the highly variable genes?
 
 # Batch correction options
-batch_correction: "Harmony" # Which batch correction methods to use? - Seperated by ",", e.g "scVI,scVI_default,scANVI,Harmony"
-benchmark_batch_correction: "no" # Whether to benchmark the batch effect correction using scib-metrics
+batch_column: "samp_tissue"
+batch_correction_methods: ["scVI", "scVI_default", "scANVI"] # List of batch correction methods to test, max = ["scVI", "scVI_default", "scANVI", "Harmony"]
+correct_variable_only: True # Compute embedding on variable genes only?
+scANVI_annot_column: "sum_majority_lineage"
+benchmark_batch_correction: True # Whether to benchmark the batch effect correction using scib-metrics
+var_explained_cols: "samp_tissue,sum_majority_lineage,category__machine,label__machine,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript" # ONe string, seperated by ","
 
-# Determine to get optimum NN from bbknn? # If false, will use number of nearest neighbours decided a priori
-use_bbknn: False
-nn: 30
+# If not performing benchmarking, then select the preferred matrix
+pref_matrix: "scVI" # Can leave empty if benching
+
+# Determine whether to get optimum NN from bbknn? # If false, will use number of nearest neighbours decided a priori
+use_bbknn: True
+nn_choice: "array" # Can be 'Manual' to use pre-defined NN parameter provided by 'nn' parameter, 'bbknn' to use the nn selected by bbknn or 'array' to run an array test over 'nn_values' parameter 
+nn_values: [15, 30, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
+nn: 300
 
 # What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
 col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript,EPCAM,KRT8,KRT18,CDH5,COL1A1,COL1A2,COL6A2,VWF,PTPRC,CD3D,CD3G,CD3E,CD79A,CD79B,CD14,FCGR3A,CD68,CD83,CSF1R,FCER1G"
 
 # Optimise run parameters?
-optimise_run_params: True
+optimise_run_params: False
 
 # Otherwise, what are the keras hyperparameters to use? Currently: these are from Leland and not neccessarily optimised for use on the different datasets together or independently
 # Don't use quotes around these
@@ -55,21 +65,20 @@ activation: softmax
 loss: categorical_crossentropy
 optimizer: sgd
 sparsity_l1__activity: 0.01
-sparsity_l1__kernel: 0.01
-sparsity_l1__bias: 0.01
-sparsity_l2__activity: 0.0
-sparsity_l2__kernel: 0.0
-sparsity_l2__bias: 0.0
+sparsity_l1__kernel: 0.0001
+sparsity_l1__bias: 0.0001
+sparsity_l2__activity: 0.0001
+sparsity_l2__kernel: 0.01
+sparsity_l2__bias: 0.01
 
 # Clustering and validation options
-clustering_resolutions: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over?
-pref_matrix: "X_Harmony" # What is the matrix you wish to use for the clustering array and reprodicibility analysis?
-MCC_thresh: 0.25 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
+clustering_resolutions: [0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over?
+MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
 
 # Celltypist options:
 add_celltypist: True # Should the script run to get the celltypist megagut annotations for these cells? 
-celltypist_model: "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult.pkl" # Can be multiple, seperated by ","
-celltypist_model_name: "Megagut" # Name to add to cols. Corresponding to above models
+celltypist_model: "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult_mar24.pkl" # Can be multiple, seperated by ","
+celltypist_model_name: "Megagut_adult_lower_GI_mar24" # Name to add to cols. Corresponding to above models
 
 # Threshold for subset of predicted cell-type annotations from keras:
 probability_threshold: 0.5 # Threshold at which to filter the anndata object after addition of probabilities for all cell types. If no filtration required, set this to 0
