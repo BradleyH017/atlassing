@@ -25,7 +25,7 @@ import matplotlib as mp
 from matplotlib import pyplot as plt
 from matplotlib.pyplot import rc_context
 import kneed as kd
-import scvi
+#import scvi
 import csv
 import datetime
 import seaborn as sns

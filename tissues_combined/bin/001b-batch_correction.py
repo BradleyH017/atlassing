@@ -41,7 +41,7 @@ from sklearn.preprocessing import StandardScaler
 from scipy.optimize import fsolve
 from scipy.optimize import brentq
 import torch
-from scib_metrics.benchmark import Benchmarker
+#from scib_metrics.benchmark import Benchmarker
 from pytorch_lightning import Trainer
 import argparse
 import scipy as sp
