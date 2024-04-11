@@ -1,7 +1,7 @@
 configfile: "config.yaml"
 rule all:
     input:
-        expand("results/{tissue}/tables/optimum_nn.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
+        expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
 
 
@@ -13,7 +13,7 @@ def increment_memory(base_memory):
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad" #"/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt",
@@ -54,13 +54,13 @@ rule qc_raw:
         n_variable_genes=config["n_variable_genes"],
         remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=20000, # all = 750000
-        queue='normal', # all = normal
-        mem_mb=20000,
-        mem_mib=20000,
-        disk_mb=20000,
+        mem=850000, # all = 850000
+        queue='teramem', # all = teramem
+        mem_mb=850000,
+        mem_mib=850000,
+        disk_mb=850000,
         tmpdir="tmp",
-        threads=2 # all = 8
+        threads=8 # all = 8
     conda:
         "scvi-env"
     shell:
@@ -112,13 +112,13 @@ if "scVI" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=20000, # All = 300000
-            queue='normal', # All = gpu-huge -gpu -
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
+            mem=300000, # All = 300000
+            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
-            threads=2 # all = 8
+            threads=8 # all = 8
         shell:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/batch_correction
@@ -144,13 +144,13 @@ if "scVI_default" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=20000, # All = 300000
-            queue='normal', # All = gpu-huge -gpu -
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
+            mem=480000, # All = 300000
+            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            mem_mb=480000,
+            mem_mib=480000,
+            disk_mb=480000,
             tmpdir="tmp",
-            threads=2 # all = 8
+            threads=8 # all = 8
         shell:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/batch_correction
@@ -176,13 +176,13 @@ if "Harmony" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=20000, # All = 300000
-            queue='normal', # All = long
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
+            mem=300000, # All = 300000
+            queue='long', # All = long
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
-            threads=2 # all = 8
+            threads=8 # all = 8
         shell:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/batch_correction
@@ -208,13 +208,13 @@ if "scANVI" in batch_methods:
         conda:
             "scvi-env"
         resources:
-            mem=20000, # All = 300000
-            queue='normal', # All = gpu-huge -gpu -
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
+            mem=300000, # All = 300000
+            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
-            threads=2 # all = 8
+            threads=8 # all = 8
         shell:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/batch_correction
@@ -251,15 +251,15 @@ if config["benchmark_batch_correction"]:
             batch_column=config["batch_column"],
             var_explained_cols=config["var_explained_cols"]
         conda:
-            "scvi-env"
+            "scib-env"
         resources:
-            mem=20000, # All = 300000
-            queue='normal', # All = gpu-huge -gpu -
-            mem_mb=20000,
-            mem_mib=20000,
-            disk_mb=20000,
+            mem=480000, # All = 300000
+            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            mem_mb=480000,
+            mem_mib=480000,
+            disk_mb=480000,
             tmpdir="tmp",
-            threads=2 # all = 8
+            threads=8 # all = 8
         shell:
             r"""
             methods_combined="$(echo "{params.methods}" | sed 's/ /,/g')"
@@ -291,11 +291,11 @@ else:
         conda:
             "scvi-env"
         resources:
-            mem=10000, # All =20000
+            mem=300000, # All =300000
             queue='normal',
-            mem_mb=10000,
-            mem_mib=10000,
-            disk_mb=10000,
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
             threads=2
         shell:
@@ -318,11 +318,11 @@ if config["use_bbknn"]:
         params:
             use_matrix="X_pca"
         resources:
-            mem=increment_memory(20000),
-            queue='normal',
-            mem_mb=increment_memory(20000),
-            mem_mib=increment_memory(20000),
-            disk_mb=increment_memory(20000),
+            mem=increment_memory(750000),
+            queue='teramem',
+            mem_mb=increment_memory(750000),
+            mem_mib=increment_memory(750000),
+            disk_mb=increment_memory(750000),
             tmpdir="tmp",
             threads=16
         conda:
@@ -360,7 +360,7 @@ if "Manual" in config["nn_choice"]:
 if "array" in config["nn_choice"]:
     rule nn_array:
         input:
-            "results/{tissue}/objects/adata_PCAd.h5ad",
+            "results/{tissue}/objects/adata_PCAd_batched.h5ad",
             "results/{tissue}/tables/knee.txt",
             "results/{tissue}/tables/batch_correction/best_batch_method.txt"
         output:
@@ -370,13 +370,13 @@ if "array" in config["nn_choice"]:
         conda:
             "scvi-env"
         resources:
-            mem=increment_memory(20000), # All = 350000
-            queue='normal', # All = long
-            mem_mb=increment_memory(20000),
-            mem_mib=increment_memory(20000),
-            disk_mb=increment_memory(20000), 
+            mem=increment_memory(350000), # All = 350000
+            queue='long', # All = long
+            mem_mb=increment_memory(350000),
+            mem_mib=increment_memory(350000),
+            disk_mb=increment_memory(350000), 
             tmpdir="tmp",
-            threads=2 # All =32
+            threads=32 # All =32
         shell:
             r"""
             mkdir -p results/{wildcards.tissue}/tables/nn_array
@@ -400,6 +400,7 @@ if "array" in config["nn_choice"]:
         input:
             gather_nn_within_tissue
         output:
+            "results/{tissue}/tables/summary_nn_array.txt",
             "results/{tissue}/tables/optimum_nn.txt"
         resources:
             mem=increment_memory(20000),
@@ -411,7 +412,7 @@ if "array" in config["nn_choice"]:
             threads=2 
         shell:
             r"""
-            cat {input} >> {output}
+            cat {input} >> {output[0]}
             """
 
 
