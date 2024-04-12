@@ -84,8 +84,11 @@ def main():
     inherited_options = parse_options()
     input_file = inherited_options.input_file
     tissue = inherited_options.tissue
-    pref_matrix = inherited_options.pref_matrix
-    nn = int(inherited_options.nn)
+    pref_matrix_f = inherited_options.pref_matrix
+    with open(pref_matrix_f, 'r') as file:
+        pref_matrix = file.read().strip()
+    
+    nn = int(inherited_options.nn_val)
     knee_file = inherited_options.knee_file
     batch_column = inherited_options.batch_column
     
@@ -100,10 +103,16 @@ def main():
     
     # Compute NN on the desired matrix
     print("Calculating neighbours")
-    sc.pp.neighbors(adata, n_neighbors=nn, n_pcs=n_pcs, use_rep="X_" + pref_matrix, key_added= "X_" + pref_matrix + "_nn")
+    if pref_matrix == "X_pca":
+        sc.pp.neighbors(adata, n_neighbors=nn, n_pcs=n_pcs, use_rep=pref_matrix, key_added= pref_matrix + "_nn")
+    else:
+        sc.pp.neighbors(adata, n_neighbors=nn, use_rep=pref_matrix, key_added= pref_matrix + "_nn")
+    
+    # Save anndata with these clusters bound
+    adata.write(f"results/{tissue}/tables/nn_array/adata_PCAd_batched_{nn}.h5ad")
     
     # Extract this matrix
-    neighbors_matrix = adata.obsp["X_" + pref_matrix + "_nn"]
+    neighbors_matrix = adata.obsp[pref_matrix + "_nn_distances"]
     
     # Extract sample identifier
     sample_ids = adata.obs[batch_column]
@@ -127,14 +136,14 @@ def main():
     sample_mixing_df = pd.DataFrame(list(sample_mixing.items()), columns=['cell', 'Nsame_samp'])
     sample_mixing_df['cell'] = adata.obs.index
     sample_mixing_df['prop_same_samp'] = sample_mixing_df['Nsame_samp'] / nn
-    
+
     mean_samp_exclusivity = sum(sample_mixing_df['prop_same_samp']) / sample_mixing_df.shape[0]
     max_samp_exclusivity = max(sample_mixing_df['prop_same_samp'])
     
     # Now compute the iLISI
-    adata.uns['neighbors'] = adata.uns["X_" + pref_matrix + "_nn"]
-    adata.obsp['connectivities'] = adata.obsp["X_" + pref_matrix + "_nn" + "_connectivities"] 
-    adata.obsp['distances'] = adata.obsp["X_" + pref_matrix + "_nn" + "_distances"] 
+    adata.uns['neighbors'] = adata.uns[pref_matrix + "_nn"]
+    adata.obsp['connectivities'] = adata.obsp[pref_matrix + "_nn" + "_connectivities"] 
+    adata.obsp['distances'] = adata.obsp[pref_matrix + "_nn" + "_distances"] 
     ilisi = scib.metrics.ilisi_graph(adata, batch_key=batch_column, type_="knn", k0=nn, scale=True)
     
     # Rather than saving these seperately, save as one file
@@ -142,7 +151,10 @@ def main():
             "value": [mean_samp_exclusivity, max_samp_exclusivity, ilisi]}
     data_df = pd.DataFrame(data)
     data_df['nn'] = nn
-    data_df.to_csv(f"results/tissue/tables/nn_array/{nn}_summary.csv", header=False)
+    print("Results")
+    print(data_df)
+    data_df.to_csv(f"results/{tissue}/tables/nn_array/{str(nn)}_summary.csv", header=False)
+    
     
     
 if __name__ == '__main__':
