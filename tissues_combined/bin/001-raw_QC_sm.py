@@ -140,9 +140,9 @@ def parse_options():
     )
     
     parser.add_argument(
-        '-filter_sequentially', '--filter_nMad_sequentially',
+        '-filter_sequentially', '--filter_sequentially',
         action='store',
-        dest='filter_nMad_sequentially',
+        dest='filter_sequentially',
         required=True,
         help=''
     )
@@ -260,33 +260,33 @@ def parse_options():
     )
     
     parser.add_argument(
-        '-samp_nCount_blood', '--min_mean_nCount_per_samp_blood',
+        '-samp_nCount_blood', '--min_median_nCount_per_samp_blood',
         action='store',
-        dest='min_mean_nCount_per_samp_blood',
+        dest='min_median_nCount_per_samp_blood',
         required=True,
         help=''
     )
     
     parser.add_argument(
-        '-samp_nCount_gut', '--min_mean_nCount_per_samp_gut',
+        '-samp_nCount_gut', '--min_median_nCount_per_samp_gut',
         action='store',
-        dest='min_mean_nCount_per_samp_gut',
+        dest='min_median_nCount_per_samp_gut',
         required=True,
         help=''
     )
     
     parser.add_argument(
-        '-samp_nGene_blood', '--min_mean_nGene_per_samp_blood',
+        '-samp_nGene_blood', '--min_median_nGene_per_samp_blood',
         action='store',
-        dest='min_mean_nGene_per_samp_blood',
+        dest='min_median_nGene_per_samp_blood',
         required=True,
         help=''
     )
     
     parser.add_argument(
-        '-samp_nGene_gut', '--min_mean_nGene_per_samp_gut',
+        '-samp_nGene_gut', '--min_median_nGene_per_samp_gut',
         action='store',
-        dest='min_mean_nGene_per_samp_gut',
+        dest='min_median_nGene_per_samp_gut',
         required=True,
         help=''
     )
@@ -336,7 +336,7 @@ def main():
     min_nUMI = float(inherited_options.min_nUMI)
     use_absolute_nUMI = inherited_options.use_absolute_nUMI
     use_relative_mad = inherited_options.use_relative_mad
-    filter_nMad_sequentially = inherited_options.filter_nMad_sequentially
+    filter_sequentially = inherited_options.filter_sequentially
     nMad_directionality = inherited_options.nMad_directionality
     lineage_column = inherited_options.lineage_column
     relative_grouping = inherited_options.relative_grouping
@@ -353,10 +353,10 @@ def main():
     min_MT = inherited_options.min_MT
     min_MT = float(min_MT)
     use_MT_thresh_blood_gut_immune = inherited_options.use_MT_thresh_blood_gut_immune
-    min_mean_nCount_per_samp_blood = float(inherited_options.min_mean_nCount_per_samp_blood)
-    min_mean_nCount_per_samp_gut = float(inherited_options.min_mean_nCount_per_samp_gut)
-    min_mean_nGene_per_samp_blood = float(inherited_options.min_mean_nGene_per_samp_blood)
-    min_mean_nGene_per_samp_gut = float(inherited_options.min_mean_nGene_per_samp_gut)
+    min_median_nCount_per_samp_blood = float(inherited_options.min_median_nCount_per_samp_blood)
+    min_median_nCount_per_samp_gut = float(inherited_options.min_median_nCount_per_samp_gut)
+    min_median_nGene_per_samp_blood = float(inherited_options.min_median_nGene_per_samp_blood)
+    min_median_nGene_per_samp_gut = float(inherited_options.min_median_nGene_per_samp_gut)
     use_abs_per_samp = inherited_options.use_abs_per_samp
     filt_blood_keras = inherited_options.filt_blood_keras
     n_variable_genes = float(inherited_options.n_variable_genes)
@@ -370,7 +370,7 @@ def main():
     print(f"use_absolute_nUMI:{use_absolute_nUMI}")
     print(f"relative_grouping:{relative_grouping}")
     print(f"relative_nMAD_threshold:{relative_nMAD_threshold}")
-    print(f"filter_nMad_sequentially: {filter_nMad_sequentially}")
+    print(f"filter_sequentially: {filter_sequentially}")
     print(f"nMad_directionality: {nMad_directionality}")
     print(f"relative_nUMI_log:{relative_nUMI_log}")
     print(f"min_nGene:{min_nGene}")
@@ -381,10 +381,10 @@ def main():
     print(f"use_absolute_MT:{use_absolute_MT}")
     print(f"absolute_max_MT:{absolute_max_MT}")
     print(f"use_MT_thresh_blood_gut_immune: {use_MT_thresh_blood_gut_immune}")
-    print(f"min_mean_nCount_per_samp_blood:{min_mean_nCount_per_samp_blood}")
-    print(f"min_mean_nCount_per_samp_gut:{min_mean_nCount_per_samp_gut}")
-    print(f"min_mean_nGene_per_samp_blood:{min_mean_nGene_per_samp_blood}")
-    print(f"min_mean_nGene_per_samp_gut:{min_mean_nGene_per_samp_gut}")
+    print(f"min_median_nCount_per_samp_blood:{min_median_nCount_per_samp_blood}")
+    print(f"min_median_nCount_per_samp_gut:{min_median_nCount_per_samp_gut}")
+    print(f"min_median_nGene_per_samp_blood:{min_median_nGene_per_samp_blood}")
+    print(f"min_median_nGene_per_samp_gut:{min_median_nGene_per_samp_gut}")
     print(f"use_abs_per_samp:{use_abs_per_samp}")
     print(f"filt_blood_keras:{filt_blood_keras}")
     print(f"n_variable_genes:{n_variable_genes}")
@@ -582,7 +582,7 @@ def main():
                 print(f"{l}: {this_thresh}")
 
     # If filtering sequentially:
-    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
+    if filter_sequentially == "yes":
         adata = adata[adata.obs['total_counts_keep'] == True]
 
     # 2. nGene
@@ -676,7 +676,7 @@ def main():
                 print(f"{l}: {this_thresh}")        
 
     # If filtering sequentially:
-    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
+    if filter_sequentially == "yes":
         adata = adata[adata.obs['n_genes_by_counts_keep'] == True]
 
     # 3. MT% 
@@ -783,13 +783,13 @@ def main():
                 print(f"{l}: {this_thresh}")
 
     # If filtering sequentially:
-    if use_relative_mad == "yes" and filter_nMad_sequentially == "yes":
+    if filter_sequentially == "yes":
         adata = adata[adata.obs['MT_perc_keep'] == True]
             
     
     # Remove on the basis of low MT%
-    adata = adata[adata.obs['pct_counts_gene_group__mito_transcript'] > min_MT]        
-    print(f"Number of cells with MT > min_MT = {adata.shape[0]}")
+    #adata = adata[adata.obs['pct_counts_gene_group__mito_transcript'] > min_MT]        
+    #print(f"Number of cells with MT > min_MT = {adata.shape[0]}")
     
     # 4. Remove samples with outlying sequencing depth
     adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
@@ -819,12 +819,14 @@ def main():
     high_samps = np.array(cells_sample.loc[cells_sample.Ncells > 10000, "sample"])
     low_samps = np.array(cells_sample.loc[cells_sample.Ncells < 500, "sample"])
     # Summarise
-    depth_count = pd.DataFrame(index = np.unique(adata.obs.samp_tissue), columns=["Mean_nCounts", "nCells", "High_cell_sample", "n_genes_by_counts"])
+    depth_count = pd.DataFrame(index = np.unique(adata.obs.samp_tissue), columns=["Mean_nCounts", "nCells", "High_cell_sample", "n_genes_by_counts", "Median_nCounts", "Median_nGene_by_counts"])
     for s in range(0, depth_count.shape[0]):
         samp = depth_count.index[s]
         depth_count.iloc[s,1] = adata.obs[adata.obs.samp_tissue == samp].shape[0]
         depth_count.iloc[s,0] = sum(adata.obs[adata.obs.samp_tissue == samp].total_counts)/depth_count.iloc[s,1]
         depth_count.iloc[s,3] = sum(adata.obs[adata.obs.samp_tissue == samp].n_genes_by_counts)/depth_count.iloc[s,1]
+        depth_count.iloc[s,4] = np.median(adata.obs[adata.obs.samp_tissue == samp].total_counts)
+        depth_count.iloc[s,5] = np.median(adata.obs[adata.obs.samp_tissue == samp].n_genes_by_counts)
         if samp in high_samps:
             depth_count.iloc[s,2] = "Red"
         else: 
@@ -834,6 +836,7 @@ def main():
             depth_count.iloc[s,2] = "Green"
 
     depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
+    depth_count["log10_Median_nCounts"] = np.log10(np.array(depth_count["Median_nCounts"].values, dtype = "float"))
 
     # Plot
     plt.figure(figsize=(8, 6))
@@ -842,6 +845,14 @@ def main():
     plt.ylabel('Mean genes detected / cell')
     plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_all.png", bbox_inches='tight')
     plt.legend()
+    plt.clf()
+    
+    # Same for median
+    plt.figure(figsize=(8, 6))
+    plt.scatter(depth_count["Median_nCounts"], depth_count["Median_nGene_by_counts"],  c=depth_count["High_cell_sample"], alpha=0.7)
+    plt.xlabel('Median counts / cell')
+    plt.ylabel('Median ngenes detected / cell')
+    plt.savefig(f"{qc_path}/sample_median_counts_ngenes_all.png", bbox_inches='tight')
     plt.clf()
 
     # Plot the distribution per tissue
@@ -874,24 +885,43 @@ def main():
         plt.xlabel('Mean counts / cell')
         plt.ylabel('Mean genes detected / cell')
         if t == "blood":
-            plt.axvline(x = min_mean_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_mean_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_mean_nCount: {min_mean_nCount_per_samp_blood}, min_mean_nGene: {min_mean_nGene_per_samp_blood}")
+            plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_blood}, min_mean_nGene: {min_median_nGene_per_samp_blood}")
         else:
-            plt.axvline(x = min_mean_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_mean_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_mean_nCount: {min_mean_nCount_per_samp_gut}, min_mean_nGene: {min_mean_nGene_per_samp_gut}")
+            plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_gut}, min_mean_nGene: {min_median_nGene_per_samp_gut}")
         
         plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_{t}.png", bbox_inches='tight')
+        plt.clf()
+    
+    # Within tissue for median
+    for t in tissues:
+        samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
+        plt.figure(figsize=(8, 6))
+        plt.scatter(depth_count[depth_count.index.isin(samps)]["Median_nCounts"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
+        plt.xlabel('Median counts / cell')
+        plt.ylabel('Median genes detected / cell')
+        if t == "blood":
+            plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_blood}, min_mean_nGene: {min_median_nGene_per_samp_blood}")
+        else:
+            plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_gut}, min_mean_nGene: {min_median_nGene_per_samp_gut}")
+        
+        plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
         plt.clf()
 
     # These are clearly different across tissues
     # Either apply absolute thresholds or a relative cut off
     if use_abs_per_samp == "yes" and use_relative_mad == "no":
-        blood_keep = (depth_count['Mean_nCounts'] > min_mean_nCount_per_samp_blood) & (depth_count['n_genes_by_counts'] > min_mean_nGene_per_samp_blood)
+        blood_keep = (depth_count['Median_nCounts'] > min_median_nCount_per_samp_blood) & (depth_count['Median_nGene_by_counts'] > min_median_nGene_per_samp_blood)
         blood_keep = blood_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] == "blood"]['samp_tissue'])
         blood_keep = blood_keep[blood_keep == True].index
-        gut_keep = (depth_count['Mean_nCounts'] > min_mean_nCount_per_samp_gut) & (depth_count['n_genes_by_counts'] > min_mean_nGene_per_samp_gut)
+        gut_keep = (depth_count['Median_nCounts'] > min_median_nCount_per_samp_gut) & (depth_count['Median_nGene_by_counts'] > min_median_nGene_per_samp_gut)
         gut_keep = gut_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] != "blood"]['samp_tissue'])
         gut_keep = gut_keep[gut_keep == True].index
         both_keep = list(np.concatenate([blood_keep, gut_keep]))
@@ -905,7 +935,7 @@ def main():
         depth_count = depth_count.rename(columns = {"index": "samp_tissue"})
         depth_count = depth_count.merge(sample_tissue, on="samp_tissue")
         depth_count.set_index("samp_tissue", inplace=True)
-        nMads=depth_count.groupby('tissue')[['Mean_nCounts', 'n_genes_by_counts']].apply(nmad_calc)
+        nMads=depth_count.groupby('tissue')[['Median_nCounts', 'Median_nGene_by_counts']].apply(nmad_calc)
         unique_tissues = nMads.index.get_level_values('tissue').unique()
         result_list = []
         for tissue in unique_tissues:
@@ -915,25 +945,70 @@ def main():
             #
         result_df = pd.concat(result_list)
         result_df = result_df.reset_index()
-        result_df = result_df.rename(columns = {'Mean_nCounts': 'Mean_nCounts_nMad', 'n_genes_by_counts': 'n_genes_by_counts_nMad'})
-        depth_count = depth_count.merge(result_df[['samp_tissue', 'Mean_nCounts_nMad', 'n_genes_by_counts_nMad']], on="samp_tissue")
+        result_df = result_df.rename(columns = {'Median_nCounts': 'Median_nCounts_nMad', 'Median_nGene_by_counts': 'Median_nGene_by_counts_nMad'})
+        depth_count = depth_count.merge(result_df[['samp_tissue', 'Median_nCounts_nMad', 'Median_nGene_by_counts_nMad']], on="samp_tissue")
         # Exclude those on the lower end only
-        depth_count['samp_Mean_nCounts_keep'] = depth_count['Mean_nCounts_nMad'] > -(relative_nMAD_threshold) # Direction aware
-        depth_count['samp_n_genes_by_counts_keep'] = depth_count['n_genes_by_counts_nMad'] > -(relative_nMAD_threshold) # Direction aware
-        depth_count['keep_both'] = depth_count['samp_Mean_nCounts_keep'] & depth_count['samp_n_genes_by_counts_keep']
+        depth_count['samp_Median_nCounts_keep'] = depth_count['Median_nCounts_nMad'] > -(relative_nMAD_threshold) # Direction aware
+        depth_count['samp_Median_nGene_by_counts_keep'] = depth_count['Median_nGene_by_counts_nMad'] > -(relative_nMAD_threshold) # Direction aware
+        depth_count['keep_both'] = depth_count['samp_Median_nCounts_keep'] & depth_count['samp_Median_nGene_by_counts_keep']
         adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(depth_count[depth_count['keep_both'] == True]['samp_tissue'])
         # print filters
-        print("For sample level samp_Mean_nCounts")
+        print("For sample level samp_Median_nCounts")
         for t in tissues:
             print(f"for {t}:")
             this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['Mean_nCounts'])
             print(this_thresh)
         #
-        print("For sample level samp_n_genes_by_counts")
+        print("For sample level samp_Median_nGene_by_counts")
         for t in tissues:
             print(f"for {t}:")
-            this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['n_genes_by_counts'])
-            print(this_thresh)
+            this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['Median_nGene_by_counts'])
+            print(this_thresh)    
+        
+    #if filter_sequentially != "yes":
+        #from matplotlib.sankey import Sankey
+        ## Have a look at the relationship between these QC factors on a sankey
+        #nodes = {}
+        ## Create node IDs for True and False values in each column
+        #for col in ["total_counts_keep", "n_genes_by_counts_keep", "MT_perc_keep", "samples_keep"]:
+        #    nodes[col] = {
+        #        True: len(nodes),
+        #        False: len(nodes) + 1
+        #    }
+        #    nodes[col + '_label'] = {
+        #        True: col + '_True',
+        #        False: col + '_False'
+        #    }
+        # Initialize lists to store source, target, and value for the Sankey plot
+        #sources = []
+        #targets = []
+        #values = []
+        # Iterate over rows in the DataFrame
+        #for i, row in adata.obs.iterrows():
+        #    # Iterate over columns in the DataFrame
+        #    for col in ["total_counts_keep", "n_genes_by_counts_keep", "MT_perc_keep", "samples_keep"]:
+        #        # Get the source and target node IDs for the current value
+        #        source = nodes[col][row[col]]
+        #        target = nodes[col + '_label'][row[col]]
+        #        
+        #        # Append source, target, and value to the lists
+        #        sources.append(source)
+        #        targets.append(target)
+        #        values.append(1)
+        #
+        ## Plot
+        #plt.figure(figsize=(8, 6))
+        #plt.title('Sankey Diagram for retention of cells across QC')
+        #plt.suptitle('Sample Data')
+        #plt.grid(False)
+        #
+        #sankey = Sankey()
+        ## Add flows
+        #for source, target, value in zip(sources, targets, values):
+        #    sankey.add(flows=[source, -source], labels=[None, target], orientations=[0, 0], color='blue')
+        #
+        #sankey.finish()
+        #plt.savefig(f"{qc_path}/sankey_cell_retention_across_QC.png", bbox_inches='tight')
 
     # 5. Apply filters to the cells before expression normalisation
     adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep'] & adata.obs['samples_keep']

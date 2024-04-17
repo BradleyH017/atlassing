@@ -2,9 +2,10 @@ configfile: "config.yaml"
 rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
-        expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
-
+        
 
 # Define memory increment function
 def increment_memory(base_memory):
@@ -17,14 +18,7 @@ rule qc_raw:
         "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
-        "results/{tissue}/tables/knee.txt",
-        "results/{tissue}/tables/log1p_cp10k_sparse.npz",
-        "results/{tissue}/tables/genes.txt",
-        "results/{tissue}/tables/cells.txt",
-        "results/{tissue}/tables/raw_counts_sparse.npz",
-        "results/{tissue}/tables/raw_cells.txt",
-        "results/{tissue}/tables/raw_genes.txt",
-        "results/{tissue}/tables/raw_gene.var.txt"
+        "results/{tissue}/tables/knee.txt"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -34,7 +28,7 @@ rule qc_raw:
         lineage_column=config["lineage_column"],
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
-        filter_nMad_sequentially=config["filter_nMad_sequentially"],
+        filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
         relative_nUMI_log=config["relative_nUMI_log"],
         min_nGene=config["min_nGene"],
@@ -46,10 +40,10 @@ rule qc_raw:
         min_MT=config["min_MT"],
         absolute_max_MT=config["absolute_max_MT"],
         use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
-        min_mean_nCount_per_samp_blood=config["min_mean_nCount_per_samp_blood"],
-        min_mean_nCount_per_samp_gut=config["min_mean_nCount_per_samp_gut"],
-        min_mean_nGene_per_samp_blood=config["min_mean_nGene_per_samp_blood"],
-        min_mean_nGene_per_samp_gut=config["min_mean_nGene_per_samp_gut"],
+        min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
+        min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
+        min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
+        min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
@@ -63,7 +57,7 @@ rule qc_raw:
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
-        "scvi-env"
+        "scvi-env_reserve"
     shell:
         r"""
         python  bin/001-raw_QC_sm.py \
@@ -74,7 +68,7 @@ rule qc_raw:
         --min_nUMI {params.min_nUMI} \
         --use_absolute_nUMI {params.use_absolute_nUMI} \
         --use_relative_mad {params.use_relative_mad} \
-        --filter_nMad_sequentially {params.filter_nMad_sequentially} \
+        --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
         --lineage_column {params.lineage_column} \
         --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
@@ -88,10 +82,10 @@ rule qc_raw:
         --absolute_max_MT {params.absolute_max_MT} \
         --min_MT {params.min_MT} \
         --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
-        --min_mean_nCount_per_samp_blood {params.min_mean_nCount_per_samp_blood} \
-        --min_mean_nCount_per_samp_gut {params.min_mean_nCount_per_samp_gut} \
-        --min_mean_nGene_per_samp_blood {params.min_mean_nGene_per_samp_blood} \
-        --min_mean_nGene_per_samp_gut {params.min_mean_nGene_per_samp_gut} \
+        --min_median_nCount_per_samp_blood {params.min_median_nCount_per_samp_blood} \
+        --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
+        --min_median_nGene_per_samp_blood {params.min_median_nGene_per_samp_blood} \
+        --min_median_nGene_per_samp_gut {params.min_median_nGene_per_samp_gut} \
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
@@ -108,7 +102,7 @@ if "scVI" in batch_methods:
         output:
             "results/{tissue}/tables/batch_correction/scVI_matrix.npz"
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         params:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
@@ -140,7 +134,7 @@ if "scVI_default" in batch_methods:
         output:
             "results/{tissue}/tables/batch_correction/scVI_default_matrix.npz"
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         params:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
@@ -172,7 +166,7 @@ if "Harmony" in batch_methods:
         output:
             "results/{tissue}/tables/batch_correction/Harmony_matrix.npz"
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         params:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
@@ -207,7 +201,7 @@ if "scANVI" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         resources:
             mem=300000, # All = 300000
             queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
@@ -252,13 +246,13 @@ if config["benchmark_batch_correction"]:
             batch_column=config["batch_column"],
             var_explained_cols=config["var_explained_cols"]
         conda:
-            "single_cell"
+            "scib-env_reserve"
         resources:
-            mem=480000, # All = 300000
+            mem=450000, # All = 350000
             queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
-            mem_mb=480000,
-            mem_mib=480000,
-            disk_mb=480000,
+            mem_mb=450000,
+            mem_mib=450000,
+            disk_mb=450000,
             tmpdir="tmp",
             threads=8 # all = 8
         shell:
@@ -290,7 +284,7 @@ else:
         params:
             method=config["pref_matrix"]
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         resources:
             mem=300000, # All =300000
             queue='normal',
@@ -352,7 +346,7 @@ if "Manual" in config["nn_choice"]:
             tmpdir="tmp",
             threads=1
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         shell:
             r"""
             echo {params.nn} > {output}
@@ -441,7 +435,7 @@ rule get_umap:
         tmpdir="tmp",
         threads=32 # All =32
     conda:
-        "scvi-env"
+        "scvi-env_reserve"
     shell:
         r"""
         python bin/003-umap_embedding.py \
@@ -459,7 +453,9 @@ rule cluster_array:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
         "results/{tissue}/tables/batch_correction/best_batch_method.txt"
     output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad"
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
         mem=increment_memory(350000), #All - 350000
         queue='long',
@@ -534,7 +530,7 @@ else:
             tmpdir="tmp",
             threads=1
         conda:
-            "scvi-env"
+            "scvi-env_reserve"
         params:
             activation=config["activation"],
             loss=config["loss"],
@@ -564,11 +560,11 @@ rule test_clusters_keras:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(750000), #All - 350000
+        mem=increment_memory(850000), #All - 850000
         queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
+        mem_mb=increment_memory(850000),
+        mem_mib=increment_memory(850000),
+        disk_mb=increment_memory(850000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -584,7 +580,7 @@ rule test_clusters_keras:
             --keras_param_file {input[2]} \
             --batch_size 32 \
             --train_size_fraction 0.67 \
-            --output_file results/{wildcards.tissue}/tables/keras-grid_search/keras-
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
         """
 
 
@@ -607,15 +603,15 @@ rule summarise_cluster_test:
     params:
         MCC_thresh=config["MCC_thresh"]
     resources:
-        mem=50000,
+        mem=350000,
         queue='normal',
-        mem_mb=50000,
-        mem_mib=50000,
-        disk_mb=50000,
+        mem_mb=350000,
+        mem_mib=350000,
+        disk_mb=350000,
         tmpdir="tmp",
         threads=1
     conda:
-        "scvi-env"
+        "scvi-env_reserve"
     shell:
         r"""
         mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
@@ -623,10 +619,9 @@ rule summarise_cluster_test:
         mkdir -p results/{wildcards.tissue}/figures/markers
         python bin/006-summarise_keras.py \
             --tissue {wildcards.tissue} \
-            --h5_path {input[0]} \
             --outpath results/{wildcards.tissue}/figures/clustering_array_summary/keras_accuracy \
             --MCC_thresh {params.MCC_thresh} \
-            --pref_matrix {input[1]}
+            --pref_matrix {input[0]}
         """
 
 rule add_celltypist:
@@ -641,13 +636,13 @@ rule add_celltypist:
         model=config["celltypist_model"],
         model_name=config["celltypist_model_name"]
     resources:
-        mem=750000,
-        queue='normal',
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
+        mem=increment_memory(750000), #All - 850000
+        queue='teramem',
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
-        threads=2
+        threads=16 
     conda:
         "scvi-env"
     shell:
@@ -666,10 +661,7 @@ rule add_celltypist:
 
 rule predict_all_cells:
     input:
-        "results/{tissue}/tables/raw_counts_sparse.npz",
-        "results/{tissue}/tables/raw_genes.txt",
-        "results/{tissue}/tables/raw_cells.txt",
-        "results/{tissue}/tables/raw_gene.var.txt",
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad",
         "results/{tissue}/tables/optim_resolution.txt"
     output:
         "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
@@ -702,7 +694,7 @@ rule add_predictions_filter:
     output:
         "results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad"
     conda:
-        "scvi-env"
+        "scvi-env_reserve"
     params:
         probability_threshold=config["probability_threshold"]
     resources:
