@@ -963,6 +963,7 @@ def main():
             print('Completed: save {}.'.format(out_f))
 
         #add the MCC to the UMAP and plot this
+        # Add
         fig_out = options.h5.split("/adata_")[0]
         print(f"UMAP outdir is {fig_out}")
         sc.settings.figdir=fig_out
