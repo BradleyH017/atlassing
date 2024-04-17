@@ -444,21 +444,21 @@ def main():
     print(f"Initial shape of the data is:{adata.shape}")
 
     # Save the raw matrix and gene var before doing anything (need this later to re-annotate)
-    sparse_matrix = sp.sparse.csc_matrix(adata.X)
-    sp.sparse.save_npz(f"results/{tissue}/tables/raw_counts_sparse.npz", sparse_matrix)
-    print("Saved sparse matrix")
-    # Save index and columns
-    with open(f"results/{tissue}/tables/raw_cells.txt", 'w') as file:
-        for index, row in adata.obs.iterrows():
-            file.write(str(index) + '\n')
-
-    print("Saved cells")
-    with open(f"results/{tissue}/tables/raw_genes.txt", 'w') as file:
-        for index, row in adata.var.iterrows():
-            file.write(str(index) + '\n')
-            
-    print("Saved genes")
-    del sparse_matrix
+    #sparse_matrix = sp.sparse.csc_matrix(adata.X)
+    #sp.sparse.save_npz(f"results/{tissue}/tables/raw_counts_sparse.npz", sparse_matrix)
+    #print("Saved sparse matrix")
+    ## Save index and columns
+    #with open(f"results/{tissue}/tables/raw_cells.txt", 'w') as file:
+    #    for index, row in adata.obs.iterrows():
+    #        file.write(str(index) + '\n')
+    #
+    #print("Saved cells")
+    #with open(f"results/{tissue}/tables/raw_genes.txt", 'w') as file:
+    #    for index, row in adata.var.iterrows():
+    #        file.write(str(index) + '\n')
+    #        
+    #print("Saved genes")
+    #del sparse_matrix
         
     # Also save the gene var df
     adata.var.to_csv(f"results/{tissue}/tables/raw_gene.var.txt", sep = "\t")
@@ -962,21 +962,21 @@ def main():
     adata.layers['log1p_cp10k'] = adata.X.copy()
     # Save this 
     tissue=inherited_options.tissue
-    sparse_matrix = sp.sparse.csc_matrix(adata.layers['log1p_cp10k'])
-    sp.sparse.save_npz(f"results/{tissue}/tables/log1p_cp10k_sparse.npz", sparse_matrix)
-    print("Saved sparse matrix")
+    #sparse_matrix = sp.sparse.csc_matrix(adata.layers['log1p_cp10k'])
+    #sp.sparse.save_npz(f"results/{tissue}/tables/log1p_cp10k_sparse.npz", sparse_matrix)
+    #print("Saved sparse matrix")
     # Save index and columns
-    with open(f"results/{tissue}/tables/cells.txt", 'w') as file:
-        for index, row in adata.obs.iterrows():
-            file.write(str(index) + '\n')
-
-    print("Saved cells")
-    with open(f"results/{tissue}/tables/genes.txt", 'w') as file:
-        for index, row in adata.var.iterrows():
-            file.write(str(index) + '\n')
-
-    print("Saved genes")
-    del sparse_matrix
+    #with open(f"results/{tissue}/tables/cells.txt", 'w') as file:
+    #    for index, row in adata.obs.iterrows():
+    #        file.write(str(index) + '\n')
+    #
+    #print("Saved cells")
+    #with open(f"results/{tissue}/tables/genes.txt", 'w') as file:
+    #    for index, row in adata.var.iterrows():
+    #        file.write(str(index) + '\n')
+    #
+    #print("Saved genes")
+    #del sparse_matrix
     
     # identify highly variable genes and scale these ahead of PCA
     sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes))

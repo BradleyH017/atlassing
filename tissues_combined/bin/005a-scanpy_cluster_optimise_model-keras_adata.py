@@ -962,6 +962,26 @@ def main():
         if verbose:
             print('Completed: save {}.'.format(out_f))
 
+        #add the MCC to the UMAP and plot this
+        fig_out = options.h5.split("/adata_")[0]
+        print(f"UMAP outdir is {fig_out}")
+        sc.settings.figdir=fig_out
+        sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
+        sc.logging.print_header()
+        sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
+        model_cp = model_report.copy()
+        model_cp.reset_index(inplace=True)
+        model_cp["leiden"] = model_cp['index']
+        mcc_add = model_cp[["leiden", "MCC"]]
+        mcc_add['reproducible'] = "no"
+        mcc_add.loc[mcc_add['MCC'].astype(float) > 0.75, 'reproducible'] = "yes"
+        adata.obs.reset_index("cell", inplace=True)
+        adata.obs = adata.obs.merge(mcc_add, on="leiden", how="left")
+        adata.obs.set_index("cell", inplace=True)
+        sc.pl.umap(adata, color = "MCC", save=f"_MCC.png")
+        print("Saved umap for MCC")
+        sc.pl.umap(adata, color = "reproducible", save=f"_MCC_gt_0pt75.png")
+
         # Save the test results - each row is a cell and the columns are the
         # prob of that cell belonging to a particular class.
         # Add in extra data
