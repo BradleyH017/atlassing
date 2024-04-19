@@ -45,6 +45,8 @@ import torch
 from pytorch_lightning import Trainer
 import argparse
 import scipy as sp
+import holoviews as hv
+hv.extension('matplotlib')
 print("Loaded libraries")
 
 ########### Define custom functions used here ###############
@@ -405,12 +407,12 @@ def main():
     outdir = "results"
     if os.path.exists(outdir) == False:
         os.mkdir(outdir)
-    
+
     # Update the outdir path to include the tissue
     outdir = f"{outdir}/{tissue}"
     if os.path.exists(outdir) == False:
         os.mkdir(outdir)
-    
+
     # Define output directories
     figpath = f"{outdir}/figures"
     if os.path.exists(figpath) == False:
@@ -498,7 +500,7 @@ def main():
     for t in tissues:
         data = np.log10(adata.obs[adata.obs.tissue == t].total_counts)
         sns.distplot(data, hist=False, rug=True, label=t)
-
+        #
         plt.legend()
         plt.xlabel('log10(nUMI)')
         plt.title(f"Absolute cut off (black): {min_nUMI}")
@@ -544,7 +546,7 @@ def main():
                 sns.distplot(data, hist=False, rug=True, color=line_color, label=f'{l} (relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
                 plt.axvline(x = cutoff_low, linestyle = '--', color = line_color, alpha = 0.5)
                 plt.axvline(x = cutoff_high, linestyle = '--', color = line_color, alpha = 0.5)
-        
+        #
         plt.legend()
         plt.xlabel('log10(nUMI)')
         plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5,  label=f"absolute: {min_nUMI}")
@@ -906,11 +908,11 @@ def main():
         if t == "blood":
             plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_blood}, min_mean_nGene: {min_median_nGene_per_samp_blood}")
+            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_blood}, min_median_nGene: {min_median_nGene_per_samp_blood}")
         else:
             plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_mean_nCount: {min_median_nCount_per_samp_gut}, min_mean_nGene: {min_median_nGene_per_samp_gut}")
+            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
         
         plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
         plt.clf()
@@ -926,6 +928,8 @@ def main():
         gut_keep = gut_keep[gut_keep == True].index
         both_keep = list(np.concatenate([blood_keep, gut_keep]))
         adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
+        lost = depth_count.shape[0]-len(both_keep)
+        print(f"The number of samples beng lost using absolute per-samp thresholds is {lost}")
     else:
         # Calculating relative threshold
         print("Calculating relative threshold: sample level mean nCells and depth")
@@ -965,50 +969,56 @@ def main():
             this_thresh = min(depth_count[(depth_count['tissue'] == t) & (depth_count['keep_both'] == True)]['Median_nGene_by_counts'])
             print(this_thresh)    
         
-    #if filter_sequentially != "yes":
-        #from matplotlib.sankey import Sankey
-        ## Have a look at the relationship between these QC factors on a sankey
-        #nodes = {}
-        ## Create node IDs for True and False values in each column
-        #for col in ["total_counts_keep", "n_genes_by_counts_keep", "MT_perc_keep", "samples_keep"]:
-        #    nodes[col] = {
-        #        True: len(nodes),
-        #        False: len(nodes) + 1
-        #    }
-        #    nodes[col + '_label'] = {
-        #        True: col + '_True',
-        #        False: col + '_False'
-        #    }
-        # Initialize lists to store source, target, and value for the Sankey plot
-        #sources = []
-        #targets = []
-        #values = []
-        # Iterate over rows in the DataFrame
-        #for i, row in adata.obs.iterrows():
-        #    # Iterate over columns in the DataFrame
-        #    for col in ["total_counts_keep", "n_genes_by_counts_keep", "MT_perc_keep", "samples_keep"]:
-        #        # Get the source and target node IDs for the current value
-        #        source = nodes[col][row[col]]
-        #        target = nodes[col + '_label'][row[col]]
-        #        
-        #        # Append source, target, and value to the lists
-        #        sources.append(source)
-        #        targets.append(target)
-        #        values.append(1)
-        #
-        ## Plot
-        #plt.figure(figsize=(8, 6))
-        #plt.title('Sankey Diagram for retention of cells across QC')
-        #plt.suptitle('Sample Data')
-        #plt.grid(False)
-        #
-        #sankey = Sankey()
-        ## Add flows
-        #for source, target, value in zip(sources, targets, values):
-        #    sankey.add(flows=[source, -source], labels=[None, target], orientations=[0, 0], color='blue')
-        #
-        #sankey.finish()
-        #plt.savefig(f"{qc_path}/sankey_cell_retention_across_QC.png", bbox_inches='tight')
+    # Plot sankey
+    temp = adata.obs[["total_counts_keep", "n_genes_by_counts_keep","MT_perc_keep", "samples_keep"]]
+    for col in temp.columns:
+        temp[col] = col + "-" + temp[col].astype(str)
+
+    temp['input'] = "input"
+    grouped = temp.groupby(["input", "total_counts_keep"])
+    input_to_total_counts = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    grouped = temp.groupby(["total_counts_keep", "n_genes_by_counts_keep"])
+    total_counts_to_n_genes = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    # Group by unique combinations of "n_genes_by_counts_keep" and "MT_perc_keep"
+    grouped = temp.groupby(["n_genes_by_counts_keep", "MT_perc_keep"])
+    # Calculate the percentage of each value of "n_genes_by_counts_keep" that contributes to each value of "MT_perc_keep"
+    n_genes_to_MT_perc = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    # Group by unique combinations of "MT_perc_keep" and "samples_keep"
+    grouped = temp.groupby(["MT_perc_keep", "samples_keep"])
+    # Calculate the percentage of each value of "MT_perc_keep" that contributes to each value of "samples_keep"
+    MT_perc_to_samples = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    # Concatenate the three DataFrames vertically
+    result = pd.concat([input_to_total_counts, total_counts_to_n_genes, n_genes_to_MT_perc, MT_perc_to_samples]).reset_index()
+    result.columns = ['source', 'target', 'value']
+    # add denom for these per row before normalisation
+    #result['param'] = result['target'].str.split('-').str[0]
+    #sum_df = pd.DataFrame({'param': np.unique(result['param'])})
+    #sum_df['denom'] = 0
+    #sum_df['nTrue'] = 0
+    #sum_df['nFalse'] = 0
+    #for index, r in sum_df.iterrows():
+    #    sum_df.loc[index, "denom"] = result[result['param'] == r['param']].value.sum()
+    #    sum_df.loc[index, "nTrue"] = temp[temp[r['param']] == f"{r['param']}-True"].shape[0]
+    #    sum_df.loc[index, "nFalse"] = temp[temp[r['param']] == f"{r['param']}-False"].shape[0]
+
+
+
+    #print("sum_df")
+    #print(sum_df)
+    ## Normalise
+    #for index, r in result.iterrows():
+    #    print(index)
+    #    if r['source'] in result['target'].values:
+    #            denom = sum_df[sum_df['param'] == r['param']].denom.values[0]
+    #            result.loc[index, "value"] = result.loc[index, "value"] / denom
+    #                                
+    
+    print("result")
+    print(result)
+    sankey = hv.Sankey(result, label='Retention of cells on the basis of different metrics')
+    sankey.opts(label_position='left', edge_color='target', node_color='index', cmap='tab20')
+    hv.output(fig='png')
+    hv.save(sankey, f"{qc_path}/sankey_cell_retention_across_QC.png")
 
     # 5. Apply filters to the cells before expression normalisation
     adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep'] & adata.obs['samples_keep']
