@@ -1,4 +1,12 @@
-configfile: "config.yaml"
+# Define which round of the analysis this is - will alter config and original input file
+round = 2 
+if round == 1:
+    configfile: "config.yaml" # round1
+    input0 = expand("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad", tissue=config["tissue"])
+else:
+    configfile: "config_in_lineage.yaml" # round 2
+    input0 = expand("results_round1/{tissue}/objects/adata_manual_lineage_clean.h5ad", tissue=config["tissue"])
+
 rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
@@ -15,7 +23,7 @@ def increment_memory(base_memory):
 
 rule qc_raw:
     input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad"
+        input0
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt"
@@ -57,7 +65,7 @@ rule qc_raw:
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
-        "scvi-env_reserve"
+        "scvi-env"
     shell:
         r"""
         python  bin/001-raw_QC_sm.py \
@@ -286,11 +294,11 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=300000, # All =300000
-            queue='normal',
-            mem_mb=300000,
-            mem_mib=300000,
-            disk_mb=300000,
+            mem=750000, # All =300000
+            queue='teramem',
+            mem_mb=750000,
+            mem_mib=750000,
+            disk_mb=750000,
             tmpdir="tmp",
             threads=2
         shell:
@@ -339,7 +347,7 @@ if "Manual" in config["nn_choice"]:
             nn=config["nn"]
         resources:
             mem=5000,
-            queue='normal',
+            queue='long',
             mem_mb=5000,
             mem_mib=5000,
             disk_mb=5000,
@@ -400,7 +408,7 @@ if "array" in config["nn_choice"]:
             "results/{tissue}/tables/optimum_nn.txt"
         resources:
             mem=increment_memory(20000),
-            queue='normal',
+            queue='long',
             mem_mb=increment_memory(20000),
             mem_mib=increment_memory(20000),
             disk_mb=increment_memory(20000), 
@@ -427,11 +435,11 @@ rule get_umap:
     params:
         col_by=config["col_by"]
     resources:
-        mem=increment_memory(350000), # All = 350000
-        queue='long', # All = long
-        mem_mb=increment_memory(350000),
-        mem_mib=increment_memory(350000),
-        disk_mb=increment_memory(350000), 
+        mem=increment_memory(750000), # All = 350000
+        queue='teramem', # All = long
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000), 
         tmpdir="tmp",
         threads=32 # All =32
     conda:
@@ -457,11 +465,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(350000), #All - 350000
-        queue='long',
-        mem_mb=increment_memory(350000),
-        mem_mib=increment_memory(350000),
-        disk_mb=increment_memory(350000),
+        mem=increment_memory(750000), #All - 350000
+        queue='teramem', # All = long
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -494,7 +502,7 @@ if config["optimise_run_params"]:
             optimise_res=config["keras_optimisation_res"]
         resources:
             mem=get_mem_mb,
-            queue='normal', # All = normal
+            queue='teramem', # All = normal
             mem_mb=get_mem_mb,
             mem_mib=get_mem_mb,
             disk_mb=get_mem_mb,
@@ -603,11 +611,11 @@ rule summarise_cluster_test:
     params:
         MCC_thresh=config["MCC_thresh"]
     resources:
-        mem=350000,
-        queue='normal',
-        mem_mb=350000,
-        mem_mib=350000,
-        disk_mb=350000,
+        mem=750000, # All - 350000
+        queue='teramem', # All - normal
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
         tmpdir="tmp",
         threads=1
     conda:
@@ -669,7 +677,7 @@ rule predict_all_cells:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     resources:
         mem=750000,
-        queue='normal',
+        queue='long',
         mem_mb=750000,
         mem_mib=750000,
         disk_mb=750000,
@@ -699,7 +707,7 @@ rule add_predictions_filter:
         probability_threshold=config["probability_threshold"]
     resources:
         mem=750000,
-        queue='normal',
+        queue='long',
         mem_mb=750000,
         mem_mib=750000,
         disk_mb=750000,
