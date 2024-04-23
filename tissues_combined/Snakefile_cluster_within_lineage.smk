@@ -1,0 +1,717 @@
+configfile: "config_cluster_within_lineage.yaml" # round2 config + cluster within lineage
+
+rule all:
+    input:
+        #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
+        expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
+        
+
+# Define memory increment function
+def increment_memory(base_memory):
+    def mem(wildcards, attempt):
+        return base_memory * (2 ** (attempt - 1))
+    return mem
+
+rule qc_raw:
+    input:
+        "input_cluster_within_lineage/adata_manual_lineage_clean_{tissue}.h5ad"
+    output:
+        "results/{tissue}/objects/adata_PCAd.h5ad",
+        "results/{tissue}/tables/knee.txt"
+    params:
+        discard_other_inflams=config["discard_other_inflams"], 
+        all_blood_immune=config["all_blood_immune"],
+        min_nUMI=config["min_nUMI"],
+        use_absolute_nUMI=config["use_absolute_nUMI"],
+        use_relative_mad=config["use_relative_mad"],
+        lineage_column=config["lineage_column"],
+        relative_grouping=config["relative_grouping"],
+        relative_nMAD_threshold=config["relative_nMAD_threshold"],
+        filter_sequentially=config["filter_sequentially"],
+        nMad_directionality=config["nMad_directionality"],
+        relative_nUMI_log=config["relative_nUMI_log"],
+        min_nGene=config["min_nGene"],
+        use_absolute_nGene=config["use_absolute_nGene"],
+        relative_nGene_log=config["relative_nGene_log"],
+        MT_thresh_gut=config["MT_thresh_gut"],
+        MT_thresh_blood=config["MT_thresh_blood"],
+        use_absolute_MT=config["use_absolute_MT"],
+        min_MT=config["min_MT"],
+        absolute_max_MT=config["absolute_max_MT"],
+        use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
+        min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
+        min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
+        min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
+        min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
+        use_abs_per_samp=config["use_abs_per_samp"],
+        filt_blood_keras=config["filt_blood_keras"],
+        n_variable_genes=config["n_variable_genes"],
+        remove_problem_genes=config["remove_problem_genes"]
+    resources:
+        mem=150000, # all = 150000
+        queue='normal', # all = teramem
+        mem_mb=150000,
+        mem_mib=150000,
+        disk_mb=150000,
+        tmpdir="tmp",
+        threads=8 # all = 8
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        python  bin/001-raw_QC_sm.py \
+        --input_file {input} \
+        --tissue {wildcards.tissue} \
+        --discard_other_inflams {params.discard_other_inflams} \
+        --all_blood_immune {params.all_blood_immune} \
+        --min_nUMI {params.min_nUMI} \
+        --use_absolute_nUMI {params.use_absolute_nUMI} \
+        --use_relative_mad {params.use_relative_mad} \
+        --filter_sequentially {params.filter_sequentially} \
+        --nMad_directionality {params.nMad_directionality} \
+        --lineage_column {params.lineage_column} \
+        --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
+        --relative_nUMI_log {params.relative_nUMI_log} \
+        --min_nGene {params.min_nGene} \
+        --use_absolute_nGene {params.use_absolute_nGene} \
+        --relative_nGene_log {params.relative_nGene_log} \
+        --MT_thresh_gut {params.MT_thresh_gut} \
+        --MT_thresh_blood {params.MT_thresh_blood} \
+        --use_absolute_MT {params.use_absolute_MT} \
+        --absolute_max_MT {params.absolute_max_MT} \
+        --min_MT {params.min_MT} \
+        --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
+        --min_median_nCount_per_samp_blood {params.min_median_nCount_per_samp_blood} \
+        --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
+        --min_median_nGene_per_samp_blood {params.min_median_nGene_per_samp_blood} \
+        --min_median_nGene_per_samp_gut {params.min_median_nGene_per_samp_gut} \
+        --use_abs_per_samp {params.use_abs_per_samp} \
+        --filt_blood_keras {params.filt_blood_keras} \
+        --n_variable_genes {params.n_variable_genes} \
+        --remove_problem_genes {params.remove_problem_genes}
+        """
+
+# Get the batch methods to use
+batch_methods = list(config["batch_correction_methods"])
+
+if "scVI" in batch_methods:
+    rule scVI:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scVI_matrix.npz"
+        conda:
+            "scvi-env_reserve"
+        params:
+            batch_column=config["batch_column"],
+            correct_variable_only=config["correct_variable_only"]
+        resources:
+            mem=150000, # All = 150000
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=150000,
+            mem_mib=150000,
+            disk_mb=150000,
+            tmpdir="tmp",
+            threads=8 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction scVI \
+                --batch_column {params.batch_column} \
+                --correct_variable_only {params.correct_variable_only}
+            
+            """
+
+if "scVI_default" in batch_methods:
+    rule scVI_default:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scVI_default_matrix.npz"
+        conda:
+            "scvi-env_reserve"
+        params:
+            batch_column=config["batch_column"],
+            correct_variable_only=config["correct_variable_only"]
+        resources:
+            mem=480000, # All = 150000
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=480000,
+            mem_mib=480000,
+            disk_mb=480000,
+            tmpdir="tmp",
+            threads=8 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction scVI_default \
+                --batch_column {params.batch_column} \
+                --correct_variable_only {params.correct_variable_only}
+            
+            """
+
+if "Harmony" in batch_methods:
+    rule Harmony:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/Harmony_matrix.npz"
+        conda:
+            "scvi-env_reserve"
+        params:
+            batch_column=config["batch_column"],
+            correct_variable_only=config["correct_variable_only"]
+        resources:
+            mem=150000, # All = 150000
+            queue='long', # All = long
+            mem_mb=150000,
+            mem_mib=150000,
+            disk_mb=150000,
+            tmpdir="tmp",
+            threads=8 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --batch_correction Harmony \
+                --batch_column {params.batch_column} \
+                --correct_variable_only {params.correct_variable_only}
+            """
+
+if "scANVI" in batch_methods:
+    rule scANVI:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad"
+        output:
+            "results/{tissue}/tables/batch_correction/scANVI_matrix.npz"
+        params:
+            scANVI_col=config["scANVI_annot_column"],
+            batch_column=config["batch_column"],
+            correct_variable_only=config["correct_variable_only"]
+        conda:
+            "scvi-env_reserve"
+        resources:
+            mem=150000, # All = 150000
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=150000,
+            mem_mib=150000,
+            disk_mb=150000,
+            tmpdir="tmp",
+            threads=8 # all = 8
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/batch_correction
+
+            python bin/001b-batch_correction.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --scANVI_col {params.scANVI_col} \
+                --batch_correction scANVI \
+                --batch_column {params.batch_column} \
+                --correct_variable_only {params.correct_variable_only}
+            """
+
+# Either benchmark batch correction and make a dummy file for the best result or make a dummy one of these from the choice in the config and gather anyway
+# Gather input files
+def gather_batches_within_tissue(wildcards):
+    return expand("results/{tissue}/tables/batch_correction/{batch}_matrix.npz",
+                  tissue=wildcards.tissue,
+                  batch=config["batch_correction_methods"])
+
+if config["benchmark_batch_correction"]:
+    rule batch_correction_benchmarking:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad",
+            gather_batches_within_tissue
+        output:
+            "results/{tissue}/tables/batch_correction/benchmark.csv",
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+            "results/{tissue}/objects/adata_PCAd_batched.h5ad",
+            "results/{tissue}/tables/batch_correction/var_explained_pre_post_batch.csv"
+        params:
+            methods=config["batch_correction_methods"],
+            label_integration=config["scANVI_annot_column"],
+            batch_column=config["batch_column"],
+            var_explained_cols=config["var_explained_cols"]
+        conda:
+            "scib-env_reserve"
+        resources:
+            mem=450000, # All = 350000
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=450000,
+            mem_mib=450000,
+            disk_mb=450000,
+            tmpdir="tmp",
+            threads=8 # all = 8
+        shell:
+            r"""
+            methods_combined="$(echo "{params.methods}" | sed 's/ /,/g')"
+            echo $methods_combined
+
+            python bin/001c-batch_correction_benchmarking.py \
+                --input_file {input[0]} \
+                --tissue {wildcards.tissue} \
+                --methods $methods_combined \
+                --use_label {params.label_integration} \
+                --batch_column {params.batch_column} \
+                --var_explained_cols {params.var_explained_cols}
+            """
+else:
+    def get_batch_file(wildcards):
+        return expand("results/{tissue}/tables/batch_correction/{method}_matrix.npz", 
+                    tissue=wildcards.tissue, 
+                    method=config["pref_matrix"])
+
+    rule make_dummy_best_batch_file:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad",
+            get_batch_file
+        output:
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+            "results/{tissue}/objects/adata_PCAd_batched.h5ad"
+        params:
+            method=config["pref_matrix"]
+        conda:
+            "scvi-env_reserve"
+        resources:
+            mem=300000, # All =150000
+            queue='normal',
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
+            tmpdir="tmp",
+            threads=2
+        shell:
+            r"""
+            echo X_{params.method} >> {output[0]}
+
+            python bin/001d-combine_adata_batch.py \
+                --input_file {input[0]} \
+                --tissue {wildcards.tissue} \
+                --pref_matrix {params.method}
+            """
+
+if config["use_bbknn"]:
+    rule get_nn_bbknn:
+        input:
+            "results/{tissue}/objects/adata_PCAd.h5ad",
+            "results/{tissue}/tables/knee.txt"
+        output:
+            "results/{tissue}/tables/optimum_nn_bbknn.txt"
+        params:
+            use_matrix="X_pca"
+        resources:
+            mem=increment_memory(300000),
+            queue='normal',
+            mem_mb=increment_memory(300000),
+            mem_mib=increment_memory(300000),
+            disk_mb=increment_memory(300000),
+            tmpdir="tmp",
+            threads=16
+        conda:
+            "bbknn"
+        shell:
+            r"""
+            python bin/002-bbknn.py \
+                --tissue {wildcards.tissue} \
+                --fpath {input[0]} \
+                --knee_file {input[1]} \
+                --use_matrix {params.use_matrix}
+            """
+
+if "Manual" in config["nn_choice"]:
+    rule make_dummy_nn_from_user:
+        output:
+            "results/{tissue}/tables/optimum_nn.txt"
+        params:
+            nn=config["nn"]
+        resources:
+            mem=5000,
+            queue='long',
+            mem_mb=5000,
+            mem_mib=5000,
+            disk_mb=5000,
+            tmpdir="tmp",
+            threads=1
+        conda:
+            "scvi-env_reserve"
+        shell:
+            r"""
+            echo {params.nn} > {output}
+            """
+
+if "array" in config["nn_choice"]:
+    rule nn_array:
+        input:
+            "results/{tissue}/objects/adata_PCAd_batched.h5ad",
+            "results/{tissue}/tables/knee.txt",
+            "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+        output:
+            "results/{tissue}/tables/nn_array/{nn_value}_summary.csv",
+            "results/{tissue}/tables/nn_array/adata_PCAd_batched_{nn_value}.h5ad"
+        params:
+            batch_column=config["batch_column"]
+        conda:
+            "scib-env"
+        resources:
+            mem=increment_memory(750000), # All = 350000
+            queue='normal', # All = long
+            mem_mb=increment_memory(750000),
+            mem_mib=increment_memory(750000),
+            disk_mb=increment_memory(750000), 
+            tmpdir="tmp",
+            threads=32 # All =32
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/nn_array
+
+            python bin/002b-nn_array.py \
+                --tissue {wildcards.tissue} \
+                --input_file {input[0]} \
+                --pref_matrix {input[2]} \
+                --knee_file {input[1]} \
+                --nn_val {wildcards.nn_value} \
+                --batch_column {params.batch_column}
+            """
+
+    # Group the nn values and decide best
+    def gather_nn_within_tissue(wildcards):
+        return expand("results/{tissue}/tables/nn_array/{nn_value}_summary.csv",
+                    tissue=wildcards.tissue,
+                    nn_value=config["nn_values"])
+    
+    rule summarise_nn_array:
+        input:
+            gather_nn_within_tissue
+        output:
+            "results/{tissue}/tables/nn_array/summary_nn_array.txt",
+            "results/{tissue}/tables/optimum_nn.txt"
+        resources:
+            mem=increment_memory(20000),
+            queue='long',
+            mem_mb=increment_memory(20000),
+            mem_mib=increment_memory(20000),
+            disk_mb=increment_memory(20000), 
+            tmpdir="tmp",
+            threads=2 
+        shell:
+            r"""
+            cat {input} >> {output[0]}
+
+            python bin/002c-summarise_nn_array.py \
+                --summary_file {output[0]} \
+                --tissue {wildcards.tissue}
+            """
+
+
+rule get_umap:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched.h5ad",
+        "results/{tissue}/tables/knee.txt",
+        "results/{tissue}/tables/optimum_nn.txt",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+    output:
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
+    params:
+        col_by=config["col_by"]
+    resources:
+        mem=increment_memory(300000), # All = 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(300000),
+        mem_mib=increment_memory(300000),
+        disk_mb=increment_memory(300000), 
+        tmpdir="tmp",
+        threads=32 # All =32
+    conda:
+        "scvi-env_reserve"
+    shell:
+        r"""
+        python bin/003-umap_embedding.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --knee_file {input[1]} \
+            --use_matrix {input[3]} \
+            --optimum_nn_file {input[2]} \
+            --col_by {params.col_by}
+        """
+
+# cluster the data with an array (save to individual anndata files)
+rule cluster_array:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+    output:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
+    resources:
+        mem=increment_memory(300000), #All - 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(300000),
+        mem_mib=increment_memory(300000),
+        disk_mb=increment_memory(300000),
+        tmpdir="tmp",
+        threads=16 # All 16
+    conda:
+        "single_cell"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
+        python bin/004-scanpy_cluster.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --pref_matrix {input[1]} \
+            --clustering_resolution {wildcards.clustering_resolution}
+        """
+
+
+if config["optimise_run_params"]:
+    def get_mem_mb(wildcards, attempt):
+        return attempt * 750000 # All 750000
+
+    rule run_params_optimisation:
+        input:
+            "results/{tissue}/tables/clustering_array/leiden_3.0/clusters.csv",
+            "results/{tissue}/tables/log1p_cp10k_sparse.npz",
+            "results/{tissue}/tables/genes.txt",
+            "results/{tissue}/tables/cells.txt"
+        output:
+            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt" 
+        params:
+            optimise_res=config["keras_optimisation_res"]
+        resources:
+            mem=get_mem_mb,
+            queue='normal', # All = normal
+            mem_mb=get_mem_mb,
+            mem_mib=get_mem_mb,
+            disk_mb=get_mem_mb,
+            tmpdir="tmp",
+            threads=20 # Aids parallelisation. For all , use 20 threads and 750000 memory 
+        conda:
+            "single_cell"
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
+
+            python bin/005a-scanpy_cluster_optimise_model-keras.py \
+                --tissue {wildcards.tissue} \
+                --sparse_matrix_path {input[1]} \
+                --clusters_df {input[0]} \
+                --genes_f {input[2]} \
+                --cells_f {input[3]} \
+                --number_epoch 25 \
+                --batch_size 32 \
+                --train_size_fraction 0.67 \
+                --output_file results/{wildcards.tissue}/tables/keras-grid_search/keras-
+            """
+else:
+    rule make_dummy_keras_params:
+        output:
+            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
+        resources:
+            mem=1000,
+            queue='normal',
+            mem_mb=1000,
+            mem_mib=1000,
+            disk_mb=1000,
+            tmpdir="tmp",
+            threads=1
+        conda:
+            "scvi-env_reserve"
+        params:
+            activation=config["activation"],
+            loss=config["loss"],
+            optimizer=config["optimizer"],
+            sparsity_l1__activity=config["sparsity_l1__activity"],
+            sparsity_l1__bias=config["sparsity_l1__bias"],
+            sparsity_l1__kernel=config["sparsity_l1__kernel"],
+            sparsity_l2__activity=config["sparsity_l2__activity"],
+            sparsity_l2__bias=config["sparsity_l2__bias"],
+            sparsity_l2__kernel=config["sparsity_l2__kernel"]
+        shell:
+            r"""
+            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
+
+            echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > {output}
+            """
+
+
+# Define clustering resolutions
+clustering_resolutions = list(config["clustering_resolutions"])
+
+rule test_clusters_keras:
+    input:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+        "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
+    output:
+        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
+    resources:
+        mem=increment_memory(300000), #All - 850000
+        queue='normal',
+        mem_mb=increment_memory(300000),
+        mem_mib=increment_memory(300000),
+        disk_mb=increment_memory(300000),
+        tmpdir="tmp",
+        threads=16 # All 16
+    conda:
+        "single_cell"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
+        python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
+            --h5_anndata {input[0]} \
+            --leiden_res {wildcards.clustering_resolution} \
+            --number_epoch 25 \
+            --keras_param_file {input[2]} \
+            --batch_size 32 \
+            --train_size_fraction 0.67 \
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
+        """
+
+
+## Define function to aggregate the output of the clustering array results within tissue
+def gather_within_tissue(wildcards):
+    return expand("results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz",
+                  tissue=wildcards.tissue,
+                  clustering_resolution=config["clustering_resolutions"])
+
+
+# Run the aggregation of the keras tests
+rule summarise_cluster_test:
+    input:
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+        gather_within_tissue
+    output:
+        "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
+        "results/{tissue}/tables/optim_resolution.txt",
+        "results/{tissue}/tables/markers/markers_all_optim_clusters.txt.gz"
+    params:
+        MCC_thresh=config["MCC_thresh"]
+    resources:
+        mem=300000, # All - 350000
+        queue='normal', # All - normal
+        mem_mb=300000,
+        mem_mib=300000,
+        disk_mb=300000,
+        tmpdir="tmp",
+        threads=1
+    conda:
+        "scvi-env_reserve"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
+        mkdir -p results/{wildcards.tissue}/tables/markers
+        mkdir -p results/{wildcards.tissue}/figures/markers
+        python bin/006-summarise_keras.py \
+            --tissue {wildcards.tissue} \
+            --outpath results/{wildcards.tissue}/figures/clustering_array_summary/keras_accuracy \
+            --MCC_thresh {params.MCC_thresh} \
+            --pref_matrix {input[0]}
+        """
+    
+
+rule add_celltypist:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+    output:
+        "results/{tissue}/tables/annotation/CellTypist/CellTypist_prob_matrix.csv",
+        "results/{tissue}/tables/annotation/CellTypist/CellTypist_decision_matrix.csv",
+        "results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv"
+    params:
+        model=config["celltypist_model"],
+        model_name=config["celltypist_model_name"]
+    resources:
+        mem=increment_memory(300000), #All - 850000
+        queue='normal',
+        mem_mb=increment_memory(300000),
+        mem_mib=increment_memory(300000),
+        disk_mb=increment_memory(300000),
+        tmpdir="tmp",
+        threads=16 
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/figures/annotation
+        mkdir -p results/{wildcards.tissue}/tables/annotation
+        mkdir -p results/{wildcards.tissue}/tables/annotation/CellTypist
+        
+        python bin/007-CellTypist.py \
+            --tissue {wildcards.tissue} \
+            --h5_path {input[0]} \
+            --pref_matrix {input[1]} \
+            --model {params.model} \
+            --model_name {params.model_name}
+        """
+
+rule predict_all_cells:
+    input:
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad",
+        "results/{tissue}/tables/optim_resolution.txt"
+    output:
+        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
+    singularity:
+        "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
+    resources:
+        mem=300000,
+        queue='long',
+        mem_mb=300000,
+        mem_mib=300000,
+        disk_mb=300000,
+        tmpdir="tmp",
+        threads=2
+    shell:
+        r"""
+        python bin/008-predict_all_probabilities_keras.py \
+            --tissue {wildcards.tissue} \
+            --sparse_matrix_path {input[0]} \
+            --genes_f {input[1]} \
+            --cells_f {input[2]} \
+            --genes_var_f {input[3]} \
+            --optim_resolution_f {input[4]} \
+            --output_file "results/{wildcards.tissue}/tables/annotation/keras/optimum_res_all_cells_"
+        """
+
+rule add_predictions_filter:
+    input:
+        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad",
+        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
+    output:
+        "results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad"
+    conda:
+        "scvi-env_reserve"
+    params:
+        probability_threshold=config["probability_threshold"]
+    resources:
+        mem=300000,
+        queue='long',
+        mem_mb=300000,
+        mem_mib=300000,
+        disk_mb=300000,
+        tmpdir="tmp",
+        threads=2
+    shell:
+        r"""
+        python bin/009-add_all_predictions_adata_filter.py \
+            --tissue {wildcards.tissue} \
+            --fpath {input[0]} \
+            --prediction_file {input[1]} \
+            --probability_threshold {params.probability_threshold}
+        """
