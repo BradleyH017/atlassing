@@ -1,5 +1,5 @@
 # Define which round of the analysis this is - will alter config and original input file
-round = 2 
+round = 1 
 if round == 1:
     configfile: "config.yaml" # round1
     input0 = expand("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad", tissue=config["tissue"])
@@ -116,7 +116,7 @@ if "scVI" in batch_methods:
             correct_variable_only=config["correct_variable_only"]
         resources:
             mem=300000, # All = 300000
-            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=300000,
             mem_mib=300000,
             disk_mb=300000,
@@ -148,7 +148,7 @@ if "scVI_default" in batch_methods:
             correct_variable_only=config["correct_variable_only"]
         resources:
             mem=480000, # All = 300000
-            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=480000,
             mem_mib=480000,
             disk_mb=480000,
@@ -212,7 +212,7 @@ if "scANVI" in batch_methods:
             "scvi-env_reserve"
         resources:
             mem=300000, # All = 300000
-            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=300000,
             mem_mib=300000,
             disk_mb=300000,
@@ -257,7 +257,7 @@ if config["benchmark_batch_correction"]:
             "scib-env_reserve"
         resources:
             mem=450000, # All = 350000
-            queue='gpu-normal -gpu -', # All = gpu-normal -gpu -
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=450000,
             mem_mib=450000,
             disk_mb=450000,
