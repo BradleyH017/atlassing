@@ -15,6 +15,8 @@ import glob
 import seaborn as sns
 import matplotlib.pyplot as plt
 import anndata as ad
+from sklearn.decomposition import PCA
+
 
 # Define options
 tissue="rectum"
@@ -160,7 +162,47 @@ for l in lineages:
             ax.set_xticks(bad_props[res])
             plt.savefig(f"{f}/exceeding_sample_prop_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
             plt.clf()
+            # Also plot the contribution of all samples to this cluster
+            prop_each_sample_bad_cluster = proportions[proportions[res] == bad_samp_cluster[0]]
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.bar(prop_each_sample_bad_cluster['samp_tissue'], prop_each_sample_bad_cluster['samp_tissue_proportion'], color='skyblue')
+            ax.set_xlabel('sample')
+            ax.set_ylabel('Relative contribution of each sample')
+            ax.set_title(f"Contribution of each sample to cluster {bad_samp_cluster[0]}")
+            plt.xticks(rotation=45, ha='right')
+            plt.savefig(f"{f}/potential_bad_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
+            plt.clf()
+            # Print the samples with contributions to this cluster over the cut off
+            offending_samps = ', '.join(list(prop_each_sample_bad_cluster.loc[prop_each_sample_bad_cluster["samp_tissue_proportion"] > max_proportion, "samp_tissue"].astype(str)))
+            print(f"Samples with contribution > {max_proportion} to cluster {bad_samp_cluster[0]} are {offending_samps}")
         #
+        # For the bad samples, calculate the proportion of their cells to all clusters
+        contr_cl = adata.obs.groupby('samp_tissue')[res].value_counts(normalize=True).reset_index(name="samp_tissue_contribution")
+        # Make this square
+        pivoted_df = contr_cl.pivot(index='samp_tissue', columns='leiden_0.5', values='samp_tissue_contribution').fillna(0)
+        if len(np.unique(contr_cl[res])) > 10:
+            n_components = 10
+        else:
+            n_components=2
+        #
+        pca = PCA(n_components=n_components)
+        pca_result = pca.fit_transform(pivoted_df)
+        pca_df = pd.DataFrame(data=pca_result[:,:2], columns=['PC1', 'PC2'], index=pivoted_df.index)
+        plt.figure(figsize=(10, 8))
+        plt.scatter(pca_df['PC1'], pca_df['PC2'], alpha=0.5)
+        #
+        # Highlight bad samples
+        for sample in bad_samples:
+            if sample in pca_df.index:
+                plt.scatter(pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2'], color='red', label='Bad Sample')
+                plt.annotate(sample, (pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2']))
+        #
+        plt.xlabel('Cell contribution PC 1')
+        plt.ylabel('Cell contribution PC 1')
+        plt.title('PCA of the relative contribution of each sample to each cluster')
+        plt.savefig(f"{f}/pca_cell_contributions.png", bbox_inches='tight')
+        plt.clf()
+
         # If we were to apply these filters, which clusters would we keep?
         prop_sum_filtered = prop_sum[(prop_sum['n_cells_full_dataset'] > min_ncells) & (prop_sum['samp_tissue_proportion'] < max_proportion)] # min ncells and max samp proportion
         prop_sum_filtered['all_MCC_pass'] = all(prop_sum_filtered['MCC'] > min_MCC)
@@ -199,10 +241,14 @@ blacklist_samples_combined = []
 for lst in blacklist_samples_all:
     blacklist_samples_combined.extend(lst.astype(str))
 
+print("Blacklist samples per lineage")
+print(blacklist_samples_combined)
 blacklist_samples_combined = np.unique(blacklist_samples_combined)
+print("Blacklist samples across all")
+print(blacklist_samples_combined)
 
 adata.obs.set_index("cell", inplace=True)
-adata = adata[~adata.obs['samp_tissue'].isin(bad_samples_use_res.astype(str))]
+adata = adata[~adata.obs['samp_tissue'].isin(blacklist_samples_combined.astype(str))]
 adata.obs.reset_index(inplace=True)
 
 # Extract cells and annotation
@@ -214,6 +260,9 @@ del combined_adatas
 round1_adata = sc.read_h5ad(f"results_round1/{tissue}/objects/adata_PCAd_batched_umap.h5ad")
 orig = round1_adata.shape[0]
 new = add_clusters.shape[0]
+if "cell" in round1_adata.obs.columns.values:
+    round1_adata.obs.set_index("cell", inplace=True)
+
 print(f"After cluster filtration, lose {str(orig - new)} cells")
 round1_adata = round1_adata[round1_adata.obs.index.isin(add_clusters['cell'])]
 round1_adata.obs.reset_index(inplace=True)
@@ -221,6 +270,6 @@ round1_adata.obs = round1_adata.obs.merge(add_clusters, on="cell", how="left")
 round1_adata.obs.set_index("cell", inplace=True)
 
 print(f"round1_adata final shape: {round1_adata.shape}")
-round1_adata.write_h5ad("results_round1/rectum/objects/adata_cross_lineage_refined_clusters.h5ad")
+round1_adata.write_h5ad("results_round1/rectum/objects/adata_grouped_lineage_refined_clusters.h5ad")
 
     
