@@ -19,7 +19,7 @@ from sklearn.decomposition import PCA
 
 
 # Define options
-tissue="rectum"
+tissue="all"
 lineages = ["epithelial", "immune", "mesenchymal"]
 
 # Propose cut offs
@@ -146,40 +146,42 @@ for l in lineages:
         black_list_df = black_list_df.merge(bl_samp_counts, on="samp_tissue", how="left")
         # Add this to the blacklist of samples
         black_list_samples.append(black_list_df)
-        # Make a plot showing proportion contributed to each cluster by that sample
-        for b in bad_samples:
-            bad_props = proportions[proportions['samp_tissue'] == b]
-            bad_samp_cluster = prop_sum.loc[(prop_sum['samp_tissue'] == b) & (prop_sum['samp_tissue_proportion'] > max_proportion), res].values
-            bad_props[res] = pd.to_numeric(bad_props[res])
-            bad_props = bad_props.sort_values(by=res, ascending=True)
-            ncells = black_list_df.loc[black_list_df['samp_tissue'] == b, "count"].values[0]
-            print(f"Plotting bad sample {b} / cluster {bad_samp_cluster[0]}")
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.bar(bad_props[res], bad_props['samp_tissue_proportion'], color='skyblue')
-            ax.set_xlabel(res)
-            ax.set_ylabel('Sample Tissue Proportion')
-            ax.set_title(f"Contribution of {b} (max prop cluster {bad_samp_cluster[0]}) to others (total n={ncells})")
-            ax.set_xticks(bad_props[res])
-            plt.savefig(f"{f}/exceeding_sample_prop_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
-            plt.clf()
-            # Also plot the contribution of all samples to this cluster
-            prop_each_sample_bad_cluster = proportions[proportions[res] == bad_samp_cluster[0]]
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.bar(prop_each_sample_bad_cluster['samp_tissue'], prop_each_sample_bad_cluster['samp_tissue_proportion'], color='skyblue')
-            ax.set_xlabel('sample')
-            ax.set_ylabel('Relative contribution of each sample')
-            ax.set_title(f"Contribution of each sample to cluster {bad_samp_cluster[0]}")
-            plt.xticks(rotation=45, ha='right')
-            plt.savefig(f"{f}/potential_bad_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
-            plt.clf()
-            # Print the samples with contributions to this cluster over the cut off
-            offending_samps = ', '.join(list(prop_each_sample_bad_cluster.loc[prop_each_sample_bad_cluster["samp_tissue_proportion"] > max_proportion, "samp_tissue"].astype(str)))
-            print(f"Samples with contribution > {max_proportion} to cluster {bad_samp_cluster[0]} are {offending_samps}")
+        if len(bad_samples) > 0:
+            # Make a plot showing proportion contributed to each cluster by that sample
+            for b in bad_samples:
+                bad_props = proportions[proportions['samp_tissue'] == b]
+                bad_samp_cluster = prop_sum.loc[(prop_sum['samp_tissue'] == b) & (prop_sum['samp_tissue_proportion'] > max_proportion), res].values
+                bad_props[res] = pd.to_numeric(bad_props[res])
+                bad_props = bad_props.sort_values(by=res, ascending=True)
+                ncells = black_list_df.loc[black_list_df['samp_tissue'] == b, "count"].values[0]
+                print(f"Plotting bad sample {b} / cluster {bad_samp_cluster[0]}")
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.bar(bad_props[res], bad_props['samp_tissue_proportion'], color='skyblue')
+                ax.set_xlabel(res)
+                ax.set_ylabel('Sample Tissue Proportion')
+                ax.set_title(f"Contribution of {b} (max prop cluster {bad_samp_cluster[0]}) to others (total n={ncells})")
+                ax.set_xticks(bad_props[res])
+                plt.savefig(f"{f}/exceeding_sample_prop_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
+                plt.clf()
+                # Also plot the contribution of all samples to this cluster
+                prop_each_sample_bad_cluster = proportions[proportions[res] == bad_samp_cluster[0]]
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.bar(prop_each_sample_bad_cluster['samp_tissue'], prop_each_sample_bad_cluster['samp_tissue_proportion'], color='skyblue')
+                ax.set_xlabel('sample')
+                ax.set_ylabel('Relative contribution of each sample')
+                ax.set_title(f"Contribution of each sample to cluster {bad_samp_cluster[0]}")
+                plt.xticks(rotation=45, ha='right')
+                plt.savefig(f"{f}/potential_bad_cluster_{bad_samp_cluster[0]}_{res}.png", bbox_inches='tight')
+                plt.clf()
+                # Print the samples with contributions to this cluster over the cut off
+                offending_samps = ', '.join(list(prop_each_sample_bad_cluster.loc[prop_each_sample_bad_cluster["samp_tissue_proportion"] > max_proportion, "samp_tissue"].astype(str)))
+                print(f"Samples with contribution > {max_proportion} to cluster {bad_samp_cluster[0]} are {offending_samps}")
+        #
         #
         # For the bad samples, calculate the proportion of their cells to all clusters
         contr_cl = adata.obs.groupby('samp_tissue')[res].value_counts(normalize=True).reset_index(name="samp_tissue_contribution")
         # Make this square
-        pivoted_df = contr_cl.pivot(index='samp_tissue', columns='leiden_0.5', values='samp_tissue_contribution').fillna(0)
+        pivoted_df = contr_cl.pivot(index='samp_tissue', columns=res, values='samp_tissue_contribution').fillna(0)
         if len(np.unique(contr_cl[res])) > 10:
             n_components = 10
         else:
@@ -202,7 +204,7 @@ for l in lineages:
         plt.title('PCA of the relative contribution of each sample to each cluster')
         plt.savefig(f"{f}/pca_cell_contributions.png", bbox_inches='tight')
         plt.clf()
-
+        #
         # If we were to apply these filters, which clusters would we keep?
         prop_sum_filtered = prop_sum[(prop_sum['n_cells_full_dataset'] > min_ncells) & (prop_sum['samp_tissue_proportion'] < max_proportion)] # min ncells and max samp proportion
         prop_sum_filtered['all_MCC_pass'] = all(prop_sum_filtered['MCC'] > min_MCC)
@@ -251,6 +253,35 @@ adata.obs.set_index("cell", inplace=True)
 adata = adata[~adata.obs['samp_tissue'].isin(blacklist_samples_combined.astype(str))]
 adata.obs.reset_index(inplace=True)
 
+######## May wish to manually select resolutions (and exclude samples), overiding the above #########
+overide = True
+if overide:
+    #del adata
+    manual_adatas = []
+    # Create dictionary for resolution to use
+    use_resolutions = {"epithelial": "1.0", "immune": "1.5", "mesenchymal": "1.0"}
+    clusters_remove = {"epithelial": ["24", "28", "29"], "immune": ["27", "30", "32"], "mesenchymal": ""}
+    blacklist_samples = ["scrnacdb13098576__donor_blood", "5892STDY13265991__donor_ti", "OTARscRNA13669872__donor_ti", "5892STDY11060801__donor_ti"]
+    # For each lineage, load in the adata, merge with desired clusters and subset
+    for l in lineages:
+        print(l)
+        adata = sc.read_h5ad(f"results/{tissue}_{l}/objects/adata_PCAd_batched_umap.h5ad")
+        clusters = pd.read_csv(f"results/{tissue}_{l}/tables/clustering_array/leiden_{use_resolutions[l]}/clusters.csv")
+        adata.obs.reset_index(inplace=True)
+        clusters = clusters.rename(columns={f"leiden_{use_resolutions[l]}": "leiden"})
+        adata.obs = adata.obs.merge(clusters, on="cell", how="left")
+        adata.obs.set_index("cell", inplace=True)
+        adata.obs['leiden'] = l + "_" + adata.obs['leiden']
+        manual_adatas.append(adata)
+        del adata
+    #
+    # Combine 
+    adata = ad.concat(manual_adatas)  
+    # Remove blacklist samples manually  
+    adata = adata[~adata.obs['samp_tissue'].isin(blacklist_samples)]
+    del manual_adatas
+    adata.obs.reset_index(inplace=True)
+
 # Extract cells and annotation
 add_clusters = adata.obs[['cell', 'leiden']]
 
@@ -270,6 +301,19 @@ round1_adata.obs = round1_adata.obs.merge(add_clusters, on="cell", how="left")
 round1_adata.obs.set_index("cell", inplace=True)
 
 print(f"round1_adata final shape: {round1_adata.shape}")
-round1_adata.write_h5ad("results_round1/rectum/objects/adata_grouped_lineage_refined_clusters.h5ad")
+round1_adata.obs['leiden'] = round1_adata.obs['leiden'].astype(str)
+round1_adata.write_h5ad(f"results_round1/{tissue}/objects/adata_grouped_lineage_refined_clusters.h5ad")
+
+sc.settings.figdir=f"results_round1/{tissue}/figures/UMAP"
+sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
+sc.logging.print_header()
+sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
+sc.pl.umap(round1_adata, color="leiden", save="_filtered_reproducible_clusters_all.png")
+
+# To run CellTypist after
+# mkdir -p results/all_combined_lineages/figures/annotation
+# mkdir -p results/all_combined_lineages/tables/annotation/CellTypist
+# mkdir -p results/all_combined_lineages/figures/UMAP/annotation
+#python bin/007-CellTypist.py --tissue all_combined_lineages --h5_path "results_round1/all/objects/adata_grouped_lineage_refined_clusters.h5ad" --pref_matrix round1_results/all/tables/batch_correction/best_batch_method.txt --model "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult_mar24.pkl" --model_name "Megagut_adult_lower_GI_mar24”
 
     
