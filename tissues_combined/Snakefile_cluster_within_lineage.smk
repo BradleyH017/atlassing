@@ -45,16 +45,17 @@ rule qc_raw:
         min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
         min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
         min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
+        max_ncells_per_sample=config["max_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
         remove_problem_genes=config["remove_problem_genes"]
     resources:
-        mem=150000, # all = 150000
-        queue='normal', # all = teramem
-        mem_mb=150000,
-        mem_mib=150000,
-        disk_mb=150000,
+        mem=850000, # all = 850000
+        queue='teramem', # all = teramem
+        mem_mb=850000,
+        mem_mib=850000,
+        disk_mb=850000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
@@ -87,6 +88,7 @@ rule qc_raw:
         --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
         --min_median_nGene_per_samp_blood {params.min_median_nGene_per_samp_blood} \
         --min_median_nGene_per_samp_gut {params.min_median_nGene_per_samp_gut} \
+        --max_ncells_per_sample {params.max_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
@@ -108,11 +110,11 @@ if "scVI" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=150000, # All = 150000
-            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
-            mem_mb=150000,
-            mem_mib=150000,
-            disk_mb=150000,
+            mem=250000, # All = 150000
+            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=250000,
+            mem_mib=250000,
+            disk_mb=250000,
             tmpdir="tmp",
             threads=8 # all = 8
         shell:
@@ -287,11 +289,11 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=300000, # All =150000
-            queue='normal',
-            mem_mb=300000,
-            mem_mib=300000,
-            disk_mb=300000,
+            mem=750000, # All =150000
+            queue='teramem',
+            mem_mb=750000,
+            mem_mib=750000,
+            disk_mb=750000,
             tmpdir="tmp",
             threads=2
         shell:
@@ -428,11 +430,11 @@ rule get_umap:
     params:
         col_by=config["col_by"]
     resources:
-        mem=increment_memory(300000), # All = 350000
-        queue='normal', # All = long
-        mem_mb=increment_memory(300000),
-        mem_mib=increment_memory(300000),
-        disk_mb=increment_memory(300000), 
+        mem=increment_memory(750000), # All = 350000
+        queue='teramem', # All = long
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000), 
         tmpdir="tmp",
         threads=32 # All =32
     conda:
@@ -458,11 +460,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(300000), #All - 350000
-        queue='normal', # All = long
-        mem_mb=increment_memory(300000),
-        mem_mib=increment_memory(300000),
-        disk_mb=increment_memory(300000),
+        mem=increment_memory(750000), #All - 350000
+        queue='teramem', # All = long
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -561,11 +563,11 @@ rule test_clusters_keras:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(300000), #All - 850000
-        queue='normal',
-        mem_mb=increment_memory(300000),
-        mem_mib=increment_memory(300000),
-        disk_mb=increment_memory(300000),
+        mem=increment_memory(750000), #All - 850000
+        queue='teramem',
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -604,11 +606,11 @@ rule summarise_cluster_test:
     params:
         MCC_thresh=config["MCC_thresh"]
     resources:
-        mem=300000, # All - 350000
-        queue='normal', # All - normal
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem=750000, # All - 350000
+        queue='teramem', # All - normal
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
         tmpdir="tmp",
         threads=1
     conda:
