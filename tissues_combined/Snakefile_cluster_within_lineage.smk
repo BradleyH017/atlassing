@@ -3,7 +3,8 @@ configfile: "config_cluster_within_lineage.yaml" # round2 config + cluster withi
 rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
-        expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
@@ -593,6 +594,88 @@ def gather_within_tissue(wildcards):
                   tissue=wildcards.tissue,
                   clustering_resolution=config["clustering_resolutions"])
 
+# Run the aggregation of the keras tests
+rule cluster_qc_summarise_keras:
+    input:
+        gather_within_tissue
+    output:
+        "results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad",
+    params:
+        max_proportion=config["max_proportion"],
+        min_ncells=config["min_ncells"],
+        MCC_thresh=config["MCC_thresh"],
+        filter_based_on_prev_fails=config["filter_based_on_prev_fails"],
+        consistent_failing_cluster_proportion=config["consistent_failing_cluster_proportion"],
+        num_consistent_failing_clusters=config["num_consistent_failing_clusters"],
+        use_cluster_QC=config["use_cluster_QC"]
+    conda:
+        "scvi-env"
+    resources:
+        mem=200000, # All - 350000
+        queue='normal', # All - normal
+        mem_mb=200000,
+        mem_mib=200000,
+        disk_mb=200000,
+        tmpdir="tmp",
+        threads=4
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
+        mkdir -p results/{wildcards.tissue}/figures/UMAP/annotation
+        python bin/006a-qc_clusters_keras.py \
+            --tissue {wildcards.tissue} \
+            --max_proportion {params.max_proportion} \
+            --min_ncells {params.min_ncells} \
+            --MCC_thresh {params.MCC_thresh} \
+            --filter_based_on_prev_fails {params.filter_based_on_prev_fails} \
+            --consistent_failing_cluster_proportion {params.consistent_failing_cluster_proportion} \
+            --num_consistent_failing_clusters {params.num_consistent_failing_clusters} \
+            --use_cluster_QC {params.use_cluster_QC}
+
+        """
+
+
+# Define function to aggregate these across lineages and output to a single file
+def gather_accross_tissues(wildcards):
+    return expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad",
+                  tissue=wildcards.tissue)
+
+'''
+baseout=config["all_post_lineage_qc_combined"]
+
+
+rule combine_adatas_original:
+    input:
+        gather_accross_tissues
+    output:
+        "results/{baseout}/objects/adata_clusters_post_clusterQC.h5ad"
+    conda:
+        "scvi-env"
+    params:
+        baseout=config["basout"],
+        base_tissue_original_h5=config["base_tissue_original"],
+        tissues=config["tissue"]
+    resources:
+        mem=750000, # All - 350000
+        queue='teramem', # All - normal
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
+        tmpdir="tmp",
+        threads=4
+    shell:
+        r"""
+        mkdir -p results/{params.baseout}/{figures,objects,tables}
+        mkdir -p results/{params.baseout}/figures/UMAP
+
+        python bin/006b-combine_across_lineages.py \
+            --baseout {params.baseout} \
+            --base_tissue_original_h5 {params.base_tissue_original_h5} \
+            --tissues {",".join(params.tissues)} 
+        """
+    
+    
+
 
 # Run the aggregation of the keras tests
 rule summarise_cluster_test:
@@ -717,3 +800,4 @@ rule add_predictions_filter:
             --prediction_file {input[1]} \
             --probability_threshold {params.probability_threshold}
         """
+'''
