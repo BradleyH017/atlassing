@@ -1,23 +1,18 @@
 # Decide tissue (s)
 tissue: 
-- 'all_epithelial'
-- 'all_immune'
-- 'all_mesenchymal'
-
-# Original h5
-base_tissue_original_h5: "results_round1/all/objects/adata_PCAd_batched_umap.h5ad" # Output file from the first round of analysis
+- 'combined' # This is what the pipeline will be ran on. Refers to the output of Snakefile_cluster_within_lineage-002
 
 # QC parameters
 discard_other_inflams: "yes" # Remove non CD inflammtation samples
 all_blood_immune: "yes" # Treat all the blood data as immune if using?
 min_nUMI: 500 # Minimum nUMI
 use_absolute_nUMI: "yes" # Use the min UMI cut off?
-use_relative_mad: "yes" # Use a relative MAD threshold
-lineage_column: "manual_lineage" # Which coloumn to use as lineage annotation
-relative_grouping: "manual_lineage" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
+use_relative_mad: "no" # Use a relative MAD threshold
+lineage_column: "sum_majority_lineage" # Which coloumn to use as lineage annotation
+relative_grouping: "sum_majority_lineage" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
 relative_nMAD_threshold: 2.5 # Threshold of nMad
 filter_sequentially: "no" # Define and filter the data sequentially?
-nMad_directionality: "bi" # Can be bi|uni. unidirectional medians cells only removed for nMads above or below the median. bidirectional medians cells removed for nMads exceeding threshold in either direction
+nMad_directionality: "uni" # Can be bi|uni. unidirectional medians cells only removed for nMads above or below the median. bidirectional medians cells removed for nMads exceeding threshold in either direction
 relative_nUMI_log: "yes" # Use relative nUMI
 min_nGene: 250 # Min nGene
 use_absolute_nGene: "yes" # Use min nGene
@@ -32,7 +27,7 @@ min_median_nCount_per_samp_blood: 0 # Exclude samples with median nCount lower t
 min_median_nCount_per_samp_gut: 0 # Same but gut
 min_median_nGene_per_samp_blood: 80 # Exclude samples with median nGene than this value (blood)
 min_median_nGene_per_samp_gut: 100 # Same but gut
-max_ncells_per_sample: 18000 # Maximum number of preQC cells that can originate from a single sample
+max_ncells_per_sample: 18000 # Maximum number of preQC cells that can originate from a single sample. If don't want to use these, set to ridiculously high number like 1000000
 use_abs_per_samp: "yes" # Use these absolute metrics
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
 n_variable_genes: 5000 # Number of variable genes for PCA calculation
@@ -56,11 +51,7 @@ nn_values: [15, 30, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
 nn: 30
 
 # What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
-col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript,EPCAM,KRT8,KRT18,CDH5,COL1A1,COL1A2,COL6A2,VWF,PTPRC,CD3D,CD3G,CD3E,CD79A,CD79B,CD14,FCGR3A,CD68,CD83,CSF1R,FCER1G"
-
-# Optimise run parameters?
-optimise_run_params: False
-keras_optimisation_res: 3.0 # Resolution at which keras should be optimised
+col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript,manual_lineage,EPCAM,KRT8,KRT18,CDH5,COL1A1,COL1A2,COL6A2,VWF,PTPRC,CD3D,CD3G,CD3E,CD79A,CD79B,CD14,FCGR3A,CD68,CD83,CSF1R,FCER1G"
 
 # Otherwise, what are the keras hyperparameters to use? Currently: these are from Leland and not neccessarily optimised for use on the different datasets together or independently
 # Don't use quotes around these
@@ -74,23 +65,8 @@ sparsity_l2__activity: 0.0001
 sparsity_l2__kernel: 0.01
 sparsity_l2__bias: 0.01
 
-# Clustering and validation options
-clustering_resolutions: [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over? [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
-MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
-
-# Cluster-level QC and post-clustering sample QC
-max_proportion: 0.2 # Maximum proportion of a cluster coming from a single sample? 0.2=20%
-min_ncells: 0 # Minimum number of cells contributing to a single cluster? 
-# Post sample-level filtration
-filter_based_on_prev_fails: True # Filter clusters based on whether the cells were uniquely failing in lower resolutions? 
-consistent_failing_cluster_proportion: 0.8 # Contribution of a failing cluster in a given resolution to failing clusterrs at a lower resoluton
-num_consistent_failing_clusters: 1 # Maximum number of failing clusters to query lower resolutions for?
-use_cluster_QC: True # Do we actually want to use the cluster QC? If not, will just take the max resolution for all cells passing MCC_thresh
-# Override options
-#override: False
-#use_resolutions: "" # Only used if override == True. String containing a dictionary of the resolutions to be used, must match the order and labels of "lineages" option, e.g '{"epithelial": "1.0", "immune": "1.5", "mesenchymal": "1.0"}'
-#clusters_remove: ""
-#blacklist_samples: "" # List of samples to blacklist, seperated by a ",", e.g - "sample1,sample2,sample3"
+# Original all data file
+original_input_round1: "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_all.h5ad" # Change this file to alter what the original input file was
 
 # Celltypist options:
 add_celltypist: True # Should the script run to get the celltypist megagut annotations for these cells? 

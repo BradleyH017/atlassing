@@ -1,10 +1,17 @@
-configfile: "config_cluster_within_lineage.yaml" # round2 config + cluster within lineage
+# Define which round of the analysis this is - will alter config and original input file
+round = 3 
+if round == 1:
+    configfile: "config.yaml" # round1
+    input0 = expand("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad", tissue=config["tissue"])
+else:
+    configfile: "config_re_embed_after_within_lineage.yaml" # round 3 (post within lineage cluster QC)
+    input0 = expand("results_round2/{tissue}/objects/adata_grouped_post_cluster_QC.h5ad", tissue=config["tissue"])
 
 rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
-        expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
+        expand("results/{tissue}/tables/clustering_array/leiden_optimum/base-model_report.tsv.gz", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
@@ -15,9 +22,36 @@ def increment_memory(base_memory):
         return base_memory * (2 ** (attempt - 1))
     return mem
 
+
+rule combine_final_clusters_original_adata:
+    input:
+        input0
+    output:
+        "results/{tissue}/objects/adata_raw_confident_cluster_cells_annotated.h5ad"
+    params:
+        original_input_round1=config["original_input_round1"]
+    resources:
+        mem=750000, # all = 850000
+        queue='teramem', # all = teramem
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
+        tmpdir="tmp",
+        threads=8 # all = 8
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/{{figures,objects,tables}}
+        python bin/992-combine_annot_with_raw.py \
+            --tissue {wildcards.tissue} \
+            --orig {params.original_input_round1} \
+            --filtered_clustered {input}
+        """
+
 rule qc_raw:
     input:
-        "input_cluster_within_lineage/adata_manual_lineage_clean_{tissue}.h5ad"
+        "results/{tissue}/objects/adata_raw_confident_cluster_cells_annotated.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt"
@@ -111,11 +145,11 @@ if "scVI" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=250000, # All = 150000
-            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
-            mem_mb=250000,
-            mem_mib=250000,
-            disk_mb=250000,
+            mem=480000, # All = 300000
+            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            mem_mb=480000,
+            mem_mib=480000,
+            disk_mb=480000,
             tmpdir="tmp",
             threads=8 # all = 8
         shell:
@@ -143,7 +177,7 @@ if "scVI_default" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=480000, # All = 150000
+            mem=480000, # All = 300000
             queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=480000,
             mem_mib=480000,
@@ -175,11 +209,11 @@ if "Harmony" in batch_methods:
             batch_column=config["batch_column"],
             correct_variable_only=config["correct_variable_only"]
         resources:
-            mem=150000, # All = 150000
+            mem=300000, # All = 300000
             queue='long', # All = long
-            mem_mb=150000,
-            mem_mib=150000,
-            disk_mb=150000,
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
             threads=8 # all = 8
         shell:
@@ -207,11 +241,11 @@ if "scANVI" in batch_methods:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=150000, # All = 150000
+            mem=300000, # All = 300000
             queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
-            mem_mb=150000,
-            mem_mib=150000,
-            disk_mb=150000,
+            mem_mb=300000,
+            mem_mib=300000,
+            disk_mb=300000,
             tmpdir="tmp",
             threads=8 # all = 8
         shell:
@@ -290,7 +324,7 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=750000, # All =150000
+            mem=750000, # All =300000
             queue='teramem',
             mem_mb=750000,
             mem_mib=750000,
@@ -317,11 +351,11 @@ if config["use_bbknn"]:
         params:
             use_matrix="X_pca"
         resources:
-            mem=increment_memory(300000),
-            queue='normal',
-            mem_mb=increment_memory(300000),
-            mem_mib=increment_memory(300000),
-            disk_mb=increment_memory(300000),
+            mem=increment_memory(750000),
+            queue='teramem',
+            mem_mb=increment_memory(750000),
+            mem_mib=increment_memory(750000),
+            disk_mb=increment_memory(750000),
             tmpdir="tmp",
             threads=16
         conda:
@@ -371,7 +405,7 @@ if "array" in config["nn_choice"]:
             "scib-env"
         resources:
             mem=increment_memory(750000), # All = 350000
-            queue='normal', # All = long
+            queue='teramem', # All = long
             mem_mb=increment_memory(750000),
             mem_mib=increment_memory(750000),
             disk_mb=increment_memory(750000), 
@@ -451,265 +485,68 @@ rule get_umap:
             --col_by {params.col_by}
         """
 
-# cluster the data with an array (save to individual anndata files)
-rule cluster_array:
-    input:
-        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad",
-        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+
+rule make_dummy_keras_params:
     output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
-    resources:
-        mem=increment_memory(750000), #All - 350000
-        queue='teramem', # All = long
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
-        tmpdir="tmp",
-        threads=16 # All 16
-    conda:
-        "single_cell"
-    shell:
-        r"""
-        mkdir -p results/{wildcards.tissue}/tables/clustering_array
-        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
-        python bin/004-scanpy_cluster.py \
-            --tissue {wildcards.tissue} \
-            --fpath {input[0]} \
-            --pref_matrix {input[1]} \
-            --clustering_resolution {wildcards.clustering_resolution}
-        """
-
-
-if config["optimise_run_params"]:
-    def get_mem_mb(wildcards, attempt):
-        return attempt * 750000 # All 750000
-
-    rule run_params_optimisation:
-        input:
-            "results/{tissue}/tables/clustering_array/leiden_3.0/clusters.csv",
-            "results/{tissue}/tables/log1p_cp10k_sparse.npz",
-            "results/{tissue}/tables/genes.txt",
-            "results/{tissue}/tables/cells.txt"
-        output:
-            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt" 
-        params:
-            optimise_res=config["keras_optimisation_res"]
-        resources:
-            mem=get_mem_mb,
-            queue='normal', # All = normal
-            mem_mb=get_mem_mb,
-            mem_mib=get_mem_mb,
-            disk_mb=get_mem_mb,
-            tmpdir="tmp",
-            threads=20 # Aids parallelisation. For all , use 20 threads and 750000 memory 
-        conda:
-            "single_cell"
-        shell:
-            r"""
-            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
-
-            python bin/005a-scanpy_cluster_optimise_model-keras.py \
-                --tissue {wildcards.tissue} \
-                --sparse_matrix_path {input[1]} \
-                --clusters_df {input[0]} \
-                --genes_f {input[2]} \
-                --cells_f {input[3]} \
-                --number_epoch 25 \
-                --batch_size 32 \
-                --train_size_fraction 0.67 \
-                --output_file results/{wildcards.tissue}/tables/keras-grid_search/keras-
-            """
-else:
-    rule make_dummy_keras_params:
-        output:
-            "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
-        resources:
-            mem=1000,
-            queue='normal',
-            mem_mb=1000,
-            mem_mib=1000,
-            disk_mb=1000,
-            tmpdir="tmp",
-            threads=1
-        conda:
-            "scvi-env_reserve"
-        params:
-            activation=config["activation"],
-            loss=config["loss"],
-            optimizer=config["optimizer"],
-            sparsity_l1__activity=config["sparsity_l1__activity"],
-            sparsity_l1__bias=config["sparsity_l1__bias"],
-            sparsity_l1__kernel=config["sparsity_l1__kernel"],
-            sparsity_l2__activity=config["sparsity_l2__activity"],
-            sparsity_l2__bias=config["sparsity_l2__bias"],
-            sparsity_l2__kernel=config["sparsity_l2__kernel"]
-        shell:
-            r"""
-            mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
-
-            echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > {output}
-            """
-
-
-# Define clustering resolutions
-clustering_resolutions = list(config["clustering_resolutions"])
-
-rule test_clusters_keras:
-    input:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
-        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
         "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
-    output:
-        "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(750000), #All - 850000
-        queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
-        tmpdir="tmp",
-        threads=16 # All 16
-    conda:
-        "single_cell"
-    shell:
-        r"""
-        mkdir -p results/{wildcards.tissue}/tables/clustering_array
-        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}
-        python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
-            --h5_anndata {input[0]} \
-            --leiden_res {wildcards.clustering_resolution} \
-            --number_epoch 25 \
-            --keras_param_file {input[2]} \
-            --batch_size 32 \
-            --train_size_fraction 0.67 \
-            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
-        """
-
-
-## Define function to aggregate the output of the clustering array results within tissue
-def gather_within_tissue(wildcards):
-    return expand("results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz",
-                  tissue=wildcards.tissue,
-                  clustering_resolution=config["clustering_resolutions"])
-
-# Run the aggregation of the keras tests
-rule cluster_qc_summarise_keras:
-    input:
-        gather_within_tissue
-    output:
-        "results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad",
-    params:
-        max_proportion=config["max_proportion"],
-        min_ncells=config["min_ncells"],
-        MCC_thresh=config["MCC_thresh"],
-        filter_based_on_prev_fails=config["filter_based_on_prev_fails"],
-        consistent_failing_cluster_proportion=config["consistent_failing_cluster_proportion"],
-        num_consistent_failing_clusters=config["num_consistent_failing_clusters"],
-        use_cluster_QC=config["use_cluster_QC"]
-    conda:
-        "scvi-env"
-    resources:
-        mem=200000, # All - 350000
-        queue='normal', # All - normal
-        mem_mb=200000,
-        mem_mib=200000,
-        disk_mb=200000,
-        tmpdir="tmp",
-        threads=4
-    shell:
-        r"""
-        mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
-        mkdir -p results/{wildcards.tissue}/figures/UMAP/annotation
-        python bin/006a-qc_clusters_keras.py \
-            --tissue {wildcards.tissue} \
-            --max_proportion {params.max_proportion} \
-            --min_ncells {params.min_ncells} \
-            --MCC_thresh {params.MCC_thresh} \
-            --filter_based_on_prev_fails {params.filter_based_on_prev_fails} \
-            --consistent_failing_cluster_proportion {params.consistent_failing_cluster_proportion} \
-            --num_consistent_failing_clusters {params.num_consistent_failing_clusters} \
-            --use_cluster_QC {params.use_cluster_QC}
-
-        """
-
-
-# Define function to aggregate these across lineages and output to a single file
-def gather_accross_tissues(wildcards):
-    return expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad",
-                  tissue=wildcards.tissue)
-
-'''
-baseout=config["all_post_lineage_qc_combined"]
-
-
-rule combine_adatas_original:
-    input:
-        gather_accross_tissues
-    output:
-        "results/{baseout}/objects/adata_clusters_post_clusterQC.h5ad"
-    conda:
-        "scvi-env"
-    params:
-        baseout=config["basout"],
-        base_tissue_original_h5=config["base_tissue_original"],
-        tissues=config["tissue"]
-    resources:
-        mem=750000, # All - 350000
-        queue='teramem', # All - normal
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
-        tmpdir="tmp",
-        threads=4
-    shell:
-        r"""
-        mkdir -p results/{params.baseout}/{figures,objects,tables}
-        mkdir -p results/{params.baseout}/figures/UMAP
-
-        python bin/006b-combine_across_lineages.py \
-            --baseout {params.baseout} \
-            --base_tissue_original_h5 {params.base_tissue_original_h5} \
-            --tissues {",".join(params.tissues)} 
-        """
-    
-    
-
-
-# Run the aggregation of the keras tests
-rule summarise_cluster_test:
-    input:
-        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
-        gather_within_tissue
-    output:
-        "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
-        "results/{tissue}/tables/optim_resolution.txt",
-        "results/{tissue}/tables/markers/markers_all_optim_clusters.txt.gz"
-    params:
-        MCC_thresh=config["MCC_thresh"]
-    resources:
-        mem=750000, # All - 350000
-        queue='teramem', # All - normal
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
+        mem=1000,
+        queue='normal',
+        mem_mb=1000,
+        mem_mib=1000,
+        disk_mb=1000,
         tmpdir="tmp",
         threads=1
     conda:
         "scvi-env_reserve"
+    params:
+        activation=config["activation"],
+        loss=config["loss"],
+        optimizer=config["optimizer"],
+        sparsity_l1__activity=config["sparsity_l1__activity"],
+        sparsity_l1__bias=config["sparsity_l1__bias"],
+        sparsity_l1__kernel=config["sparsity_l1__kernel"],
+        sparsity_l2__activity=config["sparsity_l2__activity"],
+        sparsity_l2__bias=config["sparsity_l2__bias"],
+        sparsity_l2__kernel=config["sparsity_l2__kernel"]
     shell:
         r"""
-        mkdir -p results/{wildcards.tissue}/figures/clustering_array_summary
-        mkdir -p results/{wildcards.tissue}/tables/markers
-        mkdir -p results/{wildcards.tissue}/figures/markers
-        python bin/006-summarise_keras.py \
-            --tissue {wildcards.tissue} \
-            --outpath results/{wildcards.tissue}/figures/clustering_array_summary/keras_accuracy \
-            --MCC_thresh {params.MCC_thresh} \
-            --pref_matrix {input[0]}
+        mkdir -p results/{wildcards.tissue}/tables/keras-grid_search
+
+        echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > {output}
         """
-    
+
+rule test_clusters_make_model:
+    input:
+        "results/{tissue}/objects/adata_PCAd_batched.h5ad", # Differs from other snakefiles
+        "results/{tissue}/tables/batch_correction/best_batch_method.txt",
+        "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
+    output:
+        "results/{tissue}/tables/clustering_array/leiden_optimum/base-model_report.tsv.gz"
+    resources:
+        mem=increment_memory(1000000), #All - 850000
+        queue='teramem',
+        mem_mb=increment_memory(1000000),
+        mem_mib=increment_memory(1000000),
+        disk_mb=increment_memory(1000000),
+        tmpdir="tmp",
+        threads=16 # All 16
+    conda:
+        "single_cell"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_optimum
+        python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
+            --h5_anndata {input[0]} \
+            --leiden_res "optimum" \
+            --number_epoch 25 \
+            --keras_param_file {input[2]} \
+            --batch_size 32 \
+            --train_size_fraction 0.67 \
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_optimum/base
+        """
+
 
 rule add_celltypist:
     input:
@@ -723,11 +560,11 @@ rule add_celltypist:
         model=config["celltypist_model"],
         model_name=config["celltypist_model_name"]
     resources:
-        mem=increment_memory(300000), #All - 850000
-        queue='normal',
-        mem_mb=increment_memory(300000),
-        mem_mib=increment_memory(300000),
-        disk_mb=increment_memory(300000),
+        mem=increment_memory(750000), #All - 850000
+        queue='teramem',
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
         threads=16 
     conda:
@@ -755,11 +592,11 @@ rule predict_all_cells:
     singularity:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     resources:
-        mem=300000,
+        mem=750000,
         queue='long',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
         tmpdir="tmp",
         threads=2
     shell:
@@ -785,11 +622,11 @@ rule add_predictions_filter:
     params:
         probability_threshold=config["probability_threshold"]
     resources:
-        mem=300000,
+        mem=750000,
         queue='long',
-        mem_mb=300000,
-        mem_mib=300000,
-        disk_mb=300000,
+        mem_mb=750000,
+        mem_mib=750000,
+        disk_mb=750000,
         tmpdir="tmp",
         threads=2
     shell:
@@ -800,4 +637,3 @@ rule add_predictions_filter:
             --prediction_file {input[1]} \
             --probability_threshold {params.probability_threshold}
         """
-'''

@@ -37,7 +37,7 @@
 # profile_name = sanger-brad2
 
 # Define some params
-config_var=config_in_lineage.yaml # Using the within lineage config (for round 2 analysis)
+config_var=config_re_embed_after_within_lineage.yaml # Using the within lineage config (for round 2 analysis)
 worfklow_prefix="multi-tissue_"
 group="team152"
 workdir=${PWD}
@@ -55,9 +55,9 @@ source activate sm7
 module load ISG/singularity/3.11.4 # farm22
 
 # Modify the name of the results directory (from the previous run) - so that we can create a new directory for this run
-if [ ! -d "results_round1" ]; then
-    mv results results_round1
-    mv sm_logs sm_logs_round1   
+if [ ! -d "results_round2" ]; then
+    mv results results_round2
+    mv sm_logs sm_logs_round2   
     mkdir -p sm_logs 
 fi
 
@@ -79,9 +79,9 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile \
+    -s Snakefile_re_embed_after_within_lineage-003.smk \
     --until all \
-    --dag | dot -Tpng > dag.png
+    --dag | dot -Tpng > dag_re_embed.png
 
 # Execute script (updating config params to use optimum model params)
 snakemake -j 50 \
@@ -97,14 +97,14 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile \
+    -s Snakefile_re_embed_after_within_lineage-003.smk \
     --until all 
 
-# NOTE: Have adjusted to run originalk model to test
+# NOTE: Have adjusted to run original model to test
 # Add the following to overwrite with optimum params
 # --config optimise_run_params=False sparsity_l1__activity=0.01 sparsity_l1__bias=0.0001 sparsity_l1__kernel=0.0001 sparsity_l2__activity=0.0001 sparsity_l2__bias=0.01 sparsity_l2__kernel=0.01 \
 
 
-# bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake_in_lineage.sh 
+# bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake_re_embed_after_within_lineage-003.sh 
 
 
