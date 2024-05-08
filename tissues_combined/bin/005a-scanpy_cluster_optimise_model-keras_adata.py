@@ -512,6 +512,14 @@ def main():
         default='',
         help='file with optimised keras params'
     )
+    
+    parser.add_argument(
+        '-cc', '--cluster_col',
+        action='store',
+        dest='cluster_col',
+        default='',
+        help='column in dataframe to used for clusters'
+    )
 
     parser.add_argument(
         '-of', '--output_file',
@@ -612,15 +620,24 @@ def main():
     # Set X to cp10k
     # adata.X = np.expm1(adata.layers['log1p_cp10k'])
     # Set X to ln(cp10k+1)
-    adata.X = adata.layers['log1p_cp10k']
+    if not "log1p_cp10k" in adata.layers.keys():
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        print("CP10K")
+        sc.pp.log1p(adata)
+        print("log1p")
+        adata.layers['log1p_cp10k'] = adata.X.copy()
+    else:
+        adata.X = adata.layers['log1p_cp10k']
+
     # Set X to raw counts
     # adata.X = adata.layers['counts']
 
     print('Calculating leiden clustering using resolution: ' +  str(options.res))
     #sc.tl.leiden(adata, resolution=options.res)
-    adata.uns['cluster'] = adata.uns['leiden']
-    adata.uns['cluster']['params']['method'] = 'leiden'
-    adata.obs['cluster'] = adata.obs['leiden']
+    #adata.uns['cluster'] = adata.uns['leiden']
+    #adata.uns['cluster']['params']['method'] = 'leiden'
+    adata.obs['cluster'] = adata.obs[options.cluster_col] # Modified to take optional cluster column
+    print(f"Clusters: {np.unique(adata.obs['cluster'])}")
 
     # Add some info from adata to dict_add
     #for key, value in adata.uns['neighbors']['params'].items():
