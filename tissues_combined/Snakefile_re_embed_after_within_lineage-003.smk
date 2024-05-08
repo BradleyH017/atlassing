@@ -9,9 +9,9 @@ else:
 
 rule all:
     input:
-        #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/0_nn_bbknn.txt", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
-        expand("results/{tissue}/tables/clustering_array/leiden_optimum/base-model_report.tsv.gz", tissue=config["tissue"])
+        expand("results/{tissue}/tables/clustering_array/leiden_0/base-model_report.tsv.gz", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
@@ -43,6 +43,7 @@ rule combine_final_clusters_original_adata:
     shell:
         r"""
         mkdir -p results/{wildcards.tissue}/{{figures,objects,tables}}
+        
         python bin/992-combine_annot_with_raw.py \
             --tissue {wildcards.tissue} \
             --orig {params.original_input_round1} \
@@ -347,7 +348,7 @@ if config["use_bbknn"]:
             "results/{tissue}/objects/adata_PCAd.h5ad",
             "results/{tissue}/tables/knee.txt"
         output:
-            "results/{tissue}/tables/optimum_nn_bbknn.txt"
+            "results/{tissue}/tables/0_nn_bbknn.txt"
         params:
             use_matrix="X_pca"
         resources:
@@ -372,7 +373,7 @@ if config["use_bbknn"]:
 if "Manual" in config["nn_choice"]:
     rule make_dummy_nn_from_user:
         output:
-            "results/{tissue}/tables/optimum_nn.txt"
+            "results/{tissue}/tables/0_nn.txt"
         params:
             nn=config["nn"]
         resources:
@@ -435,7 +436,7 @@ if "array" in config["nn_choice"]:
             gather_nn_within_tissue
         output:
             "results/{tissue}/tables/nn_array/summary_nn_array.txt",
-            "results/{tissue}/tables/optimum_nn.txt"
+            "results/{tissue}/tables/0_nn.txt"
         resources:
             mem=increment_memory(20000),
             queue='long',
@@ -458,7 +459,7 @@ rule get_umap:
     input:
         "results/{tissue}/objects/adata_PCAd_batched.h5ad",
         "results/{tissue}/tables/knee.txt",
-        "results/{tissue}/tables/optimum_nn.txt",
+        "results/{tissue}/tables/0_nn.txt",
         "results/{tissue}/tables/batch_correction/best_batch_method.txt"
     output:
         "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad"
@@ -518,11 +519,12 @@ rule make_dummy_keras_params:
 
 rule test_clusters_make_model:
     input:
-        "results/{tissue}/objects/adata_PCAd_batched.h5ad", # Differs from other snakefiles
+        "results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", # Differs from other snakefiles
         "results/{tissue}/tables/batch_correction/best_batch_method.txt",
         "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
     output:
-        "results/{tissue}/tables/clustering_array/leiden_optimum/base-model_report.tsv.gz"
+        "results/{tissue}/tables/clustering_array/leiden_0/base-model_report.tsv.gz",
+        "results/{tissue}/tables/clustering_array/leiden_0/base-.weights.h5"
     resources:
         mem=increment_memory(1000000), #All - 850000
         queue='teramem',
@@ -536,17 +538,16 @@ rule test_clusters_make_model:
     shell:
         r"""
         mkdir -p results/{wildcards.tissue}/tables/clustering_array
-        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_optimum
+        mkdir -p results/{wildcards.tissue}/tables/clustering_array/leiden_0
         python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
             --h5_anndata {input[0]} \
-            --leiden_res "optimum" \
+            --leiden_res 0 \
             --number_epoch 25 \
             --keras_param_file {input[2]} \
             --batch_size 32 \
             --train_size_fraction 0.67 \
-            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_optimum/base
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_0/base
         """
-
 
 rule add_celltypist:
     input:
@@ -583,57 +584,93 @@ rule add_celltypist:
             --model_name {params.model_name}
         """
 
-rule predict_all_cells:
-    input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad",
-        "results/{tissue}/tables/optim_resolution.txt"
-    output:
-        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
-    singularity:
-        "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
-    resources:
-        mem=750000,
-        queue='long',
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
-        tmpdir="tmp",
-        threads=2
-    shell:
-        r"""
-        python bin/008-predict_all_probabilities_keras.py \
-            --tissue {wildcards.tissue} \
-            --sparse_matrix_path {input[0]} \
-            --genes_f {input[1]} \
-            --cells_f {input[2]} \
-            --genes_var_f {input[3]} \
-            --optim_resolution_f {input[4]} \
-            --output_file "results/{wildcards.tissue}/tables/annotation/keras/optimum_res_all_cells_"
-        """
+if config["two_step_prediction"]:
+    rule predict_cells_1:
+        output:
+            "results/combined/objects/keras_annot_round1.h5ad"
+        conda:
+            "single_cell"
+        params:
+            orig_h5ad=config["original_input_round1"],
+            model=config["round1_model"],
+            weights=config["round1_model_weights"]
+        resources:
+            mem=750000,
+            queue='teramem',
+            mem_mb=750000,
+            mem_mib=750000,
+            disk_mb=750000,
+            tmpdir="tmp",
+            threads=2
+        shell:
+            r"""
+            mkdir -p results/combined/objects/keras_annot_round1
+            python bin/008-predict_all_probabilities_keras_adata.py \
+                --tissue "combined" \
+                --h5ad {params.orig_h5ad} \
+                --model {params.model} \
+                --weights {params.weights} \
+                --output_file "results/combined/objects/keras_annot_round1"
+            """
 
-rule add_predictions_filter:
-    input:
-        "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_test/adata_raw_input_{tissue}.h5ad",
-        "results/{tissue}/tables/annotation/keras/optimum_res_all_cells_all_probabilities.txt"
-    output:
-        "results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad"
-    conda:
-        "scvi-env_reserve"
-    params:
-        probability_threshold=config["probability_threshold"]
-    resources:
-        mem=750000,
-        queue='long',
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
-        tmpdir="tmp",
-        threads=2
-    shell:
-        r"""
-        python bin/009-add_all_predictions_adata_filter.py \
-            --tissue {wildcards.tissue} \
-            --fpath {input[0]} \
-            --prediction_file {input[1]} \
-            --probability_threshold {params.probability_threshold}
-        """
+    rule stream_1:
+        input:
+            "results/combined/objects/keras_annot_round1.h5ad"
+        output:
+            "results/combined/objects/keras_annot_round1_{model_subset}.h5ad"
+        conda:
+            "single_cell"
+        resources:
+            mem=750000,
+            queue='teramem',
+            mem_mb=750000,
+            mem_mib=750000,
+            disk_mb=750000,
+            tmpdir="tmp",
+            threads=2
+        shell:
+            r"""
+            # Something to modify the columns of adata.obs from the prev version, and divide by the maximum value acros given columns
+            """
+        
+    rule predict_cells_2:
+        input:
+            "results/combined/objects/keras_annot_round1_{model_subset}.h5ad",
+            "results_round2/{model_subset}/tables/optim_resolution.txt"
+        output:
+            "results/combined/objects/keras_annot_round2_{model_subset}.h5ad"
+        conda:
+            "single_cell"
+        resources:
+            mem=750000,
+            queue='teramem',
+            mem_mb=750000,
+            mem_mib=750000,
+            disk_mb=750000,
+            tmpdir="tmp",
+            threads=2
+        shell:
+            r"""
+            # Load in the optim resolution, generate path to the model and weights for this
+            # Prediction of this subset of data
+            """
+    
+    def gather_subsets(wildcards):
+    return expand("results/combined/objects/keras_annot_round2_{model_subset}.h5ad",
+                  model_subset=wildcards.model_subset)
+    
+    rule aggregate_after_rule_2:
+        input:
+            gather_subsets
+        params:
+            orig_h5ad=config["original_input_round1"]
+        output:
+            "results/combined/objects/keras_annot_not_subset.h5ad"
+        shell:
+            r"""
+            # Select the top cluster and probability from each input file
+            # Combine this metadata with the ORIGINAL adata file and subset for the cells inclusion in these
+            # Save to output file
+            """
+else:
+    # Write the single-step prediction here
