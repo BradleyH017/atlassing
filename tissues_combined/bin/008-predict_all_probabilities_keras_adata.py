@@ -752,14 +752,6 @@ def main():
             Predicts cell types of a new dataset using old labels.
             """
     )
-
-    parser.add_argument(
-        '-t', '--tissue',
-        action='store',
-        dest='tissue',
-        required=True,
-        help='tissue being ran on'
-    )
     
     parser.add_argument(
         '-h5', '--h5ad',
@@ -793,7 +785,6 @@ def main():
     )
     
     options = parser.parse_args()
-    tissue = options.tissue
     h5ad = options.h5ad
     model = options.optim_resolution_f
     weights = options.weights
@@ -801,11 +792,10 @@ def main():
     print(f"out_file_base: {out_file_base}")
 
     # For development
-    # tissue="combined"
-    #h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_all.h5ad"
-    #model="results_round2/combined/tables/lineage_model/base.h5"
-    #weights="results_round2/combined/tables/lineage_model/base-weights.tsv.gz"
-    #out_file_base="temp/base-"
+    #h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/temp/round1-epithelial.h5ad"
+    #model="results_round2/all_epithelial/tables/clustering_array/leiden_1.0/base.h5"
+    #weights="results_round2/all_epithelial/tables/clustering_array/leiden_1.0/base-weights.tsv.gz"
+    #out_file_base="temp/base_round2"
 
     # Load the anndata object
     adata = sc.read_h5ad(h5ad)
@@ -821,7 +811,7 @@ def main():
         adata.layers['log1p_cp10k'] = adata.X.copy()
     else:
         adata.X = adata.layers['log1p_cp10k']
-        
+            
     # Delete automatically added uns - UPDATE: bad idea to delete as this slot
     # is used in _highly_variable_genes_single_batch.
     # del adata.uns['log1p']
@@ -830,8 +820,8 @@ def main():
     # adata.uns['log1p_cpm'] = {'transformation': 'ln(CPM+1)'}
     adata.uns['log1p_cp10k'] = {'transformation': 'ln(CP10k+1)'}
 
-            
-            
+                
+                
     # We assume anndata.var.index corresponds to ensembl gene ids
     if 'ensembl_gene_id' not in adata.var:
         warnings.warn(
@@ -882,12 +872,14 @@ def main():
     # the keras model
     if sp.sparse.issparse(X):
         X = X.todense()
+
     # Subset and expand X to use the same genes as the input model. If
     # the gene is missing, then it will be assumed to have 0 counts.
     all_same = np.array_equal(
         adata.var.index,
         df_weights['ensembl_gene_id'].values
     )
+
     if not all_same:
         df_X = pd.DataFrame(X)
         df_X.index = adata.obs.index
@@ -971,6 +963,7 @@ def main():
     adata.obs.reset_index(inplace=True)
     df_prediction_classes.reset_index(inplace=True)
     adata.obs = adata.obs.merge(df_prediction_classes, on="cell", how="left")
+    adata.obs.set_index("cell", inplace=True)
     adata.write_h5ad(f"{out_file_base}.h5ad")
 
 
