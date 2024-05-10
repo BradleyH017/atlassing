@@ -6,7 +6,8 @@ rule all:
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
         #"results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
-        "results/combined/tables/annotation/CellTypist/CellTypist_prob_matrix.csv"
+        "results/combined/objects/adata_grouped_post_cluster_QC.h5ad", "results/combined/tables/lineage_model/base-model_report.tsv.gz"
+        #"results/combined/tables/annotation/CellTypist/CellTypist_prob_matrix.csv"
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
@@ -585,6 +586,7 @@ rule test_clusters_keras:
             --number_epoch 25 \
             --keras_param_file {input[2]} \
             --batch_size 32 \
+            --cluster_col "leiden" \
             --train_size_fraction 0.67 \
             --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
         """
@@ -677,9 +679,48 @@ rule combine_adatas_original:
             --base_tissue_original_h5 {params.base_tissue_original_h5} \
             --tissues "{params.concatenated_values}"
         """
+            
+rule make_lineage_prediction_model:
+    output:
+        "results/combined/tables/lineage_model/base-model_report.tsv.gz",
+    params:
+        combined_file=config["combined_file"],
+        activation=config["activation"],
+        loss=config["loss"],
+        optimizer=config["optimizer"],
+        sparsity_l1__activity=config["sparsity_l1__activity"],
+        sparsity_l1__bias=config["sparsity_l1__bias"],
+        sparsity_l1__kernel=config["sparsity_l1__kernel"],
+        sparsity_l2__activity=config["sparsity_l2__activity"],
+        sparsity_l2__bias=config["sparsity_l2__bias"],
+        sparsity_l2__kernel=config["sparsity_l2__kernel"]
+    resources:
+        mem=1000000,
+        queue='teramem',
+        mem_mb=1000000,
+        mem_mib=1000000,
+        disk_mb=1000000,
+        tmpdir="tmp",
+        threads=4
+    conda:
+        "single_cell"
+    shell:
+        r"""
+        path="results/combined/tables/keras-grid_search"
+        mkdir -p ${{path}}
 
-
-
+        echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > ${{path}}/keras-use_params.txt
+            
+        python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
+            --h5_anndata {params.combined_file} \
+            --leiden_res 0 \
+            --number_epoch 25 \
+            --keras_param_file ${{path}}/keras-use_params.txt \
+            --batch_size 32 \
+            --cluster_col "manual_lineage" \
+            --train_size_fraction 0.67 \
+            --output_file results/combined/tables/lineage_model/base
+        """
 
 '''
 rule add_celltypist:
