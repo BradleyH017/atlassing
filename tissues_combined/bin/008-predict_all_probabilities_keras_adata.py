@@ -786,19 +786,20 @@ def main():
     
     options = parser.parse_args()
     h5ad = options.h5ad
-    model = options.optim_resolution_f
+    model = options.model
     weights = options.weights
     out_file_base = options.output_file
     print(f"out_file_base: {out_file_base}")
 
     # For development
-    #h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/temp/round1-epithelial.h5ad"
-    #model="results_round2/all_epithelial/tables/clustering_array/leiden_1.0/base.h5"
-    #weights="results_round2/all_epithelial/tables/clustering_array/leiden_1.0/base-weights.tsv.gz"
-    #out_file_base="temp/base_round2"
+    #h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/temp/round1-immune.h5ad"
+    #model="results_round2/all_immune/tables/clustering_array/leiden_1.25/base.h5"
+    #weights="results_round2/all_immune/tables/clustering_array/leiden_1.25/base-weights.tsv.gz"
+    #out_file_base="temp/base_round2-immune"
 
     # Load the anndata object
     adata = sc.read_h5ad(h5ad)
+    print(f"Shape of adata: {adata.shape}")
     if "cell" in adata.obs.columns:
         adata.obs.set_index("cell", inplace=True)
 
