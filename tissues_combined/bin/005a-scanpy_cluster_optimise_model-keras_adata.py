@@ -531,6 +531,15 @@ def main():
             (default: keras_model-<params>)'
     )
     
+    parser.add_argument(
+        '-fh5', '--full_h5',
+        action='store',
+        dest='full_h5',
+        default='',
+        required=False,
+        help='h5ad file with full expression. Optional'
+    )
+    
     # BH testing
     # h5="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/alternative_results/bi_nmads_results/rectum/objects/adata_PCAd_batched_umap_clustered.h5ad"
     # keras_param_file = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/results/all/tables/keras-grid_search/keras-use_params.txt"
@@ -665,7 +674,16 @@ def main():
         ))
 
     # Set X and y
-    X = adata.X
+    if hasattr(options, 'full_h5'):
+        # Get the X from the full expression matrix
+        full = sc.read_h5ad(options.full_h5)
+        full.X = full.layers['log1p_cp10k']
+        X = full.X
+        del full
+    else:
+        # Get the genes from only the HVG subset
+        X = adata.X
+    
     y = adata.obs['cluster'].values
 
     # Set other variables
@@ -982,23 +1000,24 @@ def main():
         #add the MCC to the UMAP and plot this
         # Add
         fig_out = options.h5.split("/adata_")[0]
-        print(f"UMAP outdir is {fig_out}")
-        sc.settings.figdir=fig_out
-        sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
-        sc.logging.print_header()
-        sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
-        model_cp = model_report.copy()
-        model_cp.reset_index(inplace=True)
-        model_cp["leiden"] = model_cp['index']
-        mcc_add = model_cp[["leiden", "MCC"]]
-        mcc_add['reproducible'] = "no"
-        mcc_add.loc[mcc_add['MCC'].astype(float) > 0.75, 'reproducible'] = "yes"
-        adata.obs.reset_index("cell", inplace=True)
-        adata.obs = adata.obs.merge(mcc_add, on="leiden", how="left")
-        adata.obs.set_index("cell", inplace=True)
-        sc.pl.umap(adata, color = "MCC", save=f"_MCC.png")
-        print("Saved umap for MCC")
-        sc.pl.umap(adata, color = "reproducible", save=f"_MCC_gt_0pt75.png")
+        if "X_umap" in adata.obsm:
+            print(f"UMAP outdir is {fig_out}")
+            sc.settings.figdir=fig_out
+            sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
+            sc.logging.print_header()
+            sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
+            model_cp = model_report.copy()
+            model_cp.reset_index(inplace=True)
+            model_cp[options.cluster_col] = model_cp['index']
+            mcc_add = model_cp[[options.cluster_col, "MCC"]]
+            mcc_add['reproducible'] = "no"
+            mcc_add.loc[mcc_add['MCC'].astype(float) > 0.75, 'reproducible'] = "yes"
+            adata.obs.reset_index("cell", inplace=True)
+            adata.obs = adata.obs.merge(mcc_add, on=options.cluster_col, how="left")
+            adata.obs.set_index("cell", inplace=True)
+            sc.pl.umap(adata, color = "MCC", save=f"_MCC.png")
+            print("Saved umap for MCC")
+            sc.pl.umap(adata, color = "reproducible", save=f"_MCC_gt_0pt75.png")
 
         # Save the test results - each row is a cell and the columns are the
         # prob of that cell belonging to a particular class.
