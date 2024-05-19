@@ -918,55 +918,59 @@ def main():
         with_mean=True,
         with_std=True
     )
-    X_std = scaler.fit_transform(X)
+    if X.shape[0] > 0:
+        X_std = scaler.fit_transform(X)
 
-    # Celltype probabilities ##################################################
-    # Predict the labels of each cell using the model
-    prediction_classes = model.predict(X_std)
-    # NOTE: model.predict_proba same as model.predict
-    # prediction_classes_proba = model.predict_proba(X_std)
+        # Celltype probabilities ##################################################
+        # Predict the labels of each cell using the model
+        prediction_classes = model.predict(X_std)
+        # NOTE: model.predict_proba same as model.predict
+        # prediction_classes_proba = model.predict_proba(X_std)
 
-    # Make a dataframe of the cell id and their prediction matrix
-    df_prediction_classes = pd.DataFrame(prediction_classes)
-    df_prediction_classes.index = adata.obs.index
-    # NOTE: the mappings of predictions cols follow the df_weights order,
-    # THESE NUMBERS DO NOT NECISSARILY CORRESPOND TO CLUSTERS
-    df_prediction_classes.columns = [
-        'celltype__{}'.format(i) for i in df_weights.columns[1:]
-    ]
+        # Make a dataframe of the cell id and their prediction matrix
+        df_prediction_classes = pd.DataFrame(prediction_classes)
+        df_prediction_classes.index = adata.obs.index
+        # NOTE: the mappings of predictions cols follow the df_weights order,
+        # THESE NUMBERS DO NOT NECISSARILY CORRESPOND TO CLUSTERS
+        df_prediction_classes.columns = [
+            'celltype__{}'.format(i) for i in df_weights.columns[1:]
+        ]
 
-    # Clean up the final names
-    df_prediction_classes.columns = [
-        'probability__{}'.format(i) for i in df_prediction_classes.columns
-    ]
+        # Clean up the final names
+        df_prediction_classes.columns = [
+            'probability__{}'.format(i) for i in df_prediction_classes.columns
+        ]
 
-    # Annotate the top hit
-    df_top_prediction = pd.DataFrame({
-            'predicted_celltype': df_prediction_classes.idxmax(axis=1),
-            'predicted_celltype_probability': df_prediction_classes.max(axis=1)
-        })
+        # Annotate the top hit
+        df_top_prediction = pd.DataFrame({
+                'predicted_celltype': df_prediction_classes.idxmax(axis=1),
+                'predicted_celltype_probability': df_prediction_classes.max(axis=1)
+            })
 
-    df_top_prediction['predicted_celltype'] = df_top_prediction[
-        'predicted_celltype'
-    ].str.replace('probability__', '')
+        df_top_prediction['predicted_celltype'] = df_top_prediction[
+            'predicted_celltype'
+        ].str.replace('probability__', '')
 
-    df_prediction_classes = df_prediction_classes.merge(df_top_prediction, left_index=True, right_index=True)
+        df_prediction_classes = df_prediction_classes.merge(df_top_prediction, left_index=True, right_index=True)
 
-    # Save the h5ad of these results
-    import os
-    directory_path = os.path.dirname(out_file_base)
-    print(f"out_file_base: {out_file_base}")
-    print(f"directory_path: {directory_path}")
-    if os.path.exists(directory_path) == False:
-        os.mkdir(directory_path)
+        # Save the h5ad of these results
+        import os
+        directory_path = os.path.dirname(out_file_base)
+        print(f"out_file_base: {out_file_base}")
+        print(f"directory_path: {directory_path}")
+        if os.path.exists(directory_path) == False:
+            os.mkdir(directory_path)
 
-    # MERGE THIS WITH THE H5AD
-    adata.obs.reset_index(inplace=True)
-    df_prediction_classes.reset_index(inplace=True)
-    adata.obs = adata.obs.merge(df_prediction_classes, on="cell", how="left")
-    adata.obs.set_index("cell", inplace=True)
+        # MERGE THIS WITH THE H5AD
+        adata.obs.reset_index(inplace=True)
+        df_prediction_classes.reset_index(inplace=True)
+        adata.obs = adata.obs.merge(df_prediction_classes, on="cell", how="left")
+        adata.obs.set_index("cell", inplace=True)
+    else:
+        adata.obs['predicted_celltype'] = np.nan
+        adata.obs['predicted_celltype_probability'] = np.nan
+
     adata.write_h5ad(f"{out_file_base}.h5ad")
-
 
 if __name__ == '__main__':
     main()
