@@ -47,7 +47,7 @@ def parse_options():
             required=True,
             help=''
         )
-    
+        
     parser.add_argument(
         '-of', '--output_file',
         action='store',
@@ -67,7 +67,7 @@ def main():
     
     # Testing
     # orig_h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_all.h5ad"
-    # highQC_h5ad="results/combined/objects/adata_PCAd_batched_umap.h5ad"
+    # highQC_h5ad="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/results_round3/combined/objects/adata_PCAd_batched_umap.h5ad"
     # round2_output="temp/base_round2-"
     
     
@@ -79,29 +79,36 @@ def main():
     cell_annots = []
     for f in fpaths:
         print(f"Working on {f}")
-        temp = sc.read_h5ad(f)
+        temp = sc.read_h5ad(f, backed="r")
         temp.obs.reset_index(inplace=True)
         temp = temp.obs[want_cols]
         group = f.replace(f"{round2_output}", "")
         group = group.replace(".h5ad", "")
+        group = group.split("_")[1]
         temp['predicted_celltype'] = temp['predicted_celltype'].apply(lambda x: x.replace('celltype_', group))
+        print(temp.head())
         cell_annots.append(temp)
         del temp
     
     # Combine
     annots = pd.concat(cell_annots)
+    #annots['predicted_celltype'] = annots['predicted_celltype'].apply(lambda x: x.split('_', 1)[1])
+    print(f"Shape of annots is: {annots.shape}")
     
     # Now load the high QC set
-    hqc = sc.read_h5ad(highQC_h5ad)
+    hqc = sc.read_h5ad(highQC_h5ad, backed="r")
+    print(f"Shape of High QC data is: {hqc.shape}")
     
     # Subset the annots for the annotations that are kept in the highQC set
     annots = annots[annots['predicted_celltype'].isin(hqc.obs['leiden'])]
+    print(f"Number of annotated cells post intersection with high QC clusters is {annots.shape[0]}")
     
     # Delete the high QC set to save mem
     del hqc
     
     # Load the original h5ad
-    adata = sc.read_h5ad(orig_h5ad)
+    adata = sc.read_h5ad(orig_h5ad, backed="r")
+    print(f"Shape of orig h5ad is: {adata.shape}")
     
     # Subset for cells in annotated
     if "cell" not in adata.obs.columns:
@@ -116,4 +123,8 @@ def main():
     adata.obs.set_index("cell", inplace=True)
     adata.write_h5ad(f"{output_file}.h5ad")
         
-        
+
+
+# Execute
+if __name__ == '__main__':
+    main()
