@@ -103,8 +103,45 @@ adata.obs.reset_index(inplace=True)
 adata.obs = adata.obs.merge(keras[["cell", "label__machine", "category__machine", "sum_Immune", "sum_Epithelial", "sum_Mesenchymal", "sum_majority_lineage"]], on="cell", how="left")
 adata.obs.set_index("cell", inplace=True)
 
+# Merge with Lucis tissue swap info
+ts = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/lucia_analysis/tissue_swaps/data/metadata_predictions_cr7_Rasa_final_2024.05.17.csv", index_col=0)
+ts_to_add = ts[["sanger_sample_id", "biopsy_type_final"]]
+adata.obs.rename(columns={"tissue": "original_tissue"}, inplace=True)
+ts_to_add.rename(columns={"biopsy_type_final": "tissue"}, inplace=True)
+adata.obs.reset_index(inplace=True)
+adata.obs = adata.obs.merge(ts_to_add, on="sanger_sample_id", how="left")                      
+adata.obs['tissue'] = adata.obs['tissue'].replace('r', 'rectum') # Replace 'r' with rectum 
+adata.obs['tissue'] = adata.obs['tissue'].replace('ti', 'TI') # Replace ti with TI
+adata.obs.set_index("cell", inplace=True)
+adata = adata[adata.obs['tissue'].notna()] # Drop those we are not sure of (leads to a loss of ~300k)
+
+# Append tissue x disease:
+adata.obs['tissue_disease'] = adata.obs['tissue'].astype('str') + "_" + adata.obs['disease_status'].astype('str')
+
+# Keep only blood_cd, rectum_healthy, TI_healthy, TI_cd
+adata = adata[adata.obs['tissue_disease'].isin(["blood_cd", "rectum_healthy", "TI_healthy", "TI_cd"])]
+
+
+# Remove pilots also 
+adata = adata[~adata.obs['sanger_sample_id'].str.contains('Pilot', na=False)]
+
 # The final shape of the data:
 print(f"The final shape of the data is: {adata.shape}")
+
+# Print initial summary of data:
+tissues = np.unique(adata.obs['tissue'])
+temp = adata.obs
+for t in tissues:
+     tempt = temp[temp['tissue'] == t]
+     print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
+     cd = tempt[tempt['disease_status'] == "cd"]
+     print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
+     print(f"From a total of {len(np.unique(tempt['patient_id']))} individuals")
+
+
+print(f"The final number of individuals is: {len(np.unique(adata.obs['patient_id']))}")
+
+
 
 # Finally save
 adata.write(f"{outdir}/adata_raw_input_all.h5ad")
