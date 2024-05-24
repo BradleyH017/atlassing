@@ -938,6 +938,7 @@ def main():
 
     depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
     depth_count["log10_Median_nCounts"] = np.log10(np.array(depth_count["Median_nCounts"].values, dtype = "float"))
+    depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration.csv")
 
     # Plot
     plt.figure(figsize=(8, 6))
