@@ -357,7 +357,7 @@ def main():
     filter_sequentially = inherited_options.filter_sequentially
     nMad_directionality = inherited_options.nMad_directionality
     plot_within = inherited_options.plot_within
-    plot_within==plot_within.split(",")
+    plot_within=plot_within.split(",")
     lineage_column = inherited_options.lineage_column
     relative_grouping = inherited_options.relative_grouping
     relative_grouping = relative_grouping.split(",")
@@ -605,6 +605,32 @@ def main():
         #    for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
         #        this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['total_counts_keep'] == True)]['total_counts'])
         #        print(f"{l}: {this_thresh}")
+        
+        # Plot this results across all cells
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        data = np.log10(adata.obs.total_counts)
+        if nMad_directionality == "uni":
+            cutoff = max(adata.obs['log10_total_counts'][adata.obs['total_counts_keep'] == True])
+            print(f"The minimum threshold for total_counts is: {cutoff}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', alpha = 0.5)
+        else:
+            cutoff_low = min(adata.obs['log10_total_counts'][adata.obs['total_counts_keep'] == True])
+            cutoff_high = max(adata.obs['log10_total_counts'][adata.obs['total_counts_keep'] == True])
+            print(f"The window for total counts is: {cutoff_low} - {cutoff_high}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
+            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
+            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
+
+        plt.legend()
+        plt.xlabel('log10(nUMI)')
+        plt.axvline(x = np.log10(min_nUMI), color = 'black', linestyle = '--', alpha = 0.5,  label=f"absolute: {min_nUMI}")
+        plt.title(f"Absolute cut off (black): {min_nUMI}")
+        plt.savefig(f"{qc_path}/raw_nUMI_nmad_thresholded_{tissue}.png", bbox_inches='tight')
+        plt.clf()
+        
+        
 
     # If filtering sequentially:
     if filter_sequentially == "yes":
@@ -700,6 +726,30 @@ def main():
         #    for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
         #        this_thresh = min(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['n_genes_by_counts_keep'] == True)]['n_genes_by_counts'])
         #        print(f"{l}: {this_thresh}")        
+        
+        # Plot this results across all cells
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        data = np.log10(adata.obs.n_genes_by_counts)
+        if nMad_directionality == "uni":
+            cutoff = max(adata.obs['log10_n_genes_by_counts'][adata.obs['n_genes_by_counts_keep'] == True])
+            print(f"The minimum threshold for total_counts is: {cutoff}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', alpha = 0.5)
+        else:
+            cutoff_low = min(adata.obs['log10_n_genes_by_counts'][adata.obs['n_genes_by_counts_keep'] == True])
+            cutoff_high = max(adata.obs['log10_n_genes_by_counts'][adata.obs['n_genes_by_counts_keep'] == True])
+            print(f"The window for nGenes is: {cutoff_low} - {cutoff_high}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
+            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
+            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
+
+        plt.legend()
+        plt.xlabel('log10(nGenes)')
+        plt.axvline(x = np.log10(min_nGene), color = 'black', linestyle = '--', alpha = 0.5,  label=f"absolute: {min_nGene}")
+        plt.title(f"Absolute cut off (black): {min_nGene}")
+        plt.savefig(f"{qc_path}/raw_nGenes_nmad_thresholded_{tissue}.png", bbox_inches='tight')
+        plt.clf()
 
     # If filtering sequentially:
     if filter_sequentially == "yes":
@@ -808,6 +858,30 @@ def main():
         #    for l in np.unique(adata.obs[adata.obs['tissue'] == t][lineage_column]):
         #        this_thresh = max(adata.obs[(adata.obs['tissue'] == t) & (adata.obs[lineage_column] == l) & (adata.obs['MT_perc_keep'] == True)]['pct_counts_gene_group__mito_transcript'])
         #        print(f"{l}: {this_thresh}")
+        
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        data = adata.obs.pct_counts_gene_group__mito_transcript
+        if nMad_directionality == "uni":
+            cutoff = max(adata.obs['pct_counts_gene_group__mito_transcript'][adata.obs['MT_perc_keep'] == True])
+            print(f"The minimum threshold for total_counts is: {cutoff}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {cutoff:.2f}')
+            plt.axvline(x = cutoff, linestyle = '--', alpha = 0.5)
+        else:
+            cutoff_low = min(adata.obs['pct_counts_gene_group__mito_transcript'][adata.obs['MT_perc_keep'] == True])
+            cutoff_high = max(adata.obs['pct_counts_gene_group__mito_transcript'][adata.obs['MT_perc_keep'] == True])
+            print(f"The window for pct_counts_gene_group__mito_transcript is: {cutoff_low} - {cutoff_high}")
+            sns.distplot(data, hist=False, rug=True, label=f'(relative): {cutoff_low:.2f}-{cutoff_high:.2f}')
+            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
+            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
+
+        plt.legend()
+        plt.xlabel('pct_counts_gene_group__mito_transcript')
+        plt.axvline(x = MTgut, color = 'green', linestyle = '--', alpha = 0.5,  label=f"absolute gut: {MTgut}")
+        plt.axvline(x = MTgut, color = 'red', linestyle = '--', alpha = 0.5,  label=f"absolute blood: {MTblood}")
+        plt.title(f"Absolute cut off (black): {min_nGene}")
+        plt.savefig(f"{qc_path}/raw_pct_counts_gene_group__mito_transcript_nmad_thresholded_{tissue}.png", bbox_inches='tight')
+        plt.clf()
 
     # If filtering sequentially:
     if filter_sequentially == "yes":
