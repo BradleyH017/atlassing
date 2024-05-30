@@ -253,6 +253,26 @@ def main():
         res = cl.columns[1]
         print(res)
         adata.obs = adata.obs.merge(cl, on="cell", how="left")
+
+        # Plot QC metrics per cluster at this resolution
+        annots = pd.unique(adata.obs[res])
+        annots = np.sort(annots.astype(int)).astype(str)
+        qc_cols = ['log10_total_counts', 'total_counts_nMAD', 'log10_n_genes_by_counts', 'n_genes_by_counts_nMAD', 'MT_perc_nMads', 'pct_counts_gene_group__mito_transcript']
+        for qc in qc_cols:
+            print(f"Plotting {qc} per cluster")
+            plt.figure(figsize=(8, 6))
+            fig,ax = plt.subplots(figsize=(8,6))
+            for a in annots:
+                data = adata.obs[adata.obs[res] == float(a)]
+                data = data[qc]
+                sns.distplot(data, hist=False, rug=True, label=a)
+            
+            plt.legend()
+            plt.xlabel(qc)
+            plt.title(f"Distribution of {qc} - {res}")
+            plt.savefig(f"{f}/{qc}_per_cluster.png", bbox_inches='tight')
+            plt.clf()
+
         mcc = pd.read_csv(f"{f}/base-model_report.tsv.gz", compression="gzip", sep = "\t")
         mcc = mcc[mcc['is_cluster'] == True]
         resolution = res.strip("leiden_")
@@ -262,6 +282,28 @@ def main():
         else:
             mcc_all = pd.concat([mcc_all,mcc], ignore_index=True)
         #
+        # Also plot distribution coloured by cluster / MCC > thresh
+        annots = pd.unique(adata.obs[res])
+        annots = np.sort(annots.astype(int)).astype(str)
+        passing = mcc['cell_label'][mcc['MCC'] > MCC_thresh].values
+        for qc in qc_cols:
+            print(f"Plotting {qc} per cluster - MCC aware")
+            plt.figure(figsize=(8, 6))
+            fig,ax = plt.subplots(figsize=(8,6))
+            for a in annots:
+                data = adata.obs[adata.obs[res] == float(a)]
+                data = data[qc]
+                if a in passing:
+                    sns.distplot(data, hist=False, rug=True, label=f"{a} (MCC > {MCC_thresh})", kde_kws={'color': 'orange'})
+                else:
+                    sns.distplot(data, hist=False, rug=True, label=a)
+            
+            plt.legend()
+            plt.xlabel(qc)
+            plt.title(f"Distribution of {qc} - {res}: MCC")
+            plt.savefig(f"{f}/{qc}_per_cluster_mcc.png", bbox_inches='tight')
+            plt.clf()
+        
         #mcc_all.append(mcc)
         mcc[res] = mcc['cell_label']
         #to_add = mcc[['MCC', "n_cells_full_dataset", res]]
@@ -407,6 +449,8 @@ def main():
         pca_df = pd.DataFrame(data=pca_result[:,:2], columns=['PC1', 'PC2'], index=pivoted_df.index)
         plt.figure(figsize=(10, 8))
         plt.scatter(pca_df['PC1'], pca_df['PC2'], alpha=0.5)
+        # Save
+        pca_df.to_csv(f"{f}/pca_cell_contributions_full_df.csv")
         #
         # Highlight bad samples
         for sample in bad_samples:
@@ -545,9 +589,12 @@ def main():
     # Save a list of the blacklist samples if doing the QC
     if use_cluster_QC:
         black_list_samples_df = pd.concat(black_list_samples)
-        black_list_samples_use_res = black_list_samples_df[black_list_samples_df['res'] == use_res]
+        print(black_list_samples_df)
+        black_list_samples_use_res = black_list_samples_df[black_list_samples_df['res'].astype(str) == f"leiden_{use_res}"]
         if black_list_samples_use_res.shape[0] > 0:
-            black_list_samples_use_res.to_csv("results/{tissue}/figures/clustering_array_summary/black_list_samples_postQC.csv")
+            print("Saving blacklist samples")
+            print(black_list_samples_use_res)
+            black_list_samples_use_res.to_csv(f"results/{tissue}/figures/clustering_array_summary/black_list_samples_postQC.csv")
         
     
 
