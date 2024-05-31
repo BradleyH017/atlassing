@@ -393,35 +393,35 @@ def main():
     per_samp_relative_threshold = inherited_options.per_samp_relative_threshold
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
-    print(f"input_file: {input_file}")
-    print(f"discard_other_inflams:{discard_other_inflams}")
-    print(f"all_blood_immune:{all_blood_immune}")
-    print(f"min_nUMI:{min_nUMI}")
-    print(f"use_absolute_nUMI:{use_absolute_nUMI}")
-    print(f"relative_grouping:{relative_grouping}")
-    print(f"relative_nMAD_threshold:{relative_nMAD_threshold}")
+    print(f"input_file={input_file}")
+    print(f"discard_other_inflams={discard_other_inflams}")
+    print(f"all_blood_immune={all_blood_immune}")
+    print(f"min_nUMI={min_nUMI}")
+    print(f"use_absolute_nUMI={use_absolute_nUMI}")
+    print(f"relative_grouping={relative_grouping}")
+    print(f"relative_nMAD_threshold={relative_nMAD_threshold}")
     print(f"filter_sequentially: {filter_sequentially}")
     print(f"nMad_directionality: {nMad_directionality}")
     print(f"plot_within: {plot_within}")
-    print(f"relative_nUMI_log:{relative_nUMI_log}")
-    print(f"min_nGene:{min_nGene}")
-    print(f"use_absolute_nGene:{use_absolute_nGene}")
-    print(f"relative_nGene_log:{relative_nGene_log}")
-    print(f"MTgut:{MTgut}")
-    print(f"MTblood:{MTblood}")
-    print(f"use_absolute_MT:{use_absolute_MT}")
-    print(f"absolute_max_MT:{absolute_max_MT}")
+    print(f"relative_nUMI_log={relative_nUMI_log}")
+    print(f"min_nGene={min_nGene}")
+    print(f"use_absolute_nGene={use_absolute_nGene}")
+    print(f"relative_nGene_log={relative_nGene_log}")
+    print(f"MTgut={MTgut}")
+    print(f"MTblood={MTblood}")
+    print(f"use_absolute_MT={use_absolute_MT}")
+    print(f"absolute_max_MT={absolute_max_MT}")
     print(f"use_MT_thresh_blood_gut_immune: {use_MT_thresh_blood_gut_immune}")
-    print(f"min_median_nCount_per_samp_blood:{min_median_nCount_per_samp_blood}")
-    print(f"min_median_nCount_per_samp_gut:{min_median_nCount_per_samp_gut}")
-    print(f"min_median_nGene_per_samp_blood:{min_median_nGene_per_samp_blood}")
-    print(f"min_median_nGene_per_samp_gut:{min_median_nGene_per_samp_gut}")
+    print(f"min_median_nCount_per_samp_blood={min_median_nCount_per_samp_blood}")
+    print(f"min_median_nCount_per_samp_gut={min_median_nCount_per_samp_gut}")
+    print(f"min_median_nGene_per_samp_blood={min_median_nGene_per_samp_blood}")
+    print(f"min_median_nGene_per_samp_gut={min_median_nGene_per_samp_gut}")
     print(f"max_ncells_per_sample: {max_ncells_per_sample}")
-    print(f"use_abs_per_samp:{use_abs_per_samp}")
-    print(f"filt_blood_keras:{filt_blood_keras}")
-    print(f"n_variable_genes:{n_variable_genes}")
-    print(f"remove_problem_genes:{remove_problem_genes}")
-    print(f"per_samp_relative_threshold: {per_samp_relative_threshold}")
+    print(f"use_abs_per_samp={use_abs_per_samp}")
+    print(f"filt_blood_keras={filt_blood_keras}")
+    print(f"n_variable_genes={n_variable_genes}")
+    print(f"remove_problem_genes={remove_problem_genes}")
+    print(f"per_samp_relative_threshold={per_samp_relative_threshold}")
     print("Parsed args")
     
     # Finally, derive and print the tissue arguments
@@ -1083,7 +1083,93 @@ def main():
     samples_keep = depth_count[depth_count['nCells'] < max_ncells_per_sample].index
     adata = adata[adata.obs['samp_tissue'].isin(samples_keep)]
     # TO DO: Write this into the sankey plot below
+    
+    # If per-samp relative threshold, compute and filter
+    if per_samp_relative_threshold == "yes":
+        print("Filtering on the basis of relative sample thresholds")
+        # NOTE: This will overwrite the per-sample absolute cut off defined above
+        # Calculate
+        depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
+        depth_count["log10_Median_nCounts"] = np.log10(np.array(depth_count["Median_nCounts"].values, dtype = "float"))
+        depth_count["log10_Median_nGene_by_counts"] = np.log10(np.array(depth_count['Median_nGene_by_counts'].values, dtype="float"))
+        depth_count["log10_nCells"] = np.log10(np.array(depth_count['nCells'].values, dtype="float"))
+        cols = ["log10_nCells", "log10_Median_nCounts", "log10_Median_nGene_by_counts"]
+        print(f"columns in depth_count: {depth_count.columns}")
         
+        # Calculate nMad and what would be kept
+        for c in cols:
+            print(c)
+            depth_count[f"nMad_{c}"] = nmad_append(depth_count, c)
+            depth_count[f'keep_nMad_{c}'] = np.abs(depth_count[f"nMad_{c}"]) < relative_nMAD_threshold
+            depth_count[f'keep_nMad_{c}'] = depth_count[f'keep_nMad_{c}'].astype(str)
+        
+        # Plot
+        for c in cols:
+            print(c)
+            data = depth_count[c]
+            depth_count[f'keep_nMad_{c}'] = np.abs(depth_count[f"nMad_{c}"]) < relative_nMAD_threshold
+            absolute_diff = np.abs(data - np.median(data))
+            mad = np.median(absolute_diff)
+            cutoff_low = np.median(data) - (float(relative_nMAD_threshold) * mad)
+            cutoff_high = np.median(data) + (float(relative_nMAD_threshold) * mad)
+            if "log" in c:
+                sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
+            else:
+                sns.distplot(data, hist=False, rug=True, label=f'(relative): {cutoff_low:.2f}-{cutoff_high:.2f}')
+            
+            plt.xlabel(f"Sample-level: {c}")
+            plt.legend()
+            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
+            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
+            total_cells = sum(depth_count['nCells'])
+            total_samps = depth_count.shape[0]
+            subset = depth_count[depth_count[f'keep_nMad_{c}']]
+            nkeep_cells = sum(subset['nCells'])
+            nkeep_samples = subset.shape[0]
+            plt.title(f"Loss of {100*((total_cells - nkeep_cells)/total_cells):.2f}% cells, {100*((total_samps - nkeep_samples)/total_samps):.2f}% samples")
+            plt.savefig(f"{qc_path}/{c}_distribution.png", bbox_inches='tight')
+            plt.clf()
+            
+            # Also plot per tissue of origin
+            plt.figure(figsize=(8, 6))
+            tissues = np.unique(adata.obs['tissue'])
+            for t in tissues:
+                samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
+                sns.distplot(data[depth_count.index.isin(samps)], hist=False, rug=True, label=f'{t}')
+            
+            plt.xlabel(f"Sample-level: {c}")
+            plt.legend()
+            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
+            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
+            total_cells = sum(depth_count['nCells'])
+            total_samps = depth_count.shape[0]
+            subset = depth_count[depth_count[f'keep_nMad_{c}']]
+            nkeep_cells = sum(subset['nCells'])
+            nkeep_samples = subset.shape[0]
+            if "log" in c:
+                plt.title(f"Threshold {10**cutoff_low:.2f}-{10**cutoff_high:.2f} - Loss of {100*((total_cells - nkeep_cells)/total_cells):.2f}% cells, {100*((total_samps - nkeep_samples)/total_samps):.2f}% samples")
+            else:
+                plt.title(f"Threshold {cutoff_low:.2f}-{cutoff_high:.2f} - Loss of {100*((total_cells - nkeep_cells)/total_cells):.2f}% cells, {100*((total_samps - nkeep_samples)/total_samps):.2f}% samples")
+            
+            plt.savefig(f"{qc_path}/{c}_distribution_per_tissue.png", bbox_inches='tight')
+            plt.clf()
+        
+        # Filter
+        depth_count.reset_index(inplace=True)
+        depth_count.rename(columns={"index": "samp_tissue", "n_genes_by_counts": "mean_n_genes_by_counts"}, inplace=True)
+        
+        adata.obs.reset_index(inplace=True)
+        adata.obs = adata.obs.merge(depth_count, how="left", on="samp_tissue")
+        adata.obs.set_index("cell", inplace=True)
+        adata.obs['samples_keep'] = adata.obs['keep_nMad_log10_nCells'] & adata.obs['keep_nMad_log10_Median_nCounts'] & adata.obs['keep_nMad_log10_Median_nGene_by_counts']
+        print(f"Shape before per-samp filter: {adata.shape}")
+        adata = adata[adata.obs['samples_keep'] == True ]
+        print(f"Shape after per-samp filter: {adata.shape}")
+        columns_to_convert = [col for col in adata.obs.columns if col in depth_count.columns and col != 'High_cell_sample' and col != "samp_tissue"]
+        print(columns_to_convert)
+        # Convert these columns to float in the first DataFrame
+        adata.obs[columns_to_convert] = adata.obs[columns_to_convert].astype(float)
+    
     # Plot sankey
     temp = adata.obs[["total_counts_keep", "n_genes_by_counts_keep","MT_perc_keep", "samples_keep"]]
     for col in temp.columns:
@@ -1134,69 +1220,6 @@ def main():
     sankey.opts(label_position='left', edge_color='target', node_color='index', cmap='tab20')
     hv.output(fig='png')
     hv.save(sankey, f"{qc_path}/sankey_cell_retention_across_QC.png")
-
-    # If per-samp relative threshold, compute and filter
-    if per_samp_relative_threshold == "yes":
-        print("Filtering on the basis of relative sample thresholds")
-        # Calculate
-        depth_count["log10_Mean_Counts"] = np.log10(np.array(depth_count["Mean_nCounts"].values, dtype = "float"))
-        depth_count["log10_Median_nCounts"] = np.log10(np.array(depth_count["Median_nCounts"].values, dtype = "float"))
-        depth_count["log10_Median_nGene_by_counts"] = np.log10(np.array(depth_count['Median_nGene_by_counts'].values, dtype="float"))
-        depth_count["log10_nCells"] = np.log10(np.array(depth_count['nCells'].values, dtype="float"))
-        cols = ["log10_nCells", "log10_Median_nCounts", "log10_Median_nGene_by_counts"]
-        print(f"columns in depth_count: {depth_count.columns}")
-        
-        # Calculate nMad and what would be kept
-        for c in cols:
-            print(c)
-            depth_count[f"nMad_{c}"] = nmad_append(depth_count, c)
-            depth_count[f'keep_nMad_{c}'] = np.abs(depth_count[f"nMad_{c}"]) < relative_nMAD_threshold
-            depth_count[f'keep_nMad_{c}'] = depth_count[f'keep_nMad_{c}'].astype(str)
-        
-        # Plot
-        for c in cols:
-            print(c)
-            data = depth_count[c]
-            depth_count[f'keep_nMad_{c}'] = np.abs(depth_count[f"nMad_{c}"]) < relative_nMAD_threshold
-            absolute_diff = np.abs(data - np.median(data))
-            mad = np.median(absolute_diff)
-            cutoff_low = np.median(data) - (float(relative_nMAD_threshold) * mad)
-            cutoff_high = np.median(data) + (float(relative_nMAD_threshold) * mad)
-            if "log" in c:
-                sns.distplot(data, hist=False, rug=True, label=f'(relative): {10**cutoff_low:.2f}-{10**cutoff_high:.2f}')
-            else:
-                sns.distplot(data, hist=False, rug=True, label=f'(relative): {cutoff_low:.2f}-{cutoff_high:.2f}')
-            
-            plt.xlabel(f"Sample-level: {c}")
-            plt.legend()
-            plt.axvline(x = cutoff_low, linestyle = '--', alpha = 0.5)
-            plt.axvline(x = cutoff_high, linestyle = '--', alpha = 0.5)
-            total_cells = sum(depth_count['nCells'])
-            total_samps = depth_count.shape[0]
-            subset = depth_count[depth_count[f'keep_nMad_{c}']]
-            nkeep_cells = sum(subset['nCells'])
-            nkeep_samples = subset.shape[0]
-            plt.title(f"Loss of {100*((total_cells - nkeep_cells)/total_cells):.2f}% cells, {100*((total_samps - nkeep_samples)/total_samps):.2f}% samples")
-            plt.savefig(f"{qc_path}/{c}_distribution.png", bbox_inches='tight')
-            plt.clf()
-        
-        # Filter
-        depth_count.reset_index(inplace=True)
-        depth_count.rename(columns={"index": "samp_tissue", "n_genes_by_counts": "mean_n_genes_by_counts"}, inplace=True)
-        
-        adata.obs.reset_index(inplace=True)
-        adata.obs = adata.obs.merge(depth_count, how="left", on="samp_tissue")
-        adata.obs.set_index("cell", inplace=True)
-        adata.obs['keep_high_QC_sample'] = adata.obs['keep_nMad_log10_nCells'] & adata.obs['keep_nMad_log10_Median_nCounts'] & adata.obs['keep_nMad_log10_Median_nGene_by_counts']
-        print(f"Shape before per-samp filter: {adata.shape}")
-        adata = adata[adata.obs['keep_high_QC_sample'] == True ]
-        print(f"Shape after per-samp filter: {adata.shape}")
-        columns_to_convert = [col for col in adata.obs.columns if col in depth_count.columns and col != 'High_cell_sample' and col != "samp_tissue"]
-        print(columns_to_convert)
-        # Convert these columns to float in the first DataFrame
-        adata.obs[columns_to_convert] = adata.obs[columns_to_convert].astype(float)
-        # TO DO: Write this step to be incorporated into the sankey. Could just move it to above the sankey plotting
-
             
 
     # 5. Apply filters to the cells before expression normalisation
