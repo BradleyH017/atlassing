@@ -46,6 +46,7 @@ from pytorch_lightning import Trainer
 import argparse
 import scipy as sp
 import holoviews as hv
+from sklearn.decomposition import PCA
 hv.extension('matplotlib')
 print("Loaded libraries")
 
@@ -566,6 +567,20 @@ def main():
     # plot a distribution of nUMI per tissue
     adata.obs['total_counts'] = adata.obs['total_counts'].astype(int)
     tissues = np.unique(adata.obs['tissue'])
+    
+    # Plot
+    plt.figure(figsize=(8, 6))
+    fig,ax = plt.subplots(figsize=(8,6))
+    for t in tissues:
+        data = np.log10(adata.obs[adata.obs.tissue == t].total_counts)
+        sns.distplot(data, hist=False, rug=True, label=t)
+
+    plt.legend()
+    plt.xlabel('log10(total counts)')
+    plt.axvline(x = np.log10(min_nUMI), linestyle = '--', alpha = 0.5)
+    plt.savefig(qc_path + '/raw_total_counts_per_tissue.png', bbox_inches='tight')
+    plt.clf()
+    
     if "None" not in plot_within:
         cats = np.unique(adata.obs['category__machine'].astype(str))
         lins = np.unique(adata.obs[lineage_column])
@@ -944,16 +959,20 @@ def main():
     #adata = adata[adata.obs['pct_counts_gene_group__mito_transcript'] > min_MT]        
     #print(f"Number of cells with MT > min_MT = {adata.shape[0]}")
     
+    # Extract list of high and low cell number samples
+    adata.obs['samp_tissue'] = adata.obs['sanger_sample_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
+    samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
+    cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
+    high_samps = np.unique(cells_sample.loc[cells_sample.Ncells > max_ncells_per_sample, "sample"])
+    low_samps = np.array(cells_sample.loc[cells_sample.Ncells < min_ncells_per_sample, "sample"])
+    
     # If filtering sequentially, filter cells at this point BEFORE the filtering of samples
     if filt_cells_pre_samples == "yes": 
         adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep']
         adata = adata[adata.obs['keep_high_QC'] == True ]
     
-    
     # 4. Remove samples with outlying sequencing depth
-    adata.obs['samp_tissue'] = adata.obs['experiment_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
     samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
-    cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
     plt.figure(figsize=(8, 6))
     fig,ax = plt.subplots(figsize=(8,6))
     sns.distplot(cells_sample.Ncells)
@@ -974,9 +993,6 @@ def main():
         plt.savefig(f"{qc_path}/sample_cells_per_sample_{t}.png", bbox_inches='tight')
         plt.clf()
 
-    # Have a look at those cells with high number of cells within each tissue
-    high_samps = np.array(cells_sample.loc[cells_sample.Ncells > max_ncells_per_sample, "sample"])
-    low_samps = np.array(cells_sample.loc[cells_sample.Ncells < min_ncells_per_sample, "sample"])
     # Summarise
     depth_count = pd.DataFrame(index = np.unique(adata.obs.samp_tissue), columns=["Mean_nCounts", "nCells", "High_cell_sample", "n_genes_by_counts", "Median_nCounts", "Median_nGene_by_counts", "Median_MT"])
     for s in range(0, depth_count.shape[0]):
@@ -1041,7 +1057,7 @@ def main():
             samps = adata.obs[adata.obs['disease_tissue'] == t]['samp_tissue']
             data = depth_count[depth_count.index.isin(samps)][c]
             sns.distplot(data, hist=False, rug=True, label=t)
-    
+        #
         plt.legend()
         plt.xlabel(f'{c}/sample')
         plt.savefig(f"{qc_path}/sample_dist_{c}_tissue_disease.png", bbox_inches='tight')
@@ -1093,13 +1109,15 @@ def main():
         plt.xlabel('nCells')
         plt.ylabel('Median genes detected / cell')
         if t == "blood":
-            plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - nCells, min_median_nGene: {min_median_nGene_per_samp_blood}")
+            plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene > {min_median_nGene_per_samp_blood}")
         else:
-            plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+            plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
             plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - nCells, min_median_nGene: {min_median_nGene_per_samp_gut}")
+            plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene >  {min_median_nGene_per_samp_gut}")
         
         plt.savefig(f"{qc_path}/sample_ncells_median_ngenes_{t}.png", bbox_inches='tight')
         plt.clf()
@@ -1187,14 +1205,73 @@ def main():
             plt.title(f"Loss of {100*((total_cells - nkeep_cells)/total_cells):.2f}% cells, {100*((total_samps - nkeep_samples)/total_samps):.2f}% samples")
             plt.savefig(f"{qc_path}/sample_dist_{c}_distribution_thresholded.png", bbox_inches='tight')
             plt.clf()
-    
+            
         # Apply the thresholds
-        new_column_names = ['keep_nMad_' + col for col in cols_sample_relative_filter]
-        boolean_series = depth_count[new_column_names].all(axis=1)
+        filt_column_names = ['keep_nMad_' + col for col in cols_sample_relative_filter]
+        for c in filt_column_names:
+            print(f"Booleanising {c}")
+            depth_count[c] = depth_count[c] == "True" # Make sure they are boolean
+        
+        boolean_series = depth_count[filt_column_names].all(axis=1)
         depth_count['samples_keep'] = boolean_series
-        depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration.csv")
+            
+    # Have a look at samples that would be lost vs the rest based on the absolute min median nGene filter
+    for t in td: 
+        print(t)
+        temp = depth_count[depth_count['disease_tissue'] == t]
+        # Make stacked bar of the keras annotations
+        if "blood" in t:
+            exclude = temp[temp['Median_nGene_by_counts'] < min_median_nGene_per_samp_blood].index.values
+        else:
+            exclude = temp[temp['Median_nGene_by_counts'] < min_median_nGene_per_samp_gut].index.values
+        
+        proportion_df = adata.obs.groupby(['samp_tissue', 'category__machine']).size().reset_index(name='count')
+        proportion_df = proportion_df[proportion_df['samp_tissue'].isin(temp.index.values)]
+        proportion_df['proportion'] = proportion_df.groupby('samp_tissue')['count'].transform(lambda x: x / x.sum())
+        pivot_df = proportion_df.pivot(index='samp_tissue', columns='category__machine', values='proportion').fillna(0)
+        colors = sns.color_palette("husl", len(pivot_df.columns))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        excluded_df = pivot_df.loc[exclude]
+        remaining_df = pivot_df.drop(exclude)
+        remaining_df = remaining_df.sample(n=50, random_state=17)
+        combined_df = pd.concat([excluded_df, pd.DataFrame([np.nan] * len(pivot_df.columns)).T, remaining_df])
+        combined_df.index = list(exclude) + [''] + list(remaining_df.index)
+        bottom = np.zeros(len(combined_df))
+        for idx, category in enumerate(pivot_df.columns):
+            ax.bar(combined_df.index, combined_df[category], bottom=bottom, color=colors[idx], label=category)
+            bottom += combined_df[category].fillna(0).values
+        #
+        ax.legend(title='Category__Machine', bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.set_title('Relative Proportions of Category__Machine by Samp_Tissue')
+        ax.set_xlabel('Samp_Tissue')
+        ax.set_ylabel('Proportion')
+        ax.set_xticks([])
+        plt.title(f"{t} : Left = excluded, Right = 50 non-excluded samples")
+        plt.savefig(f"{qc_path}/category_proportions_across_{t}_samples_absolute_min_nGene.png", bbox_inches='tight')
+        plt.clf()
+        # Also make a PCA and colour by whether the samples are in the excluded set or not
+        pca = PCA(n_components=2)
+        pca_result = pca.fit_transform(pivot_df)
+        pca_df = pd.DataFrame(data=pca_result[:,:2], columns=['PC1', 'PC2'], index=pivot_df.index)
+        plt.figure(figsize=(10, 8))
+        plt.scatter(pca_df['PC1'], pca_df['PC2'], alpha=0.5)
+        # Save
+        pca_df.to_csv(f"{tabpath}/pca_cell_contributions_{t}.csv")
+        #
+        # Highlight bad samples
+        for sample in exclude:
+            if sample in pca_df.index:
+                plt.scatter(pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2'], color='red', label='Maybe bad Sample')
+                plt.annotate(sample, (pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2']))
+        #
+        plt.xlabel('Cell contribution PC 1')
+        plt.ylabel('Cell contribution PC 1')
+        plt.title(f'{t} - PCA of category__machine proportions')
+        plt.savefig(f"{qc_path}/pca_cell_contributions_{t}_absolute_min_nGene.png", bbox_inches='tight')
+        plt.clf()        
         
     if use_abs_per_samp == "yes":
+        # Min median nGene
         blood_keep = (depth_count['Median_nCounts'] > min_median_nCount_per_samp_blood) & (depth_count['Median_nGene_by_counts'] > min_median_nGene_per_samp_blood)
         blood_keep = blood_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] == "blood"]['samp_tissue'])
         blood_keep = blood_keep[blood_keep == True].index
@@ -1202,25 +1279,35 @@ def main():
         gut_keep = gut_keep & depth_count.index.isin(adata.obs[adata.obs['tissue'] != "blood"]['samp_tissue'])
         gut_keep = gut_keep[gut_keep == True].index
         both_keep = list(np.concatenate([blood_keep, gut_keep]))
-        adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
-        lost = depth_count.shape[0]-len(both_keep)
-        print(f"The number of samples beng lost using absolute per-samp thresholds is {lost}")  
+        if "samples_keep" not in depth_count.columns:
+            adata.obs['samples_keep'] = adata.obs['samp_tissue'].isin(both_keep)
+        else:
+            blood_condition = ['blood' in s for s in depth_count['disease_tissue']]
+            gut_condition = ['blood' not in s for s in depth_count['disease_tissue']]
+            depth_count.loc[blood_condition & (depth_count['Median_nGene_by_counts'] < min_median_nGene_per_samp_blood), 'samples_keep'] = False
+            depth_count.loc[gut_condition & (depth_count['Median_nGene_by_counts'] < min_median_nGene_per_samp_gut), 'samples_keep'] = False
+    
+        # nCells
+        depth_count.loc[(depth_count['nCells'] < min_ncells_per_sample) | (depth_count['nCells'] > max_ncells_per_sample), 'samples_keep'] = False
+        lost = depth_count.shape[0]-(sum(depth_count['samples_keep']))
+        print(f"The number of samples beng lost is {lost}")  
         
-        # Filter
-        depth_count.reset_index(inplace=True)
-        depth_count.rename(columns={"index": "samp_tissue", "n_genes_by_counts": "mean_n_genes_by_counts"}, inplace=True)
+    
         
-        adata.obs.reset_index(inplace=True)
-        adata.obs = adata.obs.merge(depth_count, how="left", on="samp_tissue")
-        adata.obs.set_index("cell", inplace=True)
-        adata.obs['samples_keep'] = adata.obs['keep_nMad_log10_nCells'] & adata.obs['keep_nMad_log10_Median_nCounts'] & adata.obs['keep_nMad_log10_Median_nGene_by_counts']
-        print(f"Shape before per-samp filter: {adata.shape}")
-        adata = adata[adata.obs['samples_keep'] == True ]
-        print(f"Shape after per-samp filter: {adata.shape}")
-        columns_to_convert = [col for col in adata.obs.columns if col in depth_count.columns and col != 'High_cell_sample' and col != "samp_tissue"]
-        print(columns_to_convert)
-        # Convert these columns to float in the first DataFrame
-        adata.obs[columns_to_convert] = adata.obs[columns_to_convert].astype(float)
+    # Alter cols
+    depth_count.reset_index(inplace=True)
+    depth_count.rename(columns={"index": "samp_tissue", "n_genes_by_counts": "mean_n_genes_by_counts"}, inplace=True)
+    # Save
+    depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration.csv", index=False)
+    
+    # bind to anndata
+    adata.obs.reset_index(inplace=True)
+    adata.obs = adata.obs.merge(depth_count, how="left", on="samp_tissue")
+    adata.obs.set_index("cell", inplace=True)
+    columns_to_convert = [col for col in adata.obs.columns if col in depth_count.columns and col != 'High_cell_sample' and col != "samp_tissue" and col != "samples_keep"]
+    print(columns_to_convert)
+    # Convert these columns to float in the first DataFrame
+    adata.obs[columns_to_convert] = adata.obs[columns_to_convert].astype(float)
     
     # Plot sankey
     temp = adata.obs[["total_counts_keep", "n_genes_by_counts_keep","MT_perc_keep", "samples_keep"]]
@@ -1277,7 +1364,7 @@ def main():
     keep_samps = depth_count[(depth_count['nCells'] > min_ncells_per_sample) & (depth_count['nCells'] < max_ncells_per_sample)].index
     adata = adata[adata.obs['samp_tissue'].isin(keep_samps)]
 
-    # 5. Apply filters to the cells before expression normalisation
+    # 5. Apply remaining filters to the cells/samples before expression normalisation
     adata.obs['keep_high_QC'] = adata.obs['total_counts_keep'] & adata.obs['n_genes_by_counts_keep'] & adata.obs['MT_perc_keep'] & adata.obs['samples_keep']
     adata = adata[adata.obs['keep_high_QC'] == True ]
 
