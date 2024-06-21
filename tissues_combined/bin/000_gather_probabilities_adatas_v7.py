@@ -20,7 +20,8 @@ outdir="/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis
 adatas = []
 for t in tissues:
     print(t)
-    fpath = glob.glob(f"{dir}/*{t}*")[0]
+    fpath = glob.glob(f"{dir}/*{t}_verify_annot.h5ad")[0]
+    print(fpath)
     temp = sc.read_h5ad(fpath)
     print(temp.shape)
     temp.obs['tissue'] = t
@@ -41,24 +42,31 @@ del adatas
 # Add convoluted samplename for merge later
 adata.obs['sanger_sample_id'] = adata.obs['Exp']
 
-# Merge with the gut metadata sheet 
-meta = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_v7/gut_metadata.txt", sep="\t")
-meta = meta.dropna(subset=['sanger_sample_id'])
-want = ["sanger_sample_id", "sex", "age", "disease_status", "Post_QC_Genotyping_ID", "inflammation_status", "patient_id"]
+# Save an original, combined adata object
+adata.write_h5ad(f"{outdir}/adata_raw_all_tissues.h5ad")
+
+# Subset for the high QC set of cells we are going to use for the atlas
+# To see how this has been derived, have a look at https://github.com/andersonlab/select_samples_atlas/
+# This includes filtration for; i) Age (inclusive between 18 and 70), ii) No pilots, iii) No frozen samples, iv) Confident tissue swap annotation, v) Confident sex prediction, vi) Post genotype swaps, vii) samples with 500-18k cells and min median nGene > 500
+# For this purpose, the option mode = "atlas_brad"
+mode="atlas_brad"
+meta = pd.read_csv(f"/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/input_v7/samples_select_{mode}.tsv", sep = "\t")
+want = ["sanger_sample_id", "Genotyping_ID", "sex", "age", "disease_status", "inflammation_status", "patient_id", "ethnicity", "biopsy_type"]
 adata.obs.reset_index(inplace=True)
 adata.obs.rename(columns={"index": "cell"}, inplace=True)
+adata = adata[adata.obs['sanger_sample_id'].isin(meta['sanger_sample_id'])]
+adata.shape[0] #3,148,167
 adata.obs = adata.obs.merge(meta[want], on="sanger_sample_id", how="left")
 adata.obs.set_index("cell", inplace=True)
 
 # Add tissue to row (cell) and samp
+adata.obs = adata.obs.drop(columns=['tissue']) # remove old tissue
+adata.obs = adata.obs.rename(columns={"biopsy_type": "tissue"})# Rename the new tissue
 adata.obs.reset_index(inplace=True)
 adata.obs['cell'] = adata.obs['cell'] + "_" + adata.obs['tissue']
 adata.obs.set_index("cell", inplace=True)
 adata.obs['samp_tissue'] = adata.obs['sanger_sample_id'] + "_" + adata.obs['tissue']
-# NOTE: This is currently pre-swap (CHECK THIS WITH LUCIA ONCE SHE IS DONE)
 
-# Make sure there are not individuals aged 70 or more
-adata = adata[adata.obs['age'] < 70]
 
 # Add lineage annotation from the original keras model in the metadata
 keras = adata.obs.filter(like='Keras:probability__')
@@ -103,27 +111,10 @@ adata.obs.reset_index(inplace=True)
 adata.obs = adata.obs.merge(keras[["cell", "label__machine", "category__machine", "sum_Immune", "sum_Epithelial", "sum_Mesenchymal", "sum_majority_lineage"]], on="cell", how="left")
 adata.obs.set_index("cell", inplace=True)
 
-# Merge with Lucis tissue swap info
-ts = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/lucia_analysis/tissue_swaps/data/metadata_predictions_cr7_Rasa_final_2024.05.17.csv", index_col=0)
-ts_to_add = ts[["sanger_sample_id", "biopsy_type_final"]]
-adata.obs.rename(columns={"tissue": "original_tissue"}, inplace=True)
-ts_to_add.rename(columns={"biopsy_type_final": "tissue"}, inplace=True)
-adata.obs.reset_index(inplace=True)
-adata.obs = adata.obs.merge(ts_to_add, on="sanger_sample_id", how="left")                      
-adata.obs['tissue'] = adata.obs['tissue'].replace('r', 'rectum') # Replace 'r' with rectum 
-adata.obs['tissue'] = adata.obs['tissue'].replace('ti', 'TI') # Replace ti with TI
-adata.obs.set_index("cell", inplace=True)
-adata = adata[adata.obs['tissue'].notna()] # Drop those we are not sure of (leads to a loss of ~300k)
-
 # Append tissue x disease:
 adata.obs['tissue_disease'] = adata.obs['tissue'].astype('str') + "_" + adata.obs['disease_status'].astype('str')
 
-# Keep only blood_cd, rectum_healthy, TI_healthy, TI_cd
-adata = adata[adata.obs['tissue_disease'].isin(["blood_cd", "rectum_healthy", "TI_healthy", "TI_cd"])]
 
-
-# Remove pilots also 
-adata = adata[~adata.obs['sanger_sample_id'].str.contains('Pilot', na=False)]
 
 # The final shape of the data:
 print(f"The final shape of the data is: {adata.shape}")
@@ -131,17 +122,17 @@ print(f"The final shape of the data is: {adata.shape}")
 # Print initial summary of data:
 tissues = np.unique(adata.obs['tissue'])
 temp = adata.obs
+# Make a temp column to fill genotype with sample ID if no genotype
+temp['dummy_genotyping_id'] = np.where(temp['Genotyping_ID'].notna(), temp['Genotyping_ID'], temp['patient_id'])
 for t in tissues:
      tempt = temp[temp['tissue'] == t]
      print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
-     cd = tempt[tempt['disease_status'] == "cd"]
+     cd = tempt[tempt['disease_status'] == "CD"]
      print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
-     print(f"From a total of {len(np.unique(tempt['patient_id']))} individuals")
 
 
-print(f"The final number of individuals is: {len(np.unique(adata.obs['patient_id']))}")
-
-
+print(f"The final number of individuals is: {len(np.unique(adata.obs['dummy_genotyping_id']))}")
+print(f"Of which {len(np.unique(adata.obs['Genotyping_ID'].astype(str)))} are genotyped")
 
 # Finally save
 adata.write(f"{outdir}/adata_raw_input_all.h5ad")
