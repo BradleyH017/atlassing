@@ -1032,7 +1032,7 @@ def main():
     plt.savefig(f"{qc_path}/sample_median_counts_ngenes_all.png", bbox_inches='tight')
     plt.clf()
 
-# Plot the distribution per tissue
+    # Plot the distribution per tissue
     cols_to_plot = ["nCells", "Median_nCounts", "Median_nGene_by_counts", "Median_MT"]
     for c in cols_to_plot:
         print(c)
@@ -1245,7 +1245,9 @@ def main():
         fig, ax = plt.subplots(figsize=(10, 6))
         excluded_df = pivot_df.loc[exclude]
         remaining_df = pivot_df.drop(exclude)
-        remaining_df = remaining_df.sample(n=50, random_state=17)
+        if remaining_df.shape[0] > 50:
+            remaining_df = remaining_df.sample(n=50, random_state=17)
+    
         combined_df = pd.concat([excluded_df, pd.DataFrame([np.nan] * len(pivot_df.columns)).T, remaining_df])
         combined_df.index = list(exclude) + [''] + list(remaining_df.index)
         bottom = np.zeros(len(combined_df))
