@@ -8,19 +8,43 @@ from h5py import File
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import plotnine as plt9
 os.chdir("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined")
 
 # Define lineage and resolution
-lineage = "all_immune"
-res = 1.0
+lineage = "all_mesenchymal"
+res = 1.25
 max_prop = 0.2
 MCC_thresh = 0.75
 
+# If want to see what the within lineage QC has done, also read in the raw input to compare
+compare_raw=False
+if compare_raw:
+    f = f'input_cluster_within_lineage/adata_manual_lineage_clean_{lineage}.h5ad'
+    f2 = File(f, 'r')
+    # Read only cell-metadata
+    inputobs = read_elem(f2['obs'])
+    tissues = np.unique(inputobs['tissue'])
+    for t in tissues:
+        tempt = inputobs[inputobs['tissue'] == t]
+        print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
+        cd = tempt[tempt['disease_status'] == "CD"]
+        print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
+
+
 # Read in adata obs
-f = f'results/{lineage}/tables/clustering_array/leiden_{str(res)}/adata_PCAd_batched_umap_{str(res)}.h5ad'
+f = f'old/11072024_2pt5_nMAD/{lineage}/tables/clustering_array/leiden_{str(res)}/adata_PCAd_batched_umap_{str(res)}.h5ad'
 f2 = File(f, 'r')
 # Read only cell-metadata
 obs = read_elem(f2['obs'])
+
+# Print the number of cells, samples etc
+tissues = np.unique(obs['tissue'])
+for t in tissues:
+     tempt = obs[obs['tissue'] == t]
+     print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
+     cd = tempt[tempt['disease_status'] == "CD"]
+     print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
 
 # find exceeding sample
 proportions = obs.groupby('leiden')['samp_tissue'].value_counts(normalize=True).reset_index(name="samp_tissue_proportion")
@@ -35,7 +59,7 @@ min_median_nCount_per_samp_blood = 0
 min_median_nGene_per_samp_blood = 1000
 min_median_nCount_per_samp_gut = 0
 min_median_nGene_per_samp_gut = 1000
-pathout = f"results/{lineage}/tables/clustering_array/leiden_{str(res)}"
+pathout = f"old/11072024_2pt5_nMAD/{lineage}/tables/clustering_array/leiden_{str(res)}"
 depth_count['exceeding_samples'] = depth_count.index.map(lambda x: 'red' if x in exceeding_samples else 'navy')
 
 td = np.unique(depth_count['disease_tissue'])
@@ -53,10 +77,10 @@ for t in td:
         plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
         plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
         plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
-    
+    #
     plt.savefig(f"{pathout}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
     plt.clf()
-    
+
 # Do same for MT percentage
 for t in td:
     samps = obs[obs['disease_tissue'] == t]['samp_tissue']
@@ -132,13 +156,13 @@ for qc in qc_cols:
             sns.distplot(data, hist=False, rug=True, label=f"{a} (samp_prop < {max_prop})", kde_kws={'color': 'orange'})
         else:
             sns.distplot(data, hist=False, rug=True, label=a)
-    
+    #
     plt.legend(loc='upper center', bbox_to_anchor=(1, 1), ncol=1)
     plt.xlabel(qc)
     plt.title(f"Distribution of {qc} - {res}: samp_prop")
     plt.savefig(f"{pathout}/{qc}_per_cluster_samp_prop.png", bbox_inches='tight')
     plt.clf()
-    
+
 # What does megagut call this cluster? 
 test_fail = obs[obs['leiden'].isin(failing)]
 ct_pred = test_fail['Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:predicted_labels'].value_counts(normalize=True)
@@ -177,3 +201,96 @@ for i, column in enumerate(metadata_to_check + ["ti_neoti", "f2_f1_ratio", "smok
     ax.set_title(f'Proportion of {column} across leiden')
     ax.legend(title=column, bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.savefig(f"{pathout}/distribution_of_{column}_across_clusters.png", bbox_inches='tight')
+
+# Plot a dotplot of annotation types vs these clusters
+obs['Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:conf_score'] = obs['Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:conf_score'].astype(float)
+annots = ["Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:predicted_labels", "Keras:predicted_celltype"]
+obs.rename(columns={"Keras:predicted_celltype_probability": "Keras:predicted_celltype:conf_score", "Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:conf_score": "Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:predicted_labels:conf_score"}, inplace=True)
+df_cells = obs[["leiden"] + annots + [element + ':conf_score' for element in annots]]
+for a in annots:
+    print("Calculating concordance between leiden and {a}")
+    df1 = df_cells.groupby(["leiden", a]).size().reset_index(name='nr_cells_label')
+    df2 = df_cells.groupby(["leiden"]).size().reset_index(name='nr_cells_cluster')
+    df_plt = pd.merge(df1, df2, on="leiden")
+    df_plt['frac_cells_label'] = (df_plt['nr_cells_label'] / df_plt['nr_cells_cluster']) #How many cells from annotation is in cluster
+    df3 = df_cells.groupby(["leiden", a]).mean(f"{a}:conf_score").reset_index()
+    df3.columns.values[2] = f"{a}:conf_score"
+    df_plt = pd.merge(df_plt, df3, on=["leiden", a])
+    df_plt['probability_threshold']=df_plt[f"{a}:conf_score"] > 0.9
+    df_plt[a]=df_plt[a].astype('str')
+    df_plt["leiden"]=df_plt["leiden"].astype('str')
+    cell_types=df_plt[a].drop_duplicates()
+    assignment=df_plt[["leiden", a, 'frac_cells_label']].sort_values('frac_cells_label', ascending=False)
+    assignment_all=assignment.drop_duplicates(["leiden"])
+    assignment_all['label_forall']=assignment_all[a]
+    mask = assignment_all[a].duplicated(keep=False)
+    assignment_all.loc[mask, 'label_forall'] += " (" + assignment_all.groupby(a).cumcount().add(1).astype(str) + ")"
+    assignment_all["leiden"]=assignment_all["leiden"].astype('str')
+    assignment_all[a]=assignment_all[a].astype('str')
+    assignment_all['label_forall']=assignment_all['label_forall'].astype('str')
+    assignment_highfrac=assignment_all.drop_duplicates(subset=a,keep='first')
+    assignment_highfrac["leiden"]=pd.to_numeric(assignment_highfrac["leiden"])
+    assignment_highfrac.sort_values(by=["leiden"], inplace=True)
+    assignment_highfrac["leiden"]=assignment_highfrac["leiden"].astype('str')
+    cell_types_notassigned=cell_types[~cell_types.isin(assignment_highfrac[a].values)].values
+    clusters=df_plt["leiden"].drop_duplicates()
+    clusters_notassigned=clusters[~clusters.isin(assignment_highfrac["leiden"].values)].values
+    assignment_all["leiden"]=pd.to_numeric(assignment_all["leiden"])
+    assignment_all.sort_values(by=["leiden"], inplace=True)
+    assignment_all["leiden"]=assignment_all["leiden"].astype('str')
+    assignment_all_drop=assignment_all.drop_duplicates(subset=a,keep='first')
+    clusters_assigned=assignment_highfrac["leiden"].values
+    cell_types_assigned=assignment_highfrac[a].values
+    cell_type_order=np.concatenate([cell_types_assigned, cell_types_notassigned], axis=0)
+    cluster_order=np.concatenate([clusters_assigned, clusters_notassigned], axis=0)
+    df_plt[a]=pd.Categorical(df_plt[a], categories=cell_type_order)
+    df_plt["leiden"]=pd.Categorical(df_plt["leiden"], categories=cluster_order)
+    # Plot
+    gplt = plt9.ggplot(df_plt, plt9.aes(
+            x="leiden",
+            y=a
+        ))
+    gplt = gplt + plt9.theme_bw()
+    gplt = gplt + plt9.theme(axis_text_x=plt9.element_text(angle=90))
+    gplta = gplt + plt9.geom_point(
+            plt9.aes(
+                color=f"{a}:conf_score",
+                size='frac_cells_label')) # alpha='nr_cells_Keras:predicted_celltype')
+    gplta = gplta + plt9.labs(
+            title='',
+            x='',
+            y='',
+            color='Predicted probability',
+            size='Fraction of auto-annot cell type in cluster')
+    gplta = gplta + plt9.theme(figure_size=(8, 8)) + plt9.ggtitle(f"Leiden res {res} vs {a}")
+    gplta.save(
+            f'{pathout}/leiden_vs_{a}.png',
+            width=12,
+            height=9
+    )
+    
+# Plot the absolute proportion of clusters vs the number of cells
+cls_tissue = obs.groupby(["leiden", "tissue"]).size().reset_index(name='nr_cells_label')
+cls_tissue_total = obs.groupby("leiden").size().reset_index(name="total_n")
+cls_tissue = cls_tissue.merge(cls_tissue_total, on="leiden", how="left")
+cls_tissue['prop_total'] = cls_tissue['nr_cells_label'] / cls_tissue['total_n']
+cls_tissue['log10_ncells'] = np.log10(cls_tissue['total_n'])
+# Get the propportion that is TI
+cls_tissue_ti = cls_tissue[cls_tissue['tissue'] == "ti"]
+cls_tissue_ti.reset_index(inplace=True)
+# Plot scatter of this
+plt.figure(figsize=(8, 6))
+plt.scatter(cls_tissue_ti['prop_total'].astype(float),
+            cls_tissue_ti['log10_ncells'].astype(float),
+            s=100, color='lightblue')
+
+for i, txt in enumerate(cls_tissue_ti["leiden"].astype(str)):
+    plt.text(cls_tissue_ti['prop_total'][i], cls_tissue_ti['log10_ncells'][i], txt, ha='center', va='center')
+
+
+plt.title(f"Proportion across tissues")
+plt.axvline(x = 0.5, color = 'black', linestyle = '--', alpha = 0.5)
+plt.xlabel('Cluster proportion of cluster originating from TI')
+plt.ylabel('log10(nCells)')
+plt.savefig(f"{pathout}/leiden_vs_proportion_TI.png", bbox_inches='tight')
+plt.clf()
