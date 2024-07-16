@@ -6,7 +6,7 @@ rule all:
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
         #"results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
-        "results/combined/objects/adata_grouped_post_cluster_QC.h5ad", "results/combined/tables/lineage_model/base-model_report.tsv.gz"
+        "results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
         #"results/combined/tables/annotation/CellTypist/CellTypist_prob_matrix.csv"
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
@@ -23,7 +23,8 @@ rule qc_raw:
         "input_cluster_within_lineage/adata_manual_lineage_clean_{tissue}.h5ad"
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
-        "results/{tissue}/tables/knee.txt"
+        "results/{tissue}/tables/knee.txt",
+        "results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -35,6 +36,7 @@ rule qc_raw:
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
         filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
+        plot_within=config["plot_within"],
         relative_nUMI_log=config["relative_nUMI_log"],
         min_nGene=config["min_nGene"],
         use_absolute_nGene=config["use_absolute_nGene"],
@@ -50,16 +52,21 @@ rule qc_raw:
         min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
         min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
         max_ncells_per_sample=config["max_ncells_per_sample"],
+        min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
+        filt_cells_pre_samples=config["filt_cells_pre_samples"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
-        remove_problem_genes=config["remove_problem_genes"]
+        remove_problem_genes=config["remove_problem_genes"],
+        per_samp_relative_threshold=config["per_samp_relative_threshold"],
+        sample_level_grouping=config["sample_level_grouping"],
+        cols_sample_relative_filter=config["cols_sample_relative_filter"]
     resources:
-        mem=850000, # all = 850000
-        queue='teramem', # all = teramem
-        mem_mb=850000,
-        mem_mib=850000,
-        disk_mb=850000,
+        mem=500000, # all = 850000
+        queue='normal', # all = teramem
+        mem_mb=500000,
+        mem_mib=500000,
+        disk_mb=500000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
@@ -76,6 +83,7 @@ rule qc_raw:
         --use_relative_mad {params.use_relative_mad} \
         --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
+        --plot_within {params.plot_within} \
         --lineage_column {params.lineage_column} \
         --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --relative_nUMI_log {params.relative_nUMI_log} \
@@ -93,10 +101,15 @@ rule qc_raw:
         --min_median_nGene_per_samp_blood {params.min_median_nGene_per_samp_blood} \
         --min_median_nGene_per_samp_gut {params.min_median_nGene_per_samp_gut} \
         --max_ncells_per_sample {params.max_ncells_per_sample} \
+        --min_ncells_per_sample {params.min_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
+        --filt_cells_pre_samples {params.filt_cells_pre_samples} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
-        --remove_problem_genes {params.remove_problem_genes}
+        --remove_problem_genes {params.remove_problem_genes} \
+        --per_samp_relative_threshold {params.per_samp_relative_threshold} \
+        --sample_level_grouping {params.sample_level_grouping} \
+        --cols_sample_relative_filter {params.cols_sample_relative_filter}
         """
 
 # Get the batch methods to use
@@ -115,7 +128,7 @@ if "scVI" in batch_methods:
             correct_variable_only=config["correct_variable_only"]
         resources:
             mem=250000, # All = 150000
-            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=250000,
             mem_mib=250000,
             disk_mb=250000,
@@ -147,7 +160,7 @@ if "scVI_default" in batch_methods:
             correct_variable_only=config["correct_variable_only"]
         resources:
             mem=480000, # All = 150000
-            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=480000,
             mem_mib=480000,
             disk_mb=480000,
@@ -211,7 +224,7 @@ if "scANVI" in batch_methods:
             "scvi-env_reserve"
         resources:
             mem=150000, # All = 150000
-            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=150000,
             mem_mib=150000,
             disk_mb=150000,
@@ -256,7 +269,7 @@ if config["benchmark_batch_correction"]:
             "scib-env_reserve"
         resources:
             mem=450000, # All = 350000
-            queue='gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-normal -gpu - -m "farm22-gpu0203 farm22-gpu0204"
+            queue='gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"', # All = gpu-huge -gpu - -m "farm22-gpu0203 farm22-gpu0204"
             mem_mb=450000,
             mem_mib=450000,
             disk_mb=450000,
@@ -293,11 +306,11 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=750000, # All =150000
-            queue='teramem',
-            mem_mb=750000,
-            mem_mib=750000,
-            disk_mb=750000,
+            mem=100000, # All =150000
+            queue='normal',
+            mem_mb=100000,
+            mem_mib=100000,
+            disk_mb=100000,
             tmpdir="tmp",
             threads=2
         shell:
@@ -434,11 +447,11 @@ rule get_umap:
     params:
         col_by=config["col_by"]
     resources:
-        mem=increment_memory(750000), # All = 350000
-        queue='teramem', # All = long
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000), 
+        mem=increment_memory(100000), # All = 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(100000),
+        mem_mib=increment_memory(100000),
+        disk_mb=increment_memory(100000), 
         tmpdir="tmp",
         threads=32 # All =32
     conda:
@@ -464,11 +477,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(750000), #All - 350000
-        queue='teramem', # All = long
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
+        mem=increment_memory(300000), #All - 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(300000),
+        mem_mib=increment_memory(300000),
+        disk_mb=increment_memory(300000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -563,15 +576,16 @@ rule test_clusters_keras:
     input:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad",
         "results/{tissue}/tables/batch_correction/best_batch_method.txt",
-        "results/{tissue}/tables/keras-grid_search/keras-use_params.txt"
+        "results/{tissue}/tables/keras-grid_search/keras-use_params.txt",
+        "results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad"
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(750000), #All - 850000
-        queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
+        mem=increment_memory(650000), #All - 850000
+        queue='normal',
+        mem_mb=increment_memory(650000),
+        mem_mib=increment_memory(650000),
+        disk_mb=increment_memory(650000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -588,7 +602,8 @@ rule test_clusters_keras:
             --batch_size 32 \
             --cluster_col "leiden" \
             --train_size_fraction 0.67 \
-            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base
+            --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_{wildcards.clustering_resolution}/base \
+            --full_h5 {input[3]}
         """
 
 
@@ -660,13 +675,14 @@ rule combine_adatas_original:
         "scvi-env"
     params:
         base_tissue_original_h5=config["base_tissue_original_h5"],
-        concatenated_values=concatenated_values
+        concatenated_values=concatenated_values,
+        remove_blacklist=config["remove_blacklist"]
     resources:
-        mem=750000, # All - 350000
-        queue='teramem', # All - normal
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
+        mem=650000, # All - 350000
+        queue='normal', # All - normal
+        mem_mb=650000,
+        mem_mib=650000,
+        disk_mb=650000,
         tmpdir="tmp",
         threads=4
     shell:
@@ -677,14 +693,17 @@ rule combine_adatas_original:
         python bin/006b-combine_across_lineages.py \
             --baseout "combined" \
             --base_tissue_original_h5 {params.base_tissue_original_h5} \
-            --tissues "{params.concatenated_values}"
+            --tissues "{params.concatenated_values}" \
+            --remove_blacklist {params.remove_blacklist}
         """
             
 rule make_lineage_prediction_model:
+    input:
+        "results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
     output:
-        "results/combined/tables/lineage_model/base-model_report.tsv.gz",
+        "results/combined/tables/lineage_model/base-model_report.tsv.gz"
     params:
-        combined_file=config["combined_file"],
+        #combined_file=config["combined_file"],
         activation=config["activation"],
         loss=config["loss"],
         optimizer=config["optimizer"],
@@ -710,9 +729,11 @@ rule make_lineage_prediction_model:
         mkdir -p ${{path}}
 
         echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > ${{path}}/keras-use_params.txt
-            
+        
+        echo {input}
+
         python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
-            --h5_anndata {params.combined_file} \
+            --h5_anndata {input} \
             --leiden_res 0 \
             --number_epoch 25 \
             --keras_param_file ${{path}}/keras-use_params.txt \
