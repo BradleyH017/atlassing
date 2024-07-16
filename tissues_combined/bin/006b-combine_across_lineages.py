@@ -113,6 +113,7 @@ def main():
     adata = sc.read_h5ad(base_tissue_original_h5)
     print(f"Shape of original adata: {adata.shape}")
     
+    
     # Remove the blacklist samples if desired. NOTE: This will remove blacklist samples derived from each lineage, from ALL lineages. So if one sample has strange epithelial cells, it's mesenchymal and immune cells will also be removed
     orig = adata.shape[0]
     if remove_blacklist == "yes":
