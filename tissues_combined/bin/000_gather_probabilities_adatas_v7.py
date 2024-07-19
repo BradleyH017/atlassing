@@ -134,5 +134,8 @@ for t in tissues:
 print(f"The final number of individuals is: {len(np.unique(adata.obs['dummy_genotyping_id']))}")
 print(f"Of which {len(np.unique(adata.obs['Genotyping_ID'].astype(str)))} are genotyped")
 
+# Add a dummy variable to highlight input (important for grouping)
+adata.obs['input'] = "raw"
+
 # Finally save
 adata.write(f"{outdir}/adata_raw_input_all.h5ad")
