@@ -32,23 +32,13 @@ rule qc_raw:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
         min_nUMI=config["min_nUMI"],
-        use_absolute_nUMI=config["use_absolute_nUMI"],
-        use_relative_mad=config["use_relative_mad"],
-        lineage_column=config["lineage_column"],
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
-        filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
-        plot_within=config["plot_within"],
-        relative_nUMI_log=config["relative_nUMI_log"],
+        threshold_method=config["thresh_method"],
         min_nGene=config["min_nGene"],
-        use_absolute_nGene=config["use_absolute_nGene"],
-        relative_nGene_log=config["relative_nGene_log"],
         MT_thresh_gut=config["MT_thresh_gut"],
         MT_thresh_blood=config["MT_thresh_blood"],
-        use_absolute_MT=config["use_absolute_MT"],
-        min_MT=config["min_MT"],
-        absolute_max_MT=config["absolute_max_MT"],
         use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
         min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
         min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
@@ -76,28 +66,19 @@ rule qc_raw:
         "scvi-env"
     shell:
         r"""
-        python  bin/001-raw_QC_sm.py \
+        python  bin/001-raw_QC_sm_update.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
         --all_blood_immune {params.all_blood_immune} \
         --min_nUMI {params.min_nUMI} \
-        --use_absolute_nUMI {params.use_absolute_nUMI} \
-        --use_relative_mad {params.use_relative_mad} \
-        --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
-        --plot_within {params.plot_within} \
-        --lineage_column {params.lineage_column} \
-        --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
-        --relative_nUMI_log {params.relative_nUMI_log} \
+        --threshold_method {params.threshold_method} \
+        --relative_grouping {params.relative_grouping} \
+        --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --min_nGene {params.min_nGene} \
-        --use_absolute_nGene {params.use_absolute_nGene} \
-        --relative_nGene_log {params.relative_nGene_log} \
         --MT_thresh_gut {params.MT_thresh_gut} \
         --MT_thresh_blood {params.MT_thresh_blood} \
-        --use_absolute_MT {params.use_absolute_MT} \
-        --absolute_max_MT {params.absolute_max_MT} \
-        --min_MT {params.min_MT} \
         --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
         --min_median_nCount_per_samp_blood {params.min_median_nCount_per_samp_blood} \
         --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
@@ -362,7 +343,7 @@ if "Manual" in config["nn_choice"]:
             nn=config["nn"]
         resources:
             mem=5000,
-            queue='long',
+            queue='normal',
             mem_mb=5000,
             mem_mib=5000,
             disk_mb=5000,
@@ -480,11 +461,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(850000), #All - 350000
-        queue='teramem', # All = long
-        mem_mb=increment_memory(850000),
-        mem_mib=increment_memory(850000),
-        disk_mb=increment_memory(850000),
+        mem=increment_memory(150000), #All - 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(150000),
+        mem_mib=increment_memory(150000),
+        disk_mb=increment_memory(150000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:

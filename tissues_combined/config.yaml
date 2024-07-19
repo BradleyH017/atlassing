@@ -10,23 +10,13 @@ tissue:
 discard_other_inflams: "no" # Remove non CD inflammtation samples. NO - already done
 all_blood_immune: "no" # Treat all the blood data as immune if using?
 min_nUMI: 500 # Minimum nUMI
-use_absolute_nUMI: "yes" # Use the min UMI cut off?
-use_relative_mad: "no" # Use a relative MAD threshold
-lineage_column: "sum_majority_lineage" # Which coloumn to use as lineage annotation
 relative_grouping: "sum_majority_lineage" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
 relative_nMAD_threshold: 2.5 # Threshold of nMad
-filter_sequentially: "no" # Define and filter the data sequentially?
 nMad_directionality: "bi" # Can be bi|uni. unidirectional medians cells only removed for nMads above or below the median. bidirectional medians cells removed for nMads exceeding threshold in either direction
-plot_within: "yes" # A list of values to plot QC metrics within, seperated by ",". E.g, if "lineage,category" plots will be made witihn each of these. If "None", will be plotted in none
-relative_nUMI_log: "yes" # Use relative nUMI
+threshold_method: None # Whether to use relative thresholds and in which direction. Can be "specific" to be specific to the relative_grouping, "outer" to apply the outer window of the relative groupings, or None to not apply at all.  
 min_nGene: 250 # Min nGene
-use_absolute_nGene: "yes" # Use min nGene
-relative_nGene_log: "yes" # Also use a relative nGene?
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
 MT_thresh_blood: 20 # MT thresh for blood
-use_absolute_MT: "yes" # Use ansolute MT
-min_MT: 0 # Minmum MT% - epithelial cells with 0 (!) seem to be seperating in the embedding. If don't want to apply this, set to 0
-absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it
 use_MT_thresh_blood_gut_immune: "no" # Use the absolute MT threshold for blood on the gut immune cells? 
 min_median_nCount_per_samp_blood: 0 # Exclude samples with median nCount lower than this value (blood). Samples with low medians for these metrics tend to integrate badly. If want to ignor this, set to very high number, e.g 60k
 min_median_nCount_per_samp_gut: 0 # Same but gut
