@@ -257,7 +257,7 @@ def update_obs_qc_plot_thresh(adata, column = None, within = None, relative_thre
             adata.obs[f"{column}_keep"] = adata.obs[column] > min_value
         if relative_directionality == "under":
             adata.obs[f"{column}_keep"] = adata.obs[column] < max_value
-    if threshold_method == None:
+    if threshold_method == "None":
         # Don't apply any relative threshold after calculating. Make dummy for all TRUE
         adata.obs[f"{column}_keep"] = True
     # Add absolute threshold if using
@@ -486,6 +486,14 @@ def parse_options():
     )
     
     parser.add_argument(
+        '-hvgw', '--hvgs_within',
+        action='store',
+        dest='hvgs_within',
+        required=True,
+        help=''
+    )
+    
+    parser.add_argument(
         '-rpg', '--remove_problem_genes',
         action='store',
         dest='remove_problem_genes',
@@ -514,6 +522,14 @@ def parse_options():
         action='store',
         dest='cols_sample_relative_filter',
         required=False,
+        help=''
+    )
+    
+    parser.add_argument(
+        '-pm', '--pref_matrix',
+        action='store',
+        dest='pref_matrix',
+        required=True,
         help=''
     )
 
@@ -546,11 +562,13 @@ def main():
     filt_cells_pre_samples = inherited_options.filt_cells_pre_samples
     filt_blood_keras = inherited_options.filt_blood_keras
     n_variable_genes = float(inherited_options.n_variable_genes)
+    hvgs_within = inherited_options.hvgs_within
     remove_problem_genes = inherited_options.remove_problem_genes
     per_samp_relative_threshold = inherited_options.per_samp_relative_threshold
     sample_level_grouping = inherited_options.sample_level_grouping
     cols_sample_relative_filter = inherited_options.cols_sample_relative_filter
     cols_sample_relative_filter = cols_sample_relative_filter.split(",")
+    pref_matrix = inherited_options.pref_matrix
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file={input_file}")
@@ -575,10 +593,12 @@ def main():
     print(f"filt_cells_pre_samples:{filt_cells_pre_samples}")
     print(f"filt_blood_keras={filt_blood_keras}")
     print(f"n_variable_genes={n_variable_genes}")
+    print(f"hvgs_within: {hvgs_within}")
     print(f"remove_problem_genes={remove_problem_genes}")
     print(f"per_samp_relative_threshold:{per_samp_relative_threshold}")
     print(f"sample_level_grouping:{sample_level_grouping}")
     print(f"cols_sample_relative_filter:{cols_sample_relative_filter}")
+    print(f"pref_matrix: {pref_matrix}")
     print("Parsed args")
     
     # Finally, derive and print the tissue arguments
@@ -1113,7 +1133,10 @@ def main():
     print("Saved after log1p")
     
     # identify highly variable genes and scale these ahead of PCA
-    sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes), subset=True)
+    if hvgs_within == "None":
+        sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes), subset=True)
+    else:
+        sc.pp.highly_variable_genes(adata, flavor="seurat", batch_key=hvgs_within, n_top_genes=int(n_variable_genes), subset=True)
     print("Found highly variable")
 
     # Check for intersection of IG, MT and RP genes in the HVGs
@@ -1141,54 +1164,61 @@ def main():
      cd = tempt[tempt['disease_status'] == "CD"]
      print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
 
-    ####################################
-    ######### PCA calculation ##########
-    ####################################
+    if pref_matrix not in ["scVI", "scANVI"]:
+        # Only need to compute PCA if we know the data is going to be Harmony'd, or bbknn'd
+        ####################################
+        ######### PCA calculation ##########
+        ####################################
 
-    # Run PCA
-    sc.tl.pca(adata, svd_solver='arpack')
+        # Run PCA
+        sc.tl.pca(adata, svd_solver='arpack')
 
-    # Plot PCA
-    sc.pl.pca(adata, color="tissue", save="_tissue.png")
-    #sc.pl.pca(adata, color="category__machine", save="_category.png")
-    #sc.pl.pca(adata, color="input", save="_input.png")
-    sc.pl.pca(adata, color=relative_grouping, save=f"_{relative_grouping}.png")
+        # Plot PCA
+        sc.pl.pca(adata, color="tissue", save="_tissue.png")
+        #sc.pl.pca(adata, color="category__machine", save="_category.png")
+        #sc.pl.pca(adata, color="input", save="_input.png")
+        sc.pl.pca(adata, color=relative_grouping, save=f"_{relative_grouping}.png")
 
-    # PLot Elbow plot
-    sc.pl.pca_variance_ratio(adata, log=True, save=True, n_pcs = 50)
+        # PLot Elbow plot
+        sc.pl.pca_variance_ratio(adata, log=True, save=True, n_pcs = 50)
 
-    #  Determine the optimimum number of PCs
-    # Extract PCs
-    pca_variance=pd.DataFrame({'x':list(range(1, 51, 1)), 'y':adata.uns['pca']['variance']})
-    # Identify 'knee'
-    knee=kd.KneeLocator(x=list(range(1, 51, 1)), y=adata.uns['pca']['variance_ratio'], curve="convex", direction = "decreasing")
-    knee_point = knee.knee
-    elbow_point = knee.elbow
-    print('Knee: ', knee_point) 
-    print('Elbow: ', elbow_point)
-    # Use the 'knee' + 5 additional PCs
-    nPCs = knee_point + 5
-    print("The number of PCs used for this analysis is {}".format(nPCs))
+        #  Determine the optimimum number of PCs
+        # Extract PCs
+        pca_variance=pd.DataFrame({'x':list(range(1, 51, 1)), 'y':adata.uns['pca']['variance']})
+        # Identify 'knee'
+        knee=kd.KneeLocator(x=list(range(1, 51, 1)), y=adata.uns['pca']['variance_ratio'], curve="convex", direction = "decreasing")
+        knee_point = knee.knee
+        elbow_point = knee.elbow
+        print('Knee: ', knee_point) 
+        print('Elbow: ', elbow_point)
+        # Use the 'knee' + 5 additional PCs
+        nPCs = knee_point + 5
+        print("The number of PCs used for this analysis is {}".format(nPCs))
 
-    # Save the 'knee'
-    from numpy import asarray
-    from numpy import savetxt
-    savetxt(tabpath + "/knee.txt", asarray([[knee_point]]), delimiter='\t')
+        # Save the 'knee'
+        from numpy import asarray
+        from numpy import savetxt
+        savetxt(tabpath + "/knee.txt", asarray([[knee_point]]), delimiter='\t')
 
-    # Save the PCA loadings
-    loadings = pd.DataFrame(adata.varm['PCs'])
-    loadings = loadings.iloc[:,0:knee_point]
-    loadings.index = np.array(adata.var.index)
-    pcs = list(range(1,knee_point+1))
-    cols = ["{}{}".format("PC", i) for i in pcs]
-    loadings.columns = cols
-    loadings.to_csv(tabpath + "/PCA_loadings.csv")
+        # Save the PCA loadings
+        loadings = pd.DataFrame(adata.varm['PCs'])
+        loadings = loadings.iloc[:,0:knee_point]
+        loadings.index = np.array(adata.var.index)
+        pcs = list(range(1,knee_point+1))
+        cols = ["{}{}".format("PC", i) for i in pcs]
+        loadings.columns = cols
+        loadings.to_csv(tabpath + "/PCA_loadings.csv")
 
-    # Save the PCA matrix 
-    pca = pd.DataFrame(adata.obsm['X_pca'])
-    pca = pca.iloc[:,0:knee_point]
-    pca.index = adata.obs.index
-    pca.to_csv(tabpath + "/PCA_up_to_knee.csv")
+        # Save the PCA matrix 
+        pca = pd.DataFrame(adata.obsm['X_pca'])
+        pca = pca.iloc[:,0:knee_point]
+        pca.index = adata.obs.index
+        pca.to_csv(tabpath + "/PCA_up_to_knee.csv")
+    else:
+        # Save dummy knee
+        from numpy import asarray
+        from numpy import savetxt
+        savetxt(tabpath + "/knee.txt", asarray([[0]]), delimiter='\t')
 
     # Save object ahead of batch correction
     adata.write(objpath + "/adata_PCAd.h5ad")

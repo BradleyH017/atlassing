@@ -35,7 +35,7 @@ rule qc_raw:
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
         nMad_directionality=config["nMad_directionality"],
-        threshold_method=config["thresh_method"],
+        threshold_method=config["threshold_method"],
         min_nGene=config["min_nGene"],
         MT_thresh_gut=config["MT_thresh_gut"],
         MT_thresh_blood=config["MT_thresh_blood"],
@@ -50,23 +50,25 @@ rule qc_raw:
         filt_cells_pre_samples=config["filt_cells_pre_samples"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
+        hvgs_within=config["hvgs_within"],
         remove_problem_genes=config["remove_problem_genes"],
         per_samp_relative_threshold=config["per_samp_relative_threshold"],
         sample_level_grouping=config["sample_level_grouping"],
-        cols_sample_relative_filter=config["cols_sample_relative_filter"]
+        cols_sample_relative_filter=config["cols_sample_relative_filter"],
+        pref_matrix=config["pref_matrix"]
     resources:
-        mem=1200000, # all = 850000
-        queue='teramem', # all = teramem
-        mem_mb=1200000,
-        mem_mib=1200000,
-        disk_mb=1200000,
+        mem=650000, # all = 850000
+        queue='normal', # all = teramem
+        mem_mb=650000,
+        mem_mib=650000,
+        disk_mb=650000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
         "scvi-env"
     shell:
         r"""
-        python  bin/001-raw_QC_sm_update.py \
+        python bin/001-raw_QC_update.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
@@ -90,10 +92,12 @@ rule qc_raw:
         --filt_cells_pre_samples {params.filt_cells_pre_samples} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
+        --hvgs_within {params.hvgs_within} \
         --remove_problem_genes {params.remove_problem_genes} \
         --per_samp_relative_threshold {params.per_samp_relative_threshold} \
         --sample_level_grouping {params.sample_level_grouping} \
-        --cols_sample_relative_filter {params.cols_sample_relative_filter}
+        --cols_sample_relative_filter {params.cols_sample_relative_filter} \
+        --pref_matrix {params.pref_matrix}
         """
 
 # Get the batch methods to use
