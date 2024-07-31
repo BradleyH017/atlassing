@@ -117,16 +117,15 @@ def dist_plot(adata, column, within=None, relative_threshold=None, absolute=None
     if within is not None:
         groups = np.unique(adata.obs[within])
         for g in groups:
-            tempobs = adata.obs[adata.obs[within] == g]
-            data = tempobs[column]
+            data = adata.obs.loc[adata.obs[within] == g, column].values
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             line_color = sns.color_palette("tab10")[int(np.where(groups == g)[0])]
             if thresholded:
                 if threshold_method == "specific":
                     # Calculate the threshold actually being used for this group
-                    cutoff_low = min(tempobs[column][tempobs[f"{column}_keep"] == True])
-                    cutoff_high = max(tempobs[column][tempobs[f"{column}_keep"] == True])
+                    cutoff_low = min(adata.obs[column][adata.obs[f"{column}_keep"] == True])
+                    cutoff_high = max(adata.obs[column][adata.obs[f"{column}_keep"] == True])
                 else:
                     # Calculate the threshold actually being used across all groups
                     cutoff_low = min(adata.obs[column][adata.obs[f"{column}_keep"] == True])
@@ -240,8 +239,7 @@ def update_obs_qc_plot_thresh(adata, column = None, within = None, relative_thre
         thresh = []
         groups = np.unique(adata.obs[within])
         for g in groups:
-            tempobs = adata.obs[adata.obs[within] == g]
-            data = tempobs[column]
+            data = adata.obs.loc[adata.obs[within] == g].values
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             cutoff_low = np.median(data) - (float(relative_threshold) * mad)
@@ -467,8 +465,16 @@ def parse_options():
         dest='filt_cells_pre_samples',
         required=True,
         help=''
-    )    
+    )   
     
+    parser.add_argument(
+        '-ppsqc', '--plot_per_samp_qc',
+        action='store',
+        dest='plot_per_samp_qc',
+        required=True,
+        help=''
+    )  
+        
     parser.add_argument(
         '-filt_blood_keras', '--filt_blood_keras',
         action='store',
@@ -533,6 +539,14 @@ def parse_options():
         help=''
     )
 
+    parser.add_argument(
+        '-cht', '--calc_hvgs_together',
+        action='store',
+        dest='calc_hvgs_together',
+        required=False,
+        help=''
+    )
+
     return parser.parse_args()
 
 
@@ -560,6 +574,7 @@ def main():
     min_ncells_per_sample = float(inherited_options.min_ncells_per_sample)
     use_abs_per_samp = inherited_options.use_abs_per_samp
     filt_cells_pre_samples = inherited_options.filt_cells_pre_samples
+    plot_per_samp_qc = inherited_options.plot_per_samp_qc
     filt_blood_keras = inherited_options.filt_blood_keras
     n_variable_genes = float(inherited_options.n_variable_genes)
     hvgs_within = inherited_options.hvgs_within
@@ -569,6 +584,7 @@ def main():
     cols_sample_relative_filter = inherited_options.cols_sample_relative_filter
     cols_sample_relative_filter = cols_sample_relative_filter.split(",")
     pref_matrix = inherited_options.pref_matrix
+    calc_hvgs_together = inherited_options.calc_hvgs_together
     
     print("~~~~~~~~~ Running arguments ~~~~~~~~~")
     print(f"input_file={input_file}")
@@ -644,23 +660,21 @@ def main():
 
     # Load the given files and perform initial formatting / filters
     adata = sc.read_h5ad(input_file)
-    # make sure we have counts as .X and no others
-    if "counts" in adata.layers.keys():
-        adata.X = adata.layers['counts'].copy()
-
-    if "lognorm" in adata.layers.keys():
-        del adata.layers["lognorm"]
+    # make sure we have counts as .X
+    #if "counts" in adata.layers.keys():
+    #    adata.X = adata.layers['counts'].copy() # Takes lots of memory, .X is already counts
 
     print(f"Initial shape of the data is:{adata.shape}")
     tissues = np.unique(adata.obs['tissue'])
-    for t in tissues:
-        tempt = adata.obs[adata.obs['tissue'] == t]
-        print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
-        cd = tempt[tempt['disease_status'] == "CD"]
-        print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
+    #for t in tissues:
+    #    tempt = adata.obs[adata.obs['tissue'] == t]
+    #    print(f"For {t}, there is {len(np.unique(tempt['sanger_sample_id']))} samples. A total of {tempt.shape[0]} cells")
+    #    cd = tempt[tempt['disease_status'] == "CD"]
+    #    print(f"{len(np.unique(cd['sanger_sample_id']))} are CD")
+    #    del tempt
         
     # Also save the gene var df
-    adata.var.to_csv(f"results/{tissue}/tables/raw_gene.var.txt", sep = "\t")
+    #adata.var.to_csv(f"results/{tissue}/tables/raw_gene.var.txt", sep = "\t")
 
     # Discard other inflams if wanted to 
     if discard_other_inflams == "yes":
@@ -754,116 +768,100 @@ def main():
     depth_count["log10_Median_nCounts"] = np.log10(np.array(depth_count["Median_nCounts"].values, dtype = "float"))
     depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration.csv")
 
-    # Plot
-    plt.figure(figsize=(8, 6))
-    plt.scatter(depth_count["Mean_nCounts"], depth_count["n_genes_by_counts"],  c=depth_count["High_cell_sample"], alpha=0.7)
-    plt.xlabel('Mean counts / cell')
-    plt.ylabel('Mean genes detected / cell')
-    plt.savefig(f"{qc_path}/sample_mean_counts_ngenes_all.png", bbox_inches='tight')
-    plt.legend()
-    plt.clf()
-    
-    # Same for median
-    plt.figure(figsize=(8, 6))
-    plt.scatter(depth_count["Median_nCounts"], depth_count["Median_nGene_by_counts"],  c=depth_count["High_cell_sample"], alpha=0.7)
-    plt.xlabel('Median counts / cell')
-    plt.ylabel('Median ngenes detected / cell')
-    plt.savefig(f"{qc_path}/sample_median_counts_ngenes_all.png", bbox_inches='tight')
-    plt.clf()
-
     # Plot the distribution per tissue
     cols_to_plot = ["nCells", "Median_nCounts", "Median_nGene_by_counts", "Median_MT"]
-    for c in cols_to_plot:
-        print(c)
-        plt.figure(figsize=(8, 6))
-        for t in tissues:
-            samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
-            data = depth_count[depth_count.index.isin(samps)][c]
-            sns.distplot(data, hist=False, rug=True, label=t)
-        
-        plt.legend()
-        plt.xlabel(f'{c}/sample')
-        plt.savefig(f"{qc_path}/sample_dist_{c}.png", bbox_inches='tight')
-        plt.clf()
-        
-    # Also have a look by tissue x disease
     adata.obs['disease_tissue'] = adata.obs['tissue'].astype(str) + "_" + adata.obs['disease_status'].astype(str)
-    td = np.unique(adata.obs['disease_tissue'])
-    for c in cols_to_plot:
-        print(c)
-        plt.figure(figsize=(8, 6))
+    if plot_per_samp_qc == "yes":
+        for c in cols_to_plot:
+            print(c)
+            plt.figure(figsize=(8, 6))
+            for t in tissues:
+                samps = np.unique(adata.obs.loc[adata.obs['tissue'] == t,"samp_tissue"].values)
+                data = depth_count[depth_count.index.isin(samps)][c]
+                sns.distplot(data, hist=False, rug=True, label=t)
+            
+            plt.legend()
+            plt.xlabel(f'{c}/sample')
+            plt.savefig(f"{qc_path}/sample_dist_{c}.png", bbox_inches='tight')
+            plt.clf()
+            
+        # Also have a look by tissue x disease
+        td = np.unique(adata.obs['disease_tissue'])
+        for c in cols_to_plot:
+            print(c)
+            plt.figure(figsize=(8, 6))
+            for t in td:
+                samps = np.unique(adata.obs.loc[adata.obs['disease_tissue'] == t, 'samp_tissue'].values)
+                data = depth_count[depth_count.index.isin(samps)][c]
+                sns.distplot(data, hist=False, rug=True, label=t)
+            #
+            plt.legend()
+            plt.xlabel(f'{c}/sample')
+            plt.savefig(f"{qc_path}/sample_dist_{c}_tissue_disease.png", bbox_inches='tight')
+            plt.clf()
+        
+        # Within tissue for median
+        for t in tissues:
+            samps = np.unique(adata.obs.loc[adata.obs['tissue'] == t, 'samp_tissue'].values)
+            plt.figure(figsize=(8, 6))
+            plt.scatter(depth_count[depth_count.index.isin(samps)]["Median_nCounts"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
+            plt.xlabel('Median counts / cell')
+            plt.ylabel('Median genes detected / cell')
+            if t == "blood":
+                plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_blood}, min_median_nGene: {min_median_nGene_per_samp_blood}")
+            else:
+                plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
+            
+            plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
+            plt.clf()
+            
+        # Within disease x tissue
         for t in td:
-            samps = adata.obs[adata.obs['disease_tissue'] == t]['samp_tissue']
-            data = depth_count[depth_count.index.isin(samps)][c]
-            sns.distplot(data, hist=False, rug=True, label=t)
-        #
-        plt.legend()
-        plt.xlabel(f'{c}/sample')
-        plt.savefig(f"{qc_path}/sample_dist_{c}_tissue_disease.png", bbox_inches='tight')
-        plt.clf()
-    
-    # Within tissue for median
-    for t in tissues:
-        samps = adata.obs[adata.obs['tissue'] == t]['samp_tissue']
-        plt.figure(figsize=(8, 6))
-        plt.scatter(depth_count[depth_count.index.isin(samps)]["Median_nCounts"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
-        plt.xlabel('Median counts / cell')
-        plt.ylabel('Median genes detected / cell')
-        if t == "blood":
-            plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_blood}, min_median_nGene: {min_median_nGene_per_samp_blood}")
-        else:
-            plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
+            samps = np.unique(adata.obs.loc[adata.obs['disease_tissue'] == t, 'samp_tissue'].values)
+            plt.figure(figsize=(8, 6))
+            plt.scatter(depth_count[depth_count.index.isin(samps)]["Median_nCounts"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
+            plt.xlabel('Median counts / cell')
+            plt.ylabel('Median genes detected / cell')
+            if t == "blood":
+                plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_blood}, min_median_nGene: {min_median_nGene_per_samp_blood}")
+            else:
+                plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
+            
+            plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
+            plt.clf()
         
-        plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
-        plt.clf()
-        
-    # Within disease x tissue
-    for t in td:
-        samps = adata.obs[adata.obs['disease_tissue'] == t]['samp_tissue']
-        plt.figure(figsize=(8, 6))
-        plt.scatter(depth_count[depth_count.index.isin(samps)]["Median_nCounts"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
-        plt.xlabel('Median counts / cell')
-        plt.ylabel('Median genes detected / cell')
-        if t == "blood":
-            plt.axvline(x = min_median_nCount_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_blood}, min_median_nGene: {min_median_nGene_per_samp_blood}")
-        else:
-            plt.axvline(x = min_median_nCount_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - min_median_nCount: {min_median_nCount_per_samp_gut}, min_median_nGene: {min_median_nGene_per_samp_gut}")
-        
-        plt.savefig(f"{qc_path}/sample_median_counts_ngenes_{t}.png", bbox_inches='tight')
-        plt.clf()
-    
-    # median nGenes vs nCells
-    for t in td:
-        samps = adata.obs[adata.obs['disease_tissue'] == t]['samp_tissue']
-        plt.figure(figsize=(8, 6))
-        plt.scatter(depth_count[depth_count.index.isin(samps)]["nCells"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
-        plt.xlabel('nCells')
-        plt.ylabel('Median genes detected / cell')
-        if t == "blood":
-            plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axvline(x = np.median(depth_count[depth_count.index.isin(samps)]["nCells"]), color = 'black', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = np.median(depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"]), color = 'black', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene > {min_median_nGene_per_samp_blood}. Black = medians")
-        else:
-            plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
-            plt.axvline(x = np.median(depth_count[depth_count.index.isin(samps)]["nCells"]), color = 'black', linestyle = '--', alpha = 0.5)
-            plt.axhline(y = np.median(depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"]), color = 'black', linestyle = '--', alpha = 0.5)
-            plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene >  {min_median_nGene_per_samp_gut}. Black = medians")
-        
-        plt.savefig(f"{qc_path}/sample_ncells_median_ngenes_{t}.png", bbox_inches='tight')
-        plt.clf()
+        # median nGenes vs nCells
+        for t in td:
+            samps = np.unique(adata.obs.loc[adata.obs['disease_tissue'] == t, 'samp_tissue'].values)
+            plt.figure(figsize=(8, 6))
+            plt.scatter(depth_count[depth_count.index.isin(samps)]["nCells"], depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"],  c=depth_count[depth_count.index.isin(samps)]["High_cell_sample"], alpha=0.7)
+            plt.xlabel('nCells')
+            plt.ylabel('Median genes detected / cell')
+            if t == "blood":
+                plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_blood, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axvline(x = np.median(depth_count[depth_count.index.isin(samps)]["nCells"]), color = 'black', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = np.median(depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"]), color = 'black', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene > {min_median_nGene_per_samp_blood}. Black = medians")
+            else:
+                plt.axvline(x = min_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axvline(x = max_ncells_per_sample, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = min_median_nGene_per_samp_gut, color = 'red', linestyle = '--', alpha = 0.5)
+                plt.axvline(x = np.median(depth_count[depth_count.index.isin(samps)]["nCells"]), color = 'black', linestyle = '--', alpha = 0.5)
+                plt.axhline(y = np.median(depth_count[depth_count.index.isin(samps)]["Median_nGene_by_counts"]), color = 'black', linestyle = '--', alpha = 0.5)
+                plt.title(f"{t} - {min_ncells_per_sample} < nCells < {max_ncells_per_sample}, median_nGene >  {min_median_nGene_per_samp_gut}. Black = medians")
+            
+            plt.savefig(f"{qc_path}/sample_ncells_median_ngenes_{t}.png", bbox_inches='tight')
+            plt.clf()
 
     # These are clearly different across tissues
     # Either apply absolute thresholds or a relative cut off, or both
@@ -976,52 +974,53 @@ def main():
         else:
             exclude = temp[temp['Median_nGene_by_counts'] < min_median_nGene_per_samp_gut].index.values
         
-        proportion_df = adata.obs.groupby(['samp_tissue', 'category__machine']).size().reset_index(name='count')
-        proportion_df = proportion_df[proportion_df['samp_tissue'].isin(temp.index.values)]
-        proportion_df['proportion'] = proportion_df.groupby('samp_tissue')['count'].transform(lambda x: x / x.sum())
-        pivot_df = proportion_df.pivot(index='samp_tissue', columns='category__machine', values='proportion').fillna(0)
-        colors = sns.color_palette("husl", len(pivot_df.columns))
-        fig, ax = plt.subplots(figsize=(10, 6))
-        excluded_df = pivot_df.loc[exclude]
-        remaining_df = pivot_df.drop(exclude)
-        if remaining_df.shape[0] > 50:
-            remaining_df = remaining_df.sample(n=50, random_state=17)
-    
-        combined_df = pd.concat([excluded_df, pd.DataFrame([np.nan] * len(pivot_df.columns)).T, remaining_df])
-        combined_df.index = list(exclude) + [''] + list(remaining_df.index)
-        bottom = np.zeros(len(combined_df))
-        for idx, category in enumerate(pivot_df.columns):
-            ax.bar(combined_df.index, combined_df[category], bottom=bottom, color=colors[idx], label=category)
-            bottom += combined_df[category].fillna(0).values
-        #
-        ax.legend(title='Category__Machine', bbox_to_anchor=(1.05, 1), loc='upper left')
-        ax.set_title('Relative Proportions of Category__Machine by Samp_Tissue')
-        ax.set_xlabel('Samp_Tissue')
-        ax.set_ylabel('Proportion')
-        ax.set_xticks([])
-        plt.title(f"{t} : Left = excluded, Right = 50 non-excluded samples")
-        plt.savefig(f"{qc_path}/category_proportions_across_{t}_samples_absolute_min_nGene.png", bbox_inches='tight')
-        plt.clf()
-        # Also make a PCA and colour by whether the samples are in the excluded set or not
-        pca = PCA(n_components=2)
-        pca_result = pca.fit_transform(pivot_df)
-        pca_df = pd.DataFrame(data=pca_result[:,:2], columns=['PC1', 'PC2'], index=pivot_df.index)
-        plt.figure(figsize=(10, 8))
-        plt.scatter(pca_df['PC1'], pca_df['PC2'], alpha=0.5)
-        # Save
-        pca_df.to_csv(f"{tabpath}/pca_cell_contributions_{t}.csv")
-        #
-        # Highlight bad samples
-        for sample in exclude:
-            if sample in pca_df.index:
-                plt.scatter(pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2'], color='red', label='Maybe bad Sample')
-                plt.annotate(sample, (pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2']))
-        #
-        plt.xlabel('Cell contribution PC 1')
-        plt.ylabel('Cell contribution PC 1')
-        plt.title(f'{t} - PCA of category__machine proportions')
-        plt.savefig(f"{qc_path}/pca_cell_contributions_{t}_absolute_min_nGene.png", bbox_inches='tight')
-        plt.clf()        
+        if plot_per_samp_qc == "yes":
+            proportion_df = adata.obs.groupby(['samp_tissue', 'category__machine']).size().reset_index(name='count')
+            proportion_df = proportion_df[proportion_df['samp_tissue'].isin(temp.index.values)]
+            proportion_df['proportion'] = proportion_df.groupby('samp_tissue')['count'].transform(lambda x: x / x.sum())
+            pivot_df = proportion_df.pivot(index='samp_tissue', columns='category__machine', values='proportion').fillna(0)
+            colors = sns.color_palette("husl", len(pivot_df.columns))
+            fig, ax = plt.subplots(figsize=(10, 6))
+            excluded_df = pivot_df.loc[exclude]
+            remaining_df = pivot_df.drop(exclude)
+            if remaining_df.shape[0] > 50:
+                remaining_df = remaining_df.sample(n=50, random_state=17)
+        
+            combined_df = pd.concat([excluded_df, pd.DataFrame([np.nan] * len(pivot_df.columns)).T, remaining_df])
+            combined_df.index = list(exclude) + [''] + list(remaining_df.index)
+            bottom = np.zeros(len(combined_df))
+            for idx, category in enumerate(pivot_df.columns):
+                ax.bar(combined_df.index, combined_df[category], bottom=bottom, color=colors[idx], label=category)
+                bottom += combined_df[category].fillna(0).values
+            #
+            ax.legend(title='Category__Machine', bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.set_title('Relative Proportions of Category__Machine by Samp_Tissue')
+            ax.set_xlabel('Samp_Tissue')
+            ax.set_ylabel('Proportion')
+            ax.set_xticks([])
+            plt.title(f"{t} : Left = excluded, Right = 50 non-excluded samples")
+            plt.savefig(f"{qc_path}/category_proportions_across_{t}_samples_absolute_min_nGene.png", bbox_inches='tight')
+            plt.clf()
+            # Also make a PCA and colour by whether the samples are in the excluded set or not
+            pca = PCA(n_components=2)
+            pca_result = pca.fit_transform(pivot_df)
+            pca_df = pd.DataFrame(data=pca_result[:,:2], columns=['PC1', 'PC2'], index=pivot_df.index)
+            plt.figure(figsize=(10, 8))
+            plt.scatter(pca_df['PC1'], pca_df['PC2'], alpha=0.5)
+            # Save
+            pca_df.to_csv(f"{tabpath}/pca_cell_contributions_{t}.csv")
+            #
+            # Highlight bad samples
+            for sample in exclude:
+                if sample in pca_df.index:
+                    plt.scatter(pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2'], color='red', label='Maybe bad Sample')
+                    plt.annotate(sample, (pca_df.loc[sample, 'PC1'], pca_df.loc[sample, 'PC2']))
+            #
+            plt.xlabel('Cell contribution PC 1')
+            plt.ylabel('Cell contribution PC 1')
+            plt.title(f'{t} - PCA of category__machine proportions')
+            plt.savefig(f"{qc_path}/pca_cell_contributions_{t}_absolute_min_nGene.png", bbox_inches='tight')
+            plt.clf()        
         
     if use_abs_per_samp == "yes":
         # Min median nGene
@@ -1049,7 +1048,7 @@ def main():
     depth_count.reset_index(inplace=True)
     depth_count.rename(columns={"index": "samp_tissue", "n_genes_by_counts": "mean_n_genes_by_counts"}, inplace=True)
     # Save
-    depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration.csv", index=False)
+    depth_count.to_csv(f"{tabpath}/depth_count_pre_cell_filtration2.csv", index=False)
     
     # bind to anndata
     adata.obs.reset_index(inplace=True)
@@ -1060,33 +1059,33 @@ def main():
     adata.obs.set_index("cell", inplace=True)
     
     # Plot sankey
-    temp = adata.obs[["log_total_counts_keep", "log_n_genes_by_counts_keep", "pct_counts_gene_group__mito_transcript_keep", "samples_keep"]]
-    for col in temp.columns:
-        temp[col] = col + "-" + temp[col].astype(str)
-
-    temp['input'] = "input"
-    grouped = temp.groupby(["input", "log_total_counts_keep"])
-    input_to_total_counts = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
-    grouped = temp.groupby(["log_total_counts_keep", "log_n_genes_by_counts_keep"])
-    total_counts_to_n_genes = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
-    # Group by unique combinations of "log_n_genes_by_counts_keep" and "pct_counts_gene_group__mito_transcript_keep"
-    grouped = temp.groupby(["log_n_genes_by_counts_keep", "pct_counts_gene_group__mito_transcript_keep"])
-    # Calculate the percentage of each value of "log_n_genes_by_counts_keep" that contributes to each value of "pct_counts_gene_group__mito_transcript_keep"
-    n_genes_to_MT_perc = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
-    # Group by unique combinations of "pct_counts_gene_group__mito_transcript_keep" and "samples_keep"
-    grouped = temp.groupby(["pct_counts_gene_group__mito_transcript_keep", "samples_keep"])
-    # Calculate the percentage of each value of "pct_counts_gene_group__mito_transcript_keep" that contributes to each value of "samples_keep"
-    MT_perc_to_samples = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
-    # Concatenate the three DataFrames vertically
-    result = pd.concat([input_to_total_counts, total_counts_to_n_genes, n_genes_to_MT_perc, MT_perc_to_samples]).reset_index()
-    result.columns = ['source', 'target', 'value']                               
-    
-    print("result")
-    print(result)
-    sankey = hv.Sankey(result, label='Retention of cells on the basis of different metrics')
-    sankey.opts(label_position='left', edge_color='target', node_color='index', cmap='tab20')
-    hv.output(fig='png')
-    hv.save(sankey, f"{qc_path}/sankey_cell_retention_across_QC.png")
+    #temp = adata.obs[["log_total_counts_keep", "log_n_genes_by_counts_keep", "pct_counts_gene_group__mito_transcript_keep", "samples_keep"]]
+    #for col in temp.columns:
+    #    temp[col] = col + "-" + temp[col].astype(str)
+    #
+    #temp['input'] = "input"
+    #grouped = temp.groupby(["input", "log_total_counts_keep"])
+    #input_to_total_counts = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    #grouped = temp.groupby(["log_total_counts_keep", "log_n_genes_by_counts_keep"])
+    #total_counts_to_n_genes = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    ## Group by unique combinations of "log_n_genes_by_counts_keep" and "pct_counts_gene_group__mito_transcript_keep"
+    #grouped = temp.groupby(["log_n_genes_by_counts_keep", "pct_counts_gene_group__mito_transcript_keep"])
+    ## Calculate the percentage of each value of "log_n_genes_by_counts_keep" that contributes to each value of "pct_counts_gene_group__mito_transcript_keep"
+    #n_genes_to_MT_perc = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    ## Group by unique combinations of "pct_counts_gene_group__mito_transcript_keep" and "samples_keep"
+    #grouped = temp.groupby(["pct_counts_gene_group__mito_transcript_keep", "samples_keep"])
+    ## Calculate the percentage of each value of "pct_counts_gene_group__mito_transcript_keep" that contributes to each value of "samples_keep"
+    #MT_perc_to_samples = grouped.size()#.unstack().div(grouped.size().unstack().sum(axis=1), axis=0).stack()
+    ## Concatenate the three DataFrames vertically
+    #result = pd.concat([input_to_total_counts, total_counts_to_n_genes, n_genes_to_MT_perc, MT_perc_to_samples]).reset_index()
+    #result.columns = ['source', 'target', 'value']                               
+    #
+    #print("result")
+    #print(result)
+    #sankey = hv.Sankey(result, label='Retention of cells on the basis of different metrics')
+    #sankey.opts(label_position='left', edge_color='target', node_color='index', cmap='tab20')
+    #hv.output(fig='png')
+    #hv.save(sankey, f"{qc_path}/sankey_cell_retention_across_QC.png")
     
     # Apply sample-level threshold
     adata = adata[adata.obs['samples_keep'] == True ]
@@ -1099,19 +1098,22 @@ def main():
     print("Filtered genes")
 
     # Keep a copy of the raw counts
-    adata.layers['counts'] = adata.X.copy()
-    print("Copied counts")
+    if "counts" not in adata.layers.keys():
+        adata.layers['counts'] = adata.X.copy()
+        print("Copied counts")
 
-    # Calulate the CP10K expression
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    print("CP10K")
-
-    # Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
-    sc.pp.log1p(adata)
-    print("log1p")
+    if "log1p_cp10k" not in adata.layers.keys():
+        # Calulate the CP10K expression
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        print("CP10K")
+        # Now normalise the data to identify highly variable genes (Same as in Tobi and Monika's paper)
+        sc.pp.log1p(adata)
+        print("log1p")
+        # Store this (for later, e.g 005 and plotting)
+        adata.layers['log1p_cp10k'] = adata.X.copy()
+    else:
+        print("log1p_cp10k already calculated")
     
-    # Store this (for later, e.g 005 and plotting)
-    adata.layers['log1p_cp10k'] = adata.X.copy()
     # Save this 
     tissue=inherited_options.tissue
     #sparse_matrix = sp.sparse.csc_matrix(adata.layers['log1p_cp10k'])
@@ -1129,14 +1131,17 @@ def main():
     #
     #print("Saved genes")
     #del sparse_matrix
-    adata.write_h5ad(f"results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad")
-    print("Saved after log1p")
+    
+    # NEW
+    #adata.write_h5ad(f"results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad")
+    #print("Saved after log1p")
     
     # identify highly variable genes and scale these ahead of PCA
+    print("Calculating highly variable")
     if hvgs_within == "None":
-        sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=int(n_variable_genes), subset=True)
+        sc.pp.highly_variable_genes(adata, flavor="seurat", layer="log1p_cp10k", n_top_genes=int(n_variable_genes), subset=True)
     else:
-        sc.pp.highly_variable_genes(adata, flavor="seurat", batch_key=hvgs_within, n_top_genes=int(n_variable_genes), subset=True)
+        sc.pp.highly_variable_genes(adata, flavor="seurat", layer="log1p_cp10k", batch_key=hvgs_within, n_top_genes=int(n_variable_genes), subset=True)
     print("Found highly variable")
 
     # Check for intersection of IG, MT and RP genes in the HVGs
@@ -1152,10 +1157,6 @@ def main():
         condition = adata.var['gene_symbols'].str.contains('IG[HKL]V|IG[KL]J|IG[KL]C|IGH[ADEGM]|^MT-|^RP', regex=True)
         adata.var.loc[condition, 'highly_variable'] = False
 
-    # Scale
-    sc.pp.scale(adata, max_value=10)
-    print("Scaled")
-
     # Print the final shape of the high QC data
     print(f"The final shape of the high QC data is: {adata.shape}")
     for t in tissues:
@@ -1169,6 +1170,10 @@ def main():
         ####################################
         ######### PCA calculation ##########
         ####################################
+
+        # Scale
+        sc.pp.scale(adata, max_value=10)
+        print("Scaled")
 
         # Run PCA
         sc.tl.pca(adata, svd_solver='arpack')

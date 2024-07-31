@@ -11,7 +11,8 @@ rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
-        expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
+        expand("results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad", tissue=config["tissue"], clustering_resolution=config["clustering_resolutions"])
+        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
 
@@ -27,7 +28,7 @@ rule qc_raw:
     output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
         "results/{tissue}/tables/knee.txt",
-        "results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad"
+        #"results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -48,6 +49,7 @@ rule qc_raw:
         min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_cells_pre_samples=config["filt_cells_pre_samples"],
+        plot_per_samp_qc=config["plot_per_samp_qc"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
         hvgs_within=config["hvgs_within"],
@@ -55,19 +57,22 @@ rule qc_raw:
         per_samp_relative_threshold=config["per_samp_relative_threshold"],
         sample_level_grouping=config["sample_level_grouping"],
         cols_sample_relative_filter=config["cols_sample_relative_filter"],
-        pref_matrix=config["pref_matrix"]
+        pref_matrix=config["pref_matrix"],
+        calc_hvgs_together=config["calc_hvgs_together"]
     resources:
-        mem=650000, # all = 850000
-        queue='normal', # all = teramem
-        mem_mb=650000,
-        mem_mib=650000,
-        disk_mb=650000,
+        mem=1200000, # all = 850000
+        queue='teramem', # all = teramem
+        mem_mb=1200000,
+        mem_mib=1200000,
+        disk_mb=1200000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
         "scvi-env"
     shell:
         r"""
+        mkdir -p results/{wildcards.tissue}/objects/per_samp
+
         python bin/001-raw_QC_update.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
@@ -90,6 +95,7 @@ rule qc_raw:
         --min_ncells_per_sample {params.min_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_cells_pre_samples {params.filt_cells_pre_samples} \
+        --plot_per_samp_qc {params.plot_per_samp_qc} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
         --hvgs_within {params.hvgs_within} \
@@ -97,7 +103,8 @@ rule qc_raw:
         --per_samp_relative_threshold {params.per_samp_relative_threshold} \
         --sample_level_grouping {params.sample_level_grouping} \
         --cols_sample_relative_filter {params.cols_sample_relative_filter} \
-        --pref_matrix {params.pref_matrix}
+        --pref_matrix {params.pref_matrix} \
+        --calc_hvgs_together {params.calc_hvgs_together}
         """
 
 # Get the batch methods to use
@@ -294,11 +301,11 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=750000, # All =300000
-            queue='teramem',
-            mem_mb=750000,
-            mem_mib=750000,
-            disk_mb=750000,
+            mem=120000, # All =300000
+            queue='normal',
+            mem_mb=120000,
+            mem_mib=120000,
+            disk_mb=120000,
             tmpdir="tmp",
             threads=2
         shell:
@@ -435,11 +442,11 @@ rule get_umap:
     params:
         col_by=config["col_by"]
     resources:
-        mem=increment_memory(750000), # All = 350000
-        queue='teramem', # All = long
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000), 
+        mem=increment_memory(200000), # All = 350000
+        queue='normal', # All = long
+        mem_mb=increment_memory(200000),
+        mem_mib=increment_memory(200000),
+        disk_mb=increment_memory(200000), 
         tmpdir="tmp",
         threads=32 # All =32
     conda:
