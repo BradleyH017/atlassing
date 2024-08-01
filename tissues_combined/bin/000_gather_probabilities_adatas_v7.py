@@ -137,5 +137,17 @@ print(f"Of which {len(np.unique(adata.obs['Genotyping_ID'].astype(str)))} are ge
 # Add a dummy variable to highlight input (important for grouping)
 adata.obs['input'] = "raw"
 
+# Save a list of sample identifiers
+groups = np.unique(adata.obs["samp_tissue"])
+    
+# Save a list of samples
+with open(f"{outdir}/sample_list.txt", 'w') as file:
+    for g in groups:
+        print(g)
+        file.write(str(g) + '\n')
+
+# copy counts
+adata.obs.layers['counts'] = adata.X.copy()
+
 # Finally save
 adata.write(f"{outdir}/adata_raw_input_all.h5ad")

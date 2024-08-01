@@ -50,7 +50,7 @@ def parse_options():
         '-k', '--knee_file',
         action='store',
         dest='knee_file',
-        required=True,
+        required=False,
         help=''
     )
     
@@ -93,18 +93,18 @@ def main():
     
     # Load in the anndata (batch corrected)
     adata = sc.read_h5ad(fpath)
-    
+
     # Load the knee and optimum NN params
     with open(knee_file, 'r') as file:
         content = file.read().strip()
         n_pcs = int(float(content)) + 5
         print(f"n_pcs: {n_pcs}")
-        
+
     with open(optimum_nn_file, 'r') as file:
         content = file.read().strip()
         optimum_nn = int(float(content))
         print(f"optimum_nn: {optimum_nn}")
-        
+
     # Define plot outdir
     figpath = f"results/{tissue}/figures/UMAP/"
     if os.path.exists(figpath) == False:
@@ -115,20 +115,23 @@ def main():
     sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
     sc.logging.print_header()
     sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
-    
+
     # Define outdir for gene expression plots
     exprfigpath = f"results/{tissue}/figures/UMAP/expr"
     if os.path.exists(exprfigpath) == False:
         os.mkdir(exprfigpath)
     
     # Now compute UMAP for each embedding using these parameters
-    use_matrix=np.intersect1d(list(adata.obsm.keys()), use_matrix)
     col_by = col_by.split(",")
     print(f"col_by: {col_by}")
     print(f"figpath: {figpath}")
     # Calculate NN
     print("Calculating neighbours")
-    sc.pp.neighbors(adata, n_neighbors=optimum_nn, n_pcs=n_pcs, use_rep=use_matrix, key_added= use_matrix + "_nn")
+    if use_matrix == "X_pca":
+        sc.pp.neighbors(adata, n_neighbors=optimum_nn, n_pcs=n_pcs, use_rep=use_matrix, key_added= use_matrix + "_nn")
+    else:
+        sc.pp.neighbors(adata, n_neighbors=optimum_nn, use_rep=use_matrix, key_added= use_matrix + "_nn")
+    
     # Perform UMAP embedding
     sc.tl.umap(adata, neighbors_key=use_matrix + "_nn", min_dist=0.5, spread=0.5)
     adata.obsm["UMAP_" + use_matrix] = adata.obsm["X_umap"]
@@ -148,6 +151,9 @@ def main():
                 sc.settings.figdir=figpath
                 sc.pl.umap(adata, color = c, save="_" + use_matrix + "_" + c + ".png")
 
+    if "cell" in adata.obs.columns.values:
+        adata.obs.set_index("cell", inplace=True)
+    
     # Overwite file after each 
     adata.write(f"results/{tissue}/objects/adata_PCAd_batched_umap.h5ad")
     

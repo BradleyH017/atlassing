@@ -771,6 +771,7 @@ def main():
     # Plot the distribution per tissue
     cols_to_plot = ["nCells", "Median_nCounts", "Median_nGene_by_counts", "Median_MT"]
     adata.obs['disease_tissue'] = adata.obs['tissue'].astype(str) + "_" + adata.obs['disease_status'].astype(str)
+    td = np.unique(adata.obs['disease_tissue'])
     if plot_per_samp_qc == "yes":
         for c in cols_to_plot:
             print(c)

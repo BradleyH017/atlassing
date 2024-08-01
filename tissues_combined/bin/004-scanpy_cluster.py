@@ -80,13 +80,23 @@ def main():
     # Cluster using optimum NN and the given resolution
     sc.tl.leiden(adata, resolution=clustering_resolution, neighbors_key=pref_matrix_nn)
     
+    # Save adata
+    adata.write(f"results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/adata_PCAd_batched_umap_{clustering_resolution}.h5ad")
+    
     # Extract the cell x cluster matrix
     annot = adata.obs[['leiden']]
     annot.columns = annot.columns + "_" + str(clustering_resolution)
     annot.reset_index(inplace=True)
     
     # write to file
-    annot.to_csv(f"results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv", index=False)
+    annot.to_csv(f"results/{tissue}/tables/clustering_array/leiden_{str(clustering_resolution)}/clusters.csv", index=False)
+    
+    # Plot on umap
+    sc.settings.figdir=f"results/{tissue}/tables/clustering_array/leiden_{str(clustering_resolution)}"
+    sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), info (2), hints (3)
+    sc.logging.print_header()
+    sc.settings.set_figure_params(dpi=500, facecolor='white', format="png")
+    sc.pl.umap(adata, color = "leiden", save=f"_clusters_res{clustering_resolution}.png")
 
 
 # Execute
