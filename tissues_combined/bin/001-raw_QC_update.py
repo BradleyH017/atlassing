@@ -239,7 +239,7 @@ def update_obs_qc_plot_thresh(adata, column = None, within = None, relative_thre
         thresh = []
         groups = np.unique(adata.obs[within])
         for g in groups:
-            data = adata.obs.loc[adata.obs[within] == g].values
+            data = adata.obs.loc[adata.obs[within] == g,column].values
             absolute_diff = np.abs(data - np.median(data))
             mad = np.median(absolute_diff)
             cutoff_low = np.median(data) - (float(relative_threshold) * mad)
@@ -1133,9 +1133,8 @@ def main():
     #print("Saved genes")
     #del sparse_matrix
     
-    # NEW
-    #adata.write_h5ad(f"results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad")
-    #print("Saved after log1p")
+    adata.write_h5ad(f"results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad")
+    print("Saved after log1p")
     
     # identify highly variable genes and scale these ahead of PCA
     print("Calculating highly variable")
