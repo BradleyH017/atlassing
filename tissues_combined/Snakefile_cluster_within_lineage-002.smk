@@ -2,11 +2,12 @@ configfile: "config_cluster_within_lineage.yaml" # round2 config + cluster withi
 
 rule all:
     input:
+        expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/optimum_nn_bbknn.txt", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad", tissue=config["tissue"])
         #"results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
-        "results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
+        #"results/combined/objects/adata_grouped_post_cluster_QC.h5ad"
         #"results/combined/tables/annotation/CellTypist/CellTypist_prob_matrix.csv"
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
@@ -29,23 +30,13 @@ rule qc_raw:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
         min_nUMI=config["min_nUMI"],
-        use_absolute_nUMI=config["use_absolute_nUMI"],
-        use_relative_mad=config["use_relative_mad"],
-        lineage_column=config["lineage_column"],
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
-        filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
-        plot_within=config["plot_within"],
-        relative_nUMI_log=config["relative_nUMI_log"],
+        threshold_method=config["threshold_method"],
         min_nGene=config["min_nGene"],
-        use_absolute_nGene=config["use_absolute_nGene"],
-        relative_nGene_log=config["relative_nGene_log"],
         MT_thresh_gut=config["MT_thresh_gut"],
         MT_thresh_blood=config["MT_thresh_blood"],
-        use_absolute_MT=config["use_absolute_MT"],
-        min_MT=config["min_MT"],
-        absolute_max_MT=config["absolute_max_MT"],
         use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
         min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
         min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
@@ -55,46 +46,41 @@ rule qc_raw:
         min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_cells_pre_samples=config["filt_cells_pre_samples"],
+        plot_per_samp_qc=config["plot_per_samp_qc"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
+        hvgs_within=config["hvgs_within"],
         remove_problem_genes=config["remove_problem_genes"],
         per_samp_relative_threshold=config["per_samp_relative_threshold"],
         sample_level_grouping=config["sample_level_grouping"],
-        cols_sample_relative_filter=config["cols_sample_relative_filter"]
+        cols_sample_relative_filter=config["cols_sample_relative_filter"],
+        pref_matrix=config["pref_matrix"],
+        calc_hvgs_together=config["calc_hvgs_together"]
     resources:
-        mem=500000, # all = 850000
-        queue='normal', # all = teramem
-        mem_mb=500000,
-        mem_mib=500000,
-        disk_mb=500000,
+        mem=700000, 
+        queue='normal', 
+        mem_mb=700000,
+        mem_mib=700000,
+        disk_mb=700000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
         "scvi-env"
     shell:
         r"""
-        python  bin/001-raw_QC_sm.py \
+        python bin/001-raw_QC_update.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
         --all_blood_immune {params.all_blood_immune} \
         --min_nUMI {params.min_nUMI} \
-        --use_absolute_nUMI {params.use_absolute_nUMI} \
-        --use_relative_mad {params.use_relative_mad} \
-        --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
-        --plot_within {params.plot_within} \
-        --lineage_column {params.lineage_column} \
-        --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
-        --relative_nUMI_log {params.relative_nUMI_log} \
+        --threshold_method {params.threshold_method} \
+        --relative_grouping {params.relative_grouping} \
+        --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --min_nGene {params.min_nGene} \
-        --use_absolute_nGene {params.use_absolute_nGene} \
-        --relative_nGene_log {params.relative_nGene_log} \
         --MT_thresh_gut {params.MT_thresh_gut} \
         --MT_thresh_blood {params.MT_thresh_blood} \
-        --use_absolute_MT {params.use_absolute_MT} \
-        --absolute_max_MT {params.absolute_max_MT} \
-        --min_MT {params.min_MT} \
         --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
         --min_median_nCount_per_samp_blood {params.min_median_nCount_per_samp_blood} \
         --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
@@ -104,12 +90,16 @@ rule qc_raw:
         --min_ncells_per_sample {params.min_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_cells_pre_samples {params.filt_cells_pre_samples} \
+        --plot_per_samp_qc {params.plot_per_samp_qc} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
+        --hvgs_within {params.hvgs_within} \
         --remove_problem_genes {params.remove_problem_genes} \
         --per_samp_relative_threshold {params.per_samp_relative_threshold} \
         --sample_level_grouping {params.sample_level_grouping} \
-        --cols_sample_relative_filter {params.cols_sample_relative_filter}
+        --cols_sample_relative_filter {params.cols_sample_relative_filter} \
+        --pref_matrix {params.pref_matrix} \
+        --calc_hvgs_together {params.calc_hvgs_together}
         """
 
 # Get the batch methods to use
@@ -192,7 +182,7 @@ if "Harmony" in batch_methods:
             correct_variable_only=config["correct_variable_only"]
         resources:
             mem=150000, # All = 150000
-            queue='long', # All = long
+            queue='normal', # All = normal
             mem_mb=150000,
             mem_mib=150000,
             disk_mb=150000,
@@ -359,7 +349,7 @@ if "Manual" in config["nn_choice"]:
             nn=config["nn"]
         resources:
             mem=5000,
-            queue='long',
+            queue='normal',
             mem_mb=5000,
             mem_mib=5000,
             disk_mb=5000,
@@ -387,7 +377,7 @@ if "array" in config["nn_choice"]:
             "scib-env"
         resources:
             mem=increment_memory(750000), # All = 350000
-            queue='normal', # All = long
+            queue='normal', # All = normal
             mem_mb=increment_memory(750000),
             mem_mib=increment_memory(750000),
             disk_mb=increment_memory(750000), 
@@ -420,7 +410,7 @@ if "array" in config["nn_choice"]:
             "results/{tissue}/tables/optimum_nn.txt"
         resources:
             mem=increment_memory(20000),
-            queue='long',
+            queue='normal',
             mem_mb=increment_memory(20000),
             mem_mib=increment_memory(20000),
             disk_mb=increment_memory(20000), 
@@ -448,7 +438,7 @@ rule get_umap:
         col_by=config["col_by"]
     resources:
         mem=increment_memory(100000), # All = 350000
-        queue='normal', # All = long
+        queue='normal', # All = normal
         mem_mb=increment_memory(100000),
         mem_mib=increment_memory(100000),
         disk_mb=increment_memory(100000), 
@@ -477,11 +467,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(300000), #All - 350000
-        queue='normal', # All = long
-        mem_mb=increment_memory(300000),
-        mem_mib=increment_memory(300000),
-        disk_mb=increment_memory(300000),
+        mem=increment_memory(60000), #All - 350000
+        queue='normal', # All = normal
+        mem_mb=increment_memory(60000),
+        mem_mib=increment_memory(60000),
+        disk_mb=increment_memory(60000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -581,11 +571,11 @@ rule test_clusters_keras:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(650000), #All - 850000
-        queue='normal',
-        mem_mb=increment_memory(650000),
-        mem_mib=increment_memory(650000),
-        disk_mb=increment_memory(650000),
+        mem=increment_memory(750000), #All - 850000
+        queue='teramem',
+        mem_mb=increment_memory(750000),
+        mem_mib=increment_memory(750000),
+        disk_mb=increment_memory(750000),
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -653,7 +643,7 @@ rule cluster_qc_summarise_keras:
 
         """
 
-
+'''
 # Define function to aggregate these across lineages and output to a single file
 def gather_accross_tissues(wildcards):
     return expand("results/{tissue}/objects/adata_clusters_post_clusterQC.h5ad",
@@ -743,7 +733,7 @@ rule make_lineage_prediction_model:
             --output_file results/combined/tables/lineage_model/base
         """
 
-'''
+
 rule add_celltypist:
     input:
         "results/combined/objects/adata_grouped_post_cluster_QC.h5ad",
@@ -790,7 +780,7 @@ rule predict_all_cells:
         "/software/hgi/containers/yascp/yascp.cog.sanger.ac.uk-public-singularity_images-wtsihgi_nf_scrna_qc_6bb6af5-2021-12-23-3270149cf265.sif"
     resources:
         mem=300000,
-        queue='long',
+        queue='normal',
         mem_mb=300000,
         mem_mib=300000,
         disk_mb=300000,
@@ -820,7 +810,7 @@ rule add_predictions_filter:
         probability_threshold=config["probability_threshold"]
     resources:
         mem=300000,
-        queue='long',
+        queue='normal',
         mem_mb=300000,
         mem_mib=300000,
         disk_mb=300000,
