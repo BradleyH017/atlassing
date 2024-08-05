@@ -698,6 +698,18 @@ def main():
     adata.obs['log_n_genes_by_counts'] = np.log10(adata.obs['n_genes_by_counts'])
     adata.obs['log_total_counts'] = np.log10(adata.obs['total_counts'])
     
+    # Remove samples with fewer than X cells. Important if doing relative QC
+    adata.obs['samp_tissue'] = adata.obs['sanger_sample_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
+    samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
+    cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
+    chuck = cells_sample.loc[cells_sample['Ncells'] < min_ncells_per_sample, 'sample'].values
+    if len(chuck) > 0:
+        adata = adata[~adata.obs['samp_tissue'].isin(chuck)]
+        
+    # If running on epithelial, remove samples from the blood
+    if tissue == "all_Epithelial":
+        adata = adata[adata.obs['tissue'] != "blood"]
+    
     # Plot prelimeinary exploratory plots
     # These are per-grouping for each parameter - to highlight where shared/common QC could be useful
     # Also force this to be done per tissue
@@ -710,9 +722,6 @@ def main():
         update_obs_qc_plot_thresh(adata, c, within=relative_grouping, relative_threshold=relative_nMAD_threshold, threshold_method = threshold_method, relative_directionality = "bi", absolute=thresholds[c], absolute_directionality = over_under[c], plot =True, out=qc_path, out_suffix = "_THRESHOLDED")
 
     # Extract list of high and low cell number samples - PRE QC
-    adata.obs['samp_tissue'] = adata.obs['sanger_sample_id'].astype('str') + "_" + adata.obs['tissue'].astype('str')
-    samp_data = np.unique(adata.obs.samp_tissue, return_counts=True)
-    cells_sample = pd.DataFrame({'sample': samp_data[0], 'Ncells':samp_data[1]})
     high_samps = np.unique(cells_sample.loc[cells_sample.Ncells > max_ncells_per_sample, "sample"])
     low_samps = np.array(cells_sample.loc[cells_sample.Ncells < min_ncells_per_sample, "sample"])
 
