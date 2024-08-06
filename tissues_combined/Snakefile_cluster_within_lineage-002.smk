@@ -57,11 +57,11 @@ rule qc_raw:
         pref_matrix=config["pref_matrix"],
         calc_hvgs_together=config["calc_hvgs_together"]
     resources:
-        mem=700000, 
-        queue='normal', 
-        mem_mb=700000,
-        mem_mib=700000,
-        disk_mb=700000,
+        mem=lambda wildcards: 1100000 if wildcards.tissue == 'all_Epithelial' else 200000, 
+        queue=lambda wildcards: 'teramem' if wildcards.tissue == 'all_Epithelial' else 'normal', 
+        mem_mb=lambda wildcards: 1100000 if wildcards.tissue == 'all_Epithelial' else 200000,
+        mem_mib=lambda wildcards: 1100000 if wildcards.tissue == 'all_Epithelial' else 200000,
+        disk_mb=lambda wildcards: 1100000 if wildcards.tissue == 'all_Epithelial' else 200000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
@@ -467,11 +467,11 @@ rule cluster_array:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/clusters.csv",
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/umap_clusters_res{clustering_resolution}.png"
     resources:
-        mem=increment_memory(60000), #All - 350000
+        mem=lambda wildcards: 60000 if wildcards.tissue == 'all_Epithelial' else 40000,
         queue='normal', # All = normal
-        mem_mb=increment_memory(60000),
-        mem_mib=increment_memory(60000),
-        disk_mb=increment_memory(60000),
+        mem_mb=lambda wildcards: 60000 if wildcards.tissue == 'all_Epithelial' else 40000,
+        mem_mib=lambda wildcards: 60000 if wildcards.tissue == 'all_Epithelial' else 40000,
+        disk_mb=lambda wildcards: 60000 if wildcards.tissue == 'all_Epithelial' else 40000,
         tmpdir="tmp",
         threads=16 # All 16
     conda:
@@ -571,11 +571,11 @@ rule test_clusters_keras:
     output:
         "results/{tissue}/tables/clustering_array/leiden_{clustering_resolution}/base-model_report.tsv.gz"
     resources:
-        mem=increment_memory(750000), #All - 850000
-        queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
+        mem= lambda wildcards: 1000000 if wildcards.tissue == 'all_Epithelial' else 400000,
+        queue= lambda wildcards: 'teramem' if wildcards.tissue == 'all_Epithelial' else 'normal',
+        mem_mb=lambda wildcards: 1000000 if wildcards.tissue == 'all_Epithelial' else 400000,
+        mem_mib=lambda wildcards: 1000000 if wildcards.tissue == 'all_Epithelial' else 400000,
+        disk_mb=lambda wildcards: 1000000 if wildcards.tissue == 'all_Epithelial' else 400000,
         tmpdir="tmp",
         threads=16 # All 16
     conda:
