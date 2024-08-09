@@ -10,8 +10,10 @@ else:
 rule all:
     input:
         #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/0_nn_bbknn.txt", tissue=config["tissue"])
-        #expand("results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad", tissue=config["tissue"])
-        expand("results/{tissue}/tables/clustering_array/leiden_0/base-model_report.tsv.gz", tissue=config["tissue"])
+        expand("results/{tissue}/tables/lineage_model/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", tissue=config["tissue"]),expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])
+        #expand("results/{tissue}/tables/clustering_array/leiden_0/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])#, expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_decision_matrix.csv", tissue=config["tissue"])
+        #, expand("results/{tissue}/objects/keras_annot_not_subset.h5ad", tissue=config["tissue"])
+        #expand("results/{tissue}/objects/keras_annot_not_subset.h5ad", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
         #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
         
@@ -22,40 +24,13 @@ def increment_memory(base_memory):
         return base_memory * (2 ** (attempt - 1))
     return mem
 
-
-rule combine_final_clusters_original_adata:
+rule qc_raw:
     input:
         input0
     output:
-        "results/{tissue}/objects/adata_raw_confident_cluster_cells_annotated.h5ad"
-    params:
-        original_input_round1=config["original_input_round1"]
-    resources:
-        mem=750000, # all = 850000
-        queue='teramem', # all = teramem
-        mem_mb=750000,
-        mem_mib=750000,
-        disk_mb=750000,
-        tmpdir="tmp",
-        threads=8 # all = 8
-    conda:
-        "scvi-env"
-    shell:
-        r"""
-        mkdir -p results/{wildcards.tissue}/{{figures,objects,tables}}
-        
-        python bin/992-combine_annot_with_raw.py \
-            --tissue {wildcards.tissue} \
-            --orig {params.original_input_round1} \
-            --filtered_clustered {input}
-        """
-
-rule qc_raw:
-    input:
-        "results/{tissue}/objects/adata_raw_confident_cluster_cells_annotated.h5ad"
-    output:
         "results/{tissue}/objects/adata_PCAd.h5ad",
-        "results/{tissue}/tables/knee.txt"
+        "results/{tissue}/tables/knee.txt",
+        "results/{tissue}/objects/adata_unfilt_log1p_cp10k.h5ad"
     params:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
@@ -67,6 +42,7 @@ rule qc_raw:
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
         filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
+        plot_within=config["plot_within"],
         relative_nUMI_log=config["relative_nUMI_log"],
         min_nGene=config["min_nGene"],
         use_absolute_nGene=config["use_absolute_nGene"],
@@ -82,10 +58,15 @@ rule qc_raw:
         min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
         min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
         max_ncells_per_sample=config["max_ncells_per_sample"],
+        min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
+        filt_cells_pre_samples=config["filt_cells_pre_samples"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
-        remove_problem_genes=config["remove_problem_genes"]
+        remove_problem_genes=config["remove_problem_genes"],
+        per_samp_relative_threshold=config["per_samp_relative_threshold"],
+        sample_level_grouping=config["sample_level_grouping"],
+        cols_sample_relative_filter=config["cols_sample_relative_filter"]
     resources:
         mem=850000, # all = 850000
         queue='teramem', # all = teramem
@@ -108,6 +89,7 @@ rule qc_raw:
         --use_relative_mad {params.use_relative_mad} \
         --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
+        --plot_within {params.plot_within} \
         --lineage_column {params.lineage_column} \
         --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --relative_nUMI_log {params.relative_nUMI_log} \
@@ -125,10 +107,62 @@ rule qc_raw:
         --min_median_nGene_per_samp_blood {params.min_median_nGene_per_samp_blood} \
         --min_median_nGene_per_samp_gut {params.min_median_nGene_per_samp_gut} \
         --max_ncells_per_sample {params.max_ncells_per_sample} \
+        --min_ncells_per_sample {params.min_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
+        --filt_cells_pre_samples {params.filt_cells_pre_samples} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
-        --remove_problem_genes {params.remove_problem_genes}
+        --remove_problem_genes {params.remove_problem_genes} \
+        --per_samp_relative_threshold {params.per_samp_relative_threshold} \
+        --sample_level_grouping {params.sample_level_grouping} \
+        --cols_sample_relative_filter {params.cols_sample_relative_filter}
+        """
+
+# NOTE: Using the output of the above rule will mean using only HVGs
+rule make_lineage_prediction_model:
+    input:
+        "results/{tissue}/objects/adata_PCAd.h5ad"
+    output:
+        "results/{tissue}/tables/lineage_model/base-model_report.tsv.gz"
+    params:
+        #combined_file=config["combined_file"],
+        activation=config["activation"],
+        loss=config["loss"],
+        optimizer=config["optimizer"],
+        sparsity_l1__activity=config["sparsity_l1__activity"],
+        sparsity_l1__bias=config["sparsity_l1__bias"],
+        sparsity_l1__kernel=config["sparsity_l1__kernel"],
+        sparsity_l2__activity=config["sparsity_l2__activity"],
+        sparsity_l2__bias=config["sparsity_l2__bias"],
+        sparsity_l2__kernel=config["sparsity_l2__kernel"]
+    resources:
+        mem=850000,
+        queue='teramem',
+        mem_mb=850000,
+        mem_mib=850000,
+        disk_mb=850000,
+        tmpdir="tmp",
+        threads=4
+    conda:
+        "single_cell"
+    shell:
+        r"""
+        path="results/combined/tables/keras-grid_search"
+        mkdir -p ${{path}}
+
+        echo -e "param__activation\t{params.activation}\nparam__loss\t{params.loss}\nparam__optimizer\t{params.optimizer}\nparam__sparsity_l1__activity\t{params.sparsity_l1__activity}\nparam__sparsity_l1__bias\t{params.sparsity_l1__bias}\nparam__sparsity_l1__kernel\t{params.sparsity_l1__kernel}\nparam__sparsity_l2__activity\t{params.sparsity_l2__activity}\nparam__sparsity_l2__bias\t{params.sparsity_l2__bias}\nparam__sparsity_l2__kernel\t{params.sparsity_l2__kernel}" > ${{path}}/keras-use_params.txt
+        
+        echo {input}
+
+        python bin/005a-scanpy_cluster_optimise_model-keras_adata.py \
+            --h5_anndata {input} \
+            --leiden_res 0 \
+            --number_epoch 25 \
+            --keras_param_file ${{path}}/keras-use_params.txt \
+            --batch_size 32 \
+            --cluster_col "manual_lineage" \
+            --train_size_fraction 0.67 \
+            --output_file results/combined/tables/lineage_model/base
         """
 
 # Get the batch methods to use
@@ -549,128 +583,63 @@ rule test_clusters_make_model:
             --output_file results/{wildcards.tissue}/tables/clustering_array/leiden_0/base
         """
 
-rule add_celltypist:
+rule make_celltypist_model:
     input:
-        "results/{tissue}/objects/adata_PCAd_batched_umap_clustered.h5ad",
-        "results/{tissue}/tables/batch_correction/best_batch_method.txt"
+        input0
     output:
-        "results/{tissue}/tables/annotation/CellTypist/CellTypist_prob_matrix.csv",
-        "results/{tissue}/tables/annotation/CellTypist/CellTypist_decision_matrix.csv",
-        "results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv"
-    params:
-        model=config["celltypist_model"],
-        model_name=config["celltypist_model_name"]
+        "results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl"
     resources:
-        mem=increment_memory(750000), #All - 850000
-        queue='teramem',
-        mem_mb=increment_memory(750000),
-        mem_mib=increment_memory(750000),
-        disk_mb=increment_memory(750000),
+        mem=500000,
+        queue='normal',
+        mem_mb=500000,
+        mem_mib=500000,
+        disk_mb=500000,
         tmpdir="tmp",
-        threads=16 
+        threads=30
     conda:
         "scvi-env"
     shell:
         r"""
-        mkdir -p results/{wildcards.tissue}/figures/annotation
-        mkdir -p results/{wildcards.tissue}/tables/annotation
-        mkdir -p results/{wildcards.tissue}/tables/annotation/CellTypist
-        
-        python bin/007-CellTypist.py \
-            --tissue {wildcards.tissue} \
-            --h5_path {input[0]} \
-            --pref_matrix {input[1]} \
-            --model {params.model} \
-            --model_name {params.model_name}
+        python bin/993-make_celltypist_model.py \
+            --h5_anndata {input} \
+            --outdir results/{wildcards.tissue}/objects \
+            --annotation "leiden" \
+            --gene_symbols
         """
 
-if config["two_step_prediction"]:
-    rule predict_cells_1:
-        output:
-            "results/combined/objects/keras_annot_round1.h5ad"
-        conda:
-            "single_cell"
-        params:
-            orig_h5ad=config["original_input_round1"],
-            model=config["round1_model"],
-            weights=config["round1_model_weights"]
-        resources:
-            mem=750000,
-            queue='teramem',
-            mem_mb=750000,
-            mem_mib=750000,
-            disk_mb=750000,
-            tmpdir="tmp",
-            threads=2
-        shell:
-            r"""
-            mkdir -p results/combined/objects/keras_annot_round1
-            python bin/008-predict_all_probabilities_keras_adata.py \
-                --tissue "combined" \
-                --h5ad {params.orig_h5ad} \
-                --model {params.model} \
-                --weights {params.weights} \
-                --output_file "results/combined/objects/keras_annot_round1"
-            """
 
-    rule stream_1:
-        input:
-            "results/combined/objects/keras_annot_round1.h5ad"
-        output:
-            "results/combined/objects/keras_annot_round1_{model_subset}.h5ad"
-        conda:
-            "single_cell"
-        resources:
-            mem=750000,
-            queue='teramem',
-            mem_mb=750000,
-            mem_mib=750000,
-            disk_mb=750000,
+
+rule save_sample_list:
+    output:
+        "results/{tissue}/tables/sample_list.txt"
+    conda:
+        "scvi-env"
+    resources:
+            mem=300000,
+            queue='normal',
+            mem_mb=300000,
+            mem_mib=300000,
             tmpdir="tmp",
             threads=2
-        shell:
-            r"""
-            # Something to modify the columns of adata.obs from the prev version, and divide by the maximum value acros given columns
-            """
-        
-    rule predict_cells_2:
-        input:
-            "results/combined/objects/keras_annot_round1_{model_subset}.h5ad",
-            "results_round2/{model_subset}/tables/optim_resolution.txt"
-        output:
-            "results/combined/objects/keras_annot_round2_{model_subset}.h5ad"
-        conda:
-            "single_cell"
-        resources:
-            mem=750000,
-            queue='teramem',
-            mem_mb=750000,
-            mem_mib=750000,
-            disk_mb=750000,
-            tmpdir="tmp",
-            threads=2
-        shell:
-            r"""
-            # Load in the optim resolution, generate path to the model and weights for this
-            # Prediction of this subset of data
-            """
-    
-    def gather_subsets(wildcards):
-    return expand("results/combined/objects/keras_annot_round2_{model_subset}.h5ad",
-                  model_subset=wildcards.model_subset)
-    
-    rule aggregate_after_rule_2:
-        input:
-            gather_subsets
-        params:
-            orig_h5ad=config["original_input_round1"]
-        output:
-            "results/combined/objects/keras_annot_not_subset.h5ad"
-        shell:
-            r"""
-            # Select the top cluster and probability from each input file
-            # Combine this metadata with the ORIGINAL adata file and subset for the cells inclusion in these
-            # Save to output file
-            """
-else:
-    # Write the single-step prediction here
+    params:
+        orig_h5ad=config["original_input_round1"],
+        samp_col=config["batch_column"]
+    shell:
+        r"""
+        python bin/008a-get_adata_sample_list.py \
+                --h5ad {params.orig_h5ad} \
+                --samp_col "sanger_sample_id" \
+                --output_file "results/{wildcards.tissue}/tables/"
+        """
+
+# Run CellTypist manually
+# mkdir -p results/combined/figures/annotation
+# mkdir -p results/combined/tables/annotation/
+# mkdir -p results/combined/figures/UMAP/annotation
+# mkdir -p results/{tissue}/tables/annotation/CellTypist/
+# python bin/007-CellTypist.py \
+#            --tissue "combined" \
+#            --h5_path "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/results_round3/combined/objects/adata_PCAd_batched_umap.h5ad" \
+#            --pref_matrix "results_round3/combined/tables/batch_correction/best_batch_method.txt" \
+#            --model "/lustre/scratch127/cellgen/cellgeni/cakirb/celltypist_models/megagut_celltypist_lowerGI+lym_adult_mar24.pkl" \
+#            --model_name "Megagut_adult_lower_GI_mar24" 
