@@ -31,7 +31,7 @@ rule qc_raw:
         all_blood_immune=config["all_blood_immune"],
         min_nUMI=config["min_nUMI"],
         relative_grouping=config["relative_grouping"],
-        relative_nMAD_threshold=config["relative_nMAD_threshold"],
+        relative_nMAD_threshold=lambda wildcards: config["relative_nMAD_threshold_epithelial"] if wildcards.tissue == "all_Epithelial" else config["relative_nMAD_threshold"],
         nMad_directionality=config["nMad_directionality"],
         threshold_method=config["threshold_method"],
         min_nGene=config["min_nGene"],
@@ -40,8 +40,8 @@ rule qc_raw:
         use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
         min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
         min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
-        min_median_nGene_per_samp_blood=config["min_median_nGene_per_samp_blood"],
-        min_median_nGene_per_samp_gut=config["min_median_nGene_per_samp_gut"],
+        min_median_nGene_per_samp_blood=lambda wildcards: config["min_median_nGene_per_samp_epi"] if wildcards.tissue == "all_Epithelial" else config["min_median_nGene_per_samp_nonepi"],
+        min_median_nGene_per_samp_gut=lambda wildcards: config["min_median_nGene_per_samp_epi"] if wildcards.tissue == "all_Epithelial" else config["min_median_nGene_per_samp_nonepi"],
         max_ncells_per_sample=config["max_ncells_per_sample"],
         min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
@@ -346,7 +346,7 @@ if "Manual" in config["nn_choice"]:
         output:
             "results/{tissue}/tables/optimum_nn.txt"
         params:
-            nn=config["nn"]
+            nn=lambda wildcards: config["nn_epithelial"] if wildcards.tissue == "all_Epithelial" else config["nn"]
         resources:
             mem=5000,
             queue='normal',
@@ -620,11 +620,11 @@ rule cluster_qc_summarise_keras:
     conda:
         "scvi-env"
     resources:
-        mem=200000, # All - 350000
+        mem=80000, # All - 350000
         queue='normal', # All - normal
-        mem_mb=200000,
-        mem_mib=200000,
-        disk_mb=200000,
+        mem_mb=80000,
+        mem_mib=80000,
+        disk_mb=80000,
         tmpdir="tmp",
         threads=4
     shell:

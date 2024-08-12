@@ -24,8 +24,8 @@ MT_thresh_blood: 20 # MT thresh for blood
 use_MT_thresh_blood_gut_immune: "no" # Use the absolute MT threshold for blood on the gut immune cells? 
 min_median_nCount_per_samp_blood: 0 # Exclude samples with median nCount lower than this value (blood). Samples with low medians for these metrics tend to integrate badly. If want to ignor this, set to very high number, e.g 60k
 min_median_nCount_per_samp_gut: 0 # Same but gut
-min_median_nGene_per_samp_blood: 0 # Exclude samples with median nGene than this value (blood)
-min_median_nGene_per_samp_gut: 0 # Same but gut
+min_median_nGene_per_samp_epi: 2000 # Exclude samples with median nGene than this value (epithelium)
+min_median_nGene_per_samp_nonepi: 0 # Same but not epithelium
 max_ncells_per_sample: 100000 # Maximum number of preQC cells that can originate from a single sample
 min_ncells_per_sample: 10 # Minimum number of cells that can originate from a single sample. If don't want to use, set to 0
 plot_per_samp_qc: "yes" # Plot the distribution of QC parameters across samples (e.g within tissue) - Takes up LOTS of memory if lots of samples
@@ -80,7 +80,7 @@ sparsity_l2__kernel: 0.01
 sparsity_l2__bias: 0.01
 
 # Clustering and validation options
-clustering_resolutions: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2] # What are the range of clustering resolutions to iterate over? [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+clustering_resolutions: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5] # What are the range of clustering resolutions to iterate over? [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
 
 # Cluster-level QC and post-clustering sample QC
