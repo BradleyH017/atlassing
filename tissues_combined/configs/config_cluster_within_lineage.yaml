@@ -57,7 +57,7 @@ pref_matrix: "scVI" # Can leave empty if benching
 use_bbknn: True
 nn_choice: "Manual" # Can be 'Manual' to use pre-defined NN parameter provided by 'nn' parameter, 'bbknn' to use the nn selected by bbknn or 'array' to run an array test over 'nn_values' parameter 
 nn_values: [15, 30, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
-nn: 15
+nn: 30
 nn_epithelial: 50
 
 # What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
