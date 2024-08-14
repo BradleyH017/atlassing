@@ -1,0 +1,95 @@
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@farm22-oversubscribed01>
+Subject: Job 189375: <snakemake_master> in cluster <farm22> Exited
+
+Job <snakemake_master> was submitted from host <farm22-head2> by user <bh18> in cluster <farm22> at Wed Aug 14 15:09:48 2024
+Job was executed on host(s) <farm22-oversubscribed01>, in queue <oversubscribed>, as user <bh18> in cluster <farm22> at Wed Aug 14 15:09:50 2024
+</nfs/users/nfs_b/bh18> was used as the home directory.
+</lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined> was used as the working directory.
+Started at Wed Aug 14 15:09:50 2024
+Terminated at Wed Aug 14 15:11:07 2024
+Results reported at Wed Aug 14 15:11:07 2024
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -o sm_logs/snakemake_master-%J-output.log
+#BSUB -e sm_logs/snakemake_master-%J-error.log 
+#BSUB -q oversubscribed
+#BSUB -G team152
+#BSUB -n 1
+#BSUB -M 10000
+#BSUB -a "memlimit=True"
+#BSUB -R "select[mem>10000] rusage[mem=10000] span[hosts=1]"
+#BSUB -J 1
+
+## Getting LSF snakemake config:
+# mamba install -c conda-forge cookiecutter
+# profile_dir="${HOME}/.config/snakemake"
+# mkdir -p "$profile_dir"
+## use cookiecutter to create the profile in the config directory
+# template="gh:Snakemake-Profiles/lsf"
+# cookiecutter --output-dir "$profile_dir" "$template"
+# LSF_UNIT_FOR_LIMITS=2 (MB)
+# UNKWN_behaviour=2 (kill)
+# ZOMBI_behaviour=2 (kill)
+# latency wait = 5
+# use_conda = y
+# use singularity = n
+# restart_times = 0
+# print shell commands = y
+# jobs 500
+# default mem = 1024
+# default cluster logdir = ./ (tissues_combined/sm_logs)
+# default queue = normal
+# default project = ""
+# max_status_checks_per_second = 10
+# max_jobs_per_second = 10
+# max_status_checks = 1
+# wait_between_tries = 1
+# jobscript timeout 10
+# profile_name = sanger-brad2
+
+# Define some params
+config_var=configs/config.yaml
+worfklow_prefix="multi-tissue_"
+group="team152"
+workdir=${PWD}
+
+# Submit the Snakefile to the cluster using snakemake
+#source ~/.bashrc # activate base env - farm5
+module load HGI/common/conda
+#conda init
+source activate sm7
+
+
+(... more ...)
+------------------------------------------------------------
+
+TERM_OWNER: job killed by owner.
+Exited with signal termination: 9.
+
+Resource usage summary:
+
+    CPU time :                                   27.00 sec.
+    Max Memory :                                 138 MB
+    Average Memory :                             74.69 MB
+    Total Requested Memory :                     2000.00 MB
+    Delta Memory :                               1862.00 MB
+    Max Swap :                                   -
+    Max Processes :                              6
+    Max Threads :                                36
+    Run time :                                   75 sec.
+    Turnaround time :                            79 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <sm_logs/snakemake_master-189375-error.log> for stderr output of this job.
+

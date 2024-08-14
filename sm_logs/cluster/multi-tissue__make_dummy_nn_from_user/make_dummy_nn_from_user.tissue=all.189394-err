@@ -1,0 +1,19 @@
+Building DAG of jobs...
+Using shell: /usr/local/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=5000, disk_mb=5000, disk_mib=4769, threads=1, mem=5000, mem_mib=5000
+Select jobs to execute...
+
+[Wed Aug 14 15:10:29 2024]
+rule make_dummy_nn_from_user:
+    output: results/all/tables/optimum_nn.txt
+    jobid: 0
+    reason: Forced execution
+    wildcards: tissue=all
+    resources: mem_mb=5000, disk_mb=5000, disk_mib=4769, tmpdir=tmp, threads=1, mem=5000, queue=normal, mem_mib=5000
+
+Activating conda environment: scvi-env_reserve
+[Wed Aug 14 15:10:43 2024]
+Finished job 0.
+1 of 1 steps (100%) done

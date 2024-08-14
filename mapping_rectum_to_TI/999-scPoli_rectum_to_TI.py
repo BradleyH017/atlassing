@@ -3,8 +3,8 @@
 # Script to compute an scvi model of one tissue (TI) in order to map a second tissue (rectum) onto this data
 # Following https://github.com/theislab/scarches/blob/master/notebooks/scvi_surgery_pipeline.ipynb and
 # https://github.com/theislab/scarches/blob/master/notebooks/hlca_map_classify.ipynb and 
-# https://github.com/MarioniLab/oor_benchmark/tree/master/src/oor_benchmark/methods
-# Forked from https://github.com/MarioniLab/oor_benchmark.git
+## https://github.com/MarioniLab/oor_benchmark/tree/master/src/oor_benchmark/methods
+## Forked from https://github.com/MarioniLab/oor_benchmark.git
 __author__ = 'Bradley Harris'
 __date__ = '2024-01-02'
 __version__ = '0.0.1'
@@ -117,13 +117,14 @@ def main():
     print(f"source shape = {source_adata.shape}")
 
     # Annotate these
-    annot = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv")
-    annot['cluster'] = annot['cluster'].astype('category')
-    source_adata.obs['cluster'] = source_adata.obs['cluster'].astype(int)
-    cells = source_adata.obs.index
-    source_adata.obs = source_adata.obs.merge(annot, on="cluster")
-    source_adata.obs.index=cells
-    source_adata.obs['label__machine'] = source_adata.obs['label__machine_retired']
+    if not "label__machine" in source_adata.obs.columns:
+        annot = pd.read_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/highQC_TI_discovery/data-clean_annotation_full.csv")
+        annot['cluster'] = annot['cluster'].astype('category')
+        source_adata.obs['cluster'] = source_adata.obs['cluster'].astype(int)
+        source_adata.obs['cell'] = source_adata.obs.index
+        source_adata.obs = source_adata.obs.merge(annot, how="left", on="cluster")
+        source_adata.obs.set_index('cell', inplace=True)
+        source_adata.obs['label__machine'] = source_adata.obs['label__machine_retired']
 
     # Load in the query
     target_adata = sc.read(query__file)
@@ -140,7 +141,7 @@ def main():
     sc.pp.log1p(source_adata)
     sc.pp.highly_variable_genes(source_adata, flavor="seurat", n_top_genes=4000, batch_key='sanger_sample_id', subset=True)
 
-    # Prep the targetdata
+    # Prep the target data
     sc.pp.normalize_total(target_adata, target_sum=1e4)
     sc.pp.log1p(target_adata)
 
@@ -333,6 +334,17 @@ def main():
         cmap='magma',
         vmax=1,
         save="_TI-rectum_no_prototypes_scPoli_annotation_uncertainty.png"
+    )
+    
+    # Have a look at the catsgories
+    sc.pl.umap(
+        adata_no_prototypes, 
+        color='category',
+        show=False, 
+        frameon=False,
+        cmap='magma',
+        vmax=1,
+        save="_TI-rectum_no_prototypes_scPoli_category.png"
     )
         
     
