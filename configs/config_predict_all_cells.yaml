@@ -18,7 +18,7 @@ min_nGene: 250 # Min nGene
 use_absolute_nGene: "yes" # Use min nGene
 relative_nGene_log: "yes" # Also use a relative nGene?
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
-MT_thresh_blood: 20 # MT thresh for blood
+MT_thresh_blood: 20 # MT thresh for blood
 use_absolute_MT: "yes" # Use ansolute MT
 min_MT: 0 # Minmum MT% - epithelial cells with 0 (!) seem to be seperating in the embedding. If don't want to apply this, set to 0
 absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it

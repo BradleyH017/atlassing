@@ -19,7 +19,7 @@ min_nGene: 250 # Min nGene
 use_absolute_nGene: "yes" # Use min nGene
 relative_nGene_log: "yes" # Also use a relative nGene?
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
-MT_thresh_blood: 20 # MT thresh for blood
+MT_thresh_blood: 20 # MT thresh for blood
 use_absolute_MT: "yes" # Use ansolute MT
 min_MT: 0 # Minmum MT% - epithelial cells with 0 (!) seem to be seperating in the embedding. If don't want to apply this, set to 0
 absolute_max_MT: 50 # In this case, the absolute threshold is only used if the relatve thresholds exceed it
@@ -31,7 +31,7 @@ min_median_nGene_per_samp_gut: 1000 # Same but gut
 max_ncells_per_sample: 18000 # Maximum number of cells that can originate from a single sample. If don't want to use these, set to ridiculously high number like 1000000
 min_ncells_per_sample: 0 # Minimum number of cells that can originate from a single sample. If don't want to use, set to 0
 use_abs_per_samp: "yes" # Use these absolute metrics
-filt_cells_pre_samples: "yes" # Filter the cells based on the above metrics BEFORE filtering the samples. NOTE: This will drastically alter the distirbution of QC metrics and therefore sample choice
+filt_cells_pre_samples: "yes" # Filter the cells based on the above metrics BEFORE filtering the samples. NOTE: This will drastically alter the distirbution of QC metrics and therefore sample choice
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
 n_variable_genes: 5000 # Number of variable genes for PCA calculation
 remove_problem_genes: "yes" # Remover MT/RP/IG genes from the highly variable genes?
