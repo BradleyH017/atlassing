@@ -1,102 +1,0 @@
-/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing
-/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results
-['/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing', '/software/team152/bh18/conda_envs/sc4/lib/python39.zip', '/software/team152/bh18/conda_envs/sc4/lib/python3.9', '/software/team152/bh18/conda_envs/sc4/lib/python3.9/lib-dynload', '/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages']
-/software/team152/bh18/conda_envs/sc4/lib/python3.9/site-packages/numpy/__init__.py
-Loaded libraries
-scanpy==1.9.3 anndata==0.9.2 umap==0.5.3 numpy==1.24.4 scipy==1.11.1 pandas==1.5.3 scikit-learn==1.3.0 statsmodels==0.14.0 python-igraph==0.10.6 pynndescent==0.5.10
-Loaded the data
-[11.]
-[4370.]
-The number of cells initially included is 690474
-The number of cells with >1 count in  481019
-99.29372
-The MAD of the remaining cells is:14.394099235534668
-Using the median + 2.5*mad=63.7783579826355, leaving us with 431993 cells
-The number of lost B Cell plasma cells lost at a cut off of 50 MT% is 31487(40.68245539232787%)
-The number of cells that remain after filtration is 395418
-0.2927018488118744
-After removal of the high cell samples, dataset size is
-(382163, 27912)
-IG
-(array([False,  True]), array([138,  87]))
-MT
-(array([False]), array([13]))
-RP
-(array([False]), array([146]))
-Knee:  12
-Elbow:  12
-The number of PCs used for this analysis is 17
-Training:   0%|          | 0/21 [00:00<?, ?it/s]Epoch 1/21:   0%|          | 0/21 [00:00<?, ?it/s]Epoch 1/21:   5%|▍         | 1/21 [33:39<11:13:17, 2019.89s/it]Epoch 1/21:   5%|▍         | 1/21 [33:39<11:13:17, 2019.89s/it, loss=8.67e+03, v_num=1]Epoch 2/21:   5%|▍         | 1/21 [33:39<11:13:17, 2019.89s/it, loss=8.67e+03, v_num=1]Epoch 2/21:  10%|▉         | 2/21 [1:13:31<11:48:57, 2238.82s/it, loss=8.67e+03, v_num=1]Epoch 2/21:  10%|▉         | 2/21 [1:13:31<11:48:57, 2238.82s/it, loss=8.42e+03, v_num=1]Epoch 3/21:  10%|▉         | 2/21 [1:13:31<11:48:57, 2238.82s/it, loss=8.42e+03, v_num=1]Epoch 3/21:  14%|█▍        | 3/21 [2:14:49<14:28:44, 2895.83s/it, loss=8.42e+03, v_num=1]Epoch 3/21:  14%|█▍        | 3/21 [2:14:49<14:28:44, 2895.83s/it, loss=8.24e+03, v_num=1]Epoch 4/21:  14%|█▍        | 3/21 [2:14:49<14:28:44, 2895.83s/it, loss=8.24e+03, v_num=1]Epoch 4/21:  19%|█▉        | 4/21 [3:19:22<15:29:44, 3281.47s/it, loss=8.24e+03, v_num=1]Epoch 4/21:  19%|█▉        | 4/21 [3:19:22<15:29:44, 3281.47s/it, loss=8.2e+03, v_num=1] Epoch 5/21:  19%|█▉        | 4/21 [3:19:22<15:29:44, 3281.47s/it, loss=8.2e+03, v_num=1]Epoch 5/21:  24%|██▍       | 5/21 [4:32:29<16:21:25, 3680.34s/it, loss=8.2e+03, v_num=1]Epoch 5/21:  24%|██▍       | 5/21 [4:32:29<16:21:25, 3680.34s/it, loss=8.41e+03, v_num=1]Epoch 6/21:  24%|██▍       | 5/21 [4:32:29<16:21:25, 3680.34s/it, loss=8.41e+03, v_num=1]Epoch 6/21:  29%|██▊       | 6/21 [5:19:19<14:06:04, 3384.31s/it, loss=8.41e+03, v_num=1]Epoch 6/21:  29%|██▊       | 6/21 [5:19:19<14:06:04, 3384.31s/it, loss=8.52e+03, v_num=1]Epoch 7/21:  29%|██▊       | 6/21 [5:19:19<14:06:04, 3384.31s/it, loss=8.52e+03, v_num=1]Epoch 7/21:  33%|███▎      | 7/21 [6:08:07<12:34:52, 3235.18s/it, loss=8.52e+03, v_num=1]Epoch 7/21:  33%|███▎      | 7/21 [6:08:07<12:34:52, 3235.18s/it, loss=8.28e+03, v_num=1]Epoch 8/21:  33%|███▎      | 7/21 [6:08:07<12:34:52, 3235.18s/it, loss=8.28e+03, v_num=1]Epoch 8/21:  38%|███▊      | 8/21 [7:17:50<12:46:20, 3536.93s/it, loss=8.28e+03, v_num=1]Epoch 8/21:  38%|███▊      | 8/21 [7:17:50<12:46:20, 3536.93s/it, loss=8.28e+03, v_num=1]Epoch 9/21:  38%|███▊      | 8/21 [7:17:50<12:46:20, 3536.93s/it, loss=8.28e+03, v_num=1]Epoch 9/21:  43%|████▎     | 9/21 [8:12:07<11:29:52, 3449.39s/it, loss=8.28e+03, v_num=1]Epoch 9/21:  43%|████▎     | 9/21 [8:12:07<11:29:52, 3449.39s/it, loss=8.11e+03, v_num=1]Epoch 10/21:  43%|████▎     | 9/21 [8:12:07<11:29:52, 3449.39s/it, loss=8.11e+03, v_num=1]Epoch 10/21:  48%|████▊     | 10/21 [8:57:33<9:51:26, 3226.03s/it, loss=8.11e+03, v_num=1]Epoch 10/21:  48%|████▊     | 10/21 [8:57:33<9:51:26, 3226.03s/it, loss=8.32e+03, v_num=1]Epoch 11/21:  48%|████▊     | 10/21 [8:57:33<9:51:26, 3226.03s/it, loss=8.32e+03, v_num=1]Epoch 11/21:  52%|█████▏    | 11/21 [9:37:44<8:16:06, 2976.63s/it, loss=8.32e+03, v_num=1]Epoch 11/21:  52%|█████▏    | 11/21 [9:37:44<8:16:06, 2976.63s/it, loss=8.31e+03, v_num=1]Epoch 12/21:  52%|█████▏    | 11/21 [9:37:44<8:16:06, 2976.63s/it, loss=8.31e+03, v_num=1]Epoch 12/21:  57%|█████▋    | 12/21 [10:12:24<6:45:35, 2703.93s/it, loss=8.31e+03, v_num=1]Epoch 12/21:  57%|█████▋    | 12/21 [10:12:24<6:45:35, 2703.93s/it, loss=8.28e+03, v_num=1]Epoch 13/21:  57%|█████▋    | 12/21 [10:12:24<6:45:35, 2703.93s/it, loss=8.28e+03, v_num=1]Epoch 13/21:  62%|██████▏   | 13/21 [10:40:17<5:18:52, 2391.59s/it, loss=8.28e+03, v_num=1]Epoch 13/21:  62%|██████▏   | 13/21 [10:40:17<5:18:52, 2391.59s/it, loss=8.27e+03, v_num=1]Epoch 14/21:  62%|██████▏   | 13/21 [10:40:17<5:18:52, 2391.59s/it, loss=8.27e+03, v_num=1]Epoch 14/21:  67%|██████▋   | 14/21 [11:18:04<4:34:36, 2353.75s/it, loss=8.27e+03, v_num=1]Epoch 14/21:  67%|██████▋   | 14/21 [11:18:04<4:34:36, 2353.75s/it, loss=8.29e+03, v_num=1]Epoch 15/21:  67%|██████▋   | 14/21 [11:18:04<4:34:36, 2353.75s/it, loss=8.29e+03, v_num=1]Epoch 15/21:  71%|███████▏  | 15/21 [11:58:02<3:56:44, 2367.35s/it, loss=8.29e+03, v_num=1]Epoch 15/21:  71%|███████▏  | 15/21 [11:58:02<3:56:44, 2367.35s/it, loss=8.2e+03, v_num=1] Epoch 16/21:  71%|███████▏  | 15/21 [11:58:02<3:56:44, 2367.35s/it, loss=8.2e+03, v_num=1]Epoch 16/21:  76%|███████▌  | 16/21 [12:56:43<3:46:12, 2714.59s/it, loss=8.2e+03, v_num=1]Epoch 16/21:  76%|███████▌  | 16/21 [12:56:43<3:46:12, 2714.59s/it, loss=8.27e+03, v_num=1]Epoch 17/21:  76%|███████▌  | 16/21 [12:56:43<3:46:12, 2714.59s/it, loss=8.27e+03, v_num=1]Epoch 17/21:  81%|████████  | 17/21 [13:50:06<3:10:45, 2861.37s/it, loss=8.27e+03, v_num=1]Epoch 17/21:  81%|████████  | 17/21 [13:50:06<3:10:45, 2861.37s/it, loss=8.2e+03, v_num=1] Epoch 18/21:  81%|████████  | 17/21 [13:50:06<3:10:45, 2861.37s/it, loss=8.2e+03, v_num=1]Epoch 18/21:  86%|████████▌ | 18/21 [14:38:39<2:23:50, 2876.88s/it, loss=8.2e+03, v_num=1]Epoch 18/21:  86%|████████▌ | 18/21 [14:38:39<2:23:50, 2876.88s/it, loss=8.18e+03, v_num=1]Epoch 19/21:  86%|████████▌ | 18/21 [14:38:39<2:23:50, 2876.88s/it, loss=8.18e+03, v_num=1]Epoch 19/21:  90%|█████████ | 19/21 [15:04:33<1:22:38, 2479.42s/it, loss=8.18e+03, v_num=1]Epoch 19/21:  90%|█████████ | 19/21 [15:04:33<1:22:38, 2479.42s/it, loss=8.32e+03, v_num=1]Epoch 20/21:  90%|█████████ | 19/21 [15:04:33<1:22:38, 2479.42s/it, loss=8.32e+03, v_num=1]Epoch 20/21:  95%|█████████▌| 20/21 [15:34:28<37:54, 2274.15s/it, loss=8.32e+03, v_num=1]  Epoch 20/21:  95%|█████████▌| 20/21 [15:34:28<37:54, 2274.15s/it, loss=8.16e+03, v_num=1]Epoch 21/21:  95%|█████████▌| 20/21 [15:34:28<37:54, 2274.15s/it, loss=8.16e+03, v_num=1]Epoch 21/21: 100%|██████████| 21/21 [16:07:40<00:00, 2189.37s/it, loss=8.16e+03, v_num=1]Epoch 21/21: 100%|██████████| 21/21 [16:07:40<00:00, 2189.37s/it, loss=8.17e+03, v_num=1]Epoch 21/21: 100%|██████████| 21/21 [16:07:40<00:00, 2764.79s/it, loss=8.17e+03, v_num=1]
-              Isolated labels  ...            Total
-Embedding                      ...                 
-X_pca                0.551443  ...         0.506297
-X_scVI               0.530169  ...         0.494188
-Metric Type  Bio conservation  ...  Aggregate score
-
-[3 rows x 13 columns]
-The method with the greatest overall score is: 
-['X_pca']
-
-------------------------------------------------------------
-Sender: LSF System <lsfadmin@node-13-18>
-Subject: Job 35041679: <rectum_atlassing01> in cluster <farm5> Exited
-
-Job <rectum_atlassing01> was submitted from host <farm5-head2> by user <bh18> in cluster <farm5> at Mon Sep 25 14:41:33 2023
-Job was executed on host(s) <4*node-13-18>, in queue <long>, as user <bh18> in cluster <farm5> at Mon Sep 25 21:31:55 2023
-</nfs/users/nfs_b/bh18> was used as the home directory.
-</lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing> was used as the working directory.
-Started at Mon Sep 25 21:31:55 2023
-Terminated at Wed Sep 27 02:36:02 2023
-Results reported at Wed Sep 27 02:36:02 2023
-
-Your job looked like:
-
-------------------------------------------------------------
-# LSBATCH: User input
-#! /bin/bash
-#BSUB -o logs/preprocessing-%J-output.log
-#BSUB -e logs/preprocessing-%J-error.log 
-#BSUB -q normal
-#BSUB -G team152
-#BSUB -n 4
-#BSUB -M 300000
-#BSUB -a "memlimit=True"
-#BSUB -R "select[mem>300000] rusage[mem=300000] span[hosts=1]"
-#BSUB -J 9
-
-# Define option
-cd /lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis
-
-## FOR THE ATLASSING OF THE RECTUM (#BSUB -M 200000)
-# This is done on the 'All_not_gt_subset' data
-# Use the sc4 environment
-cd scripts/scRNAseq/Atlassing/
-python atlassing_rectum_all_samples.py
-# bsub -o logs/rectum_atlassing01-%J-output.log -e logs/rectum_atlassing01-%J-error.log -q long -J "rectum_atlassing01" < atlassing_rectum_submit.sh 
-
-
-------------------------------------------------------------
-
-Exited with exit code 1.
-
-Resource usage summary:
-
-    CPU time :                                   210892.50 sec.
-    Max Memory :                                 143721 MB
-    Average Memory :                             105405.65 MB
-    Total Requested Memory :                     300000.00 MB
-    Delta Memory :                               156279.00 MB
-    Max Swap :                                   -
-    Max Processes :                              5
-    Max Threads :                                43
-    Run time :                                   104646 sec.
-    Turnaround time :                            129269 sec.
-
-The output (if any) is above this job summary.
-
-
-
-PS:
-
-Read file <logs/rectum_atlassing01-35041679-error.log> for stderr output of this job.
-
