@@ -37,7 +37,7 @@
 # profile_name = sanger-brad2
 
 # Define some params
-config_var=configs/config.yaml
+config_var=config_predict_all_cells.yaml # Using the within lineage config (for round 2 analysis)
 worfklow_prefix="multi-tissue_"
 group="team152"
 workdir=${PWD}
@@ -54,13 +54,19 @@ source activate sm7
 #module load ISG/singularity/3.9.0 # farm5
 module load ISG/singularity/3.11.4 # farm22
 
+# Modify the name of the results directory (from the previous run) - so that we can create a new directory for this run
+if [ ! -d "results_round3" ]; then
+    mv results results_round3
+    mv sm_logs sm_logs_round3   
+    mkdir -p sm_logs 
+fi
 
 # Copy config to results
 mkdir -p results
 cp $config_var results/
 
 # Build dag
-snakemake -j 50 \
+snakemake -j 1000 \
     --latency-wait 90 \
     --rerun-incomplete \
     --keep-incomplete \
@@ -73,12 +79,13 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s workflows/Snakefile \
+    -s Snakefile_predict_all_cells-004.smk \
     --until all \
-    --dag | dot -Tpng > dags/dag.png
+    --rerun-triggers mtime \
+    --dag | dot -Tpng > dag_predict_cells.png
 
 # Execute script (updating config params to use optimum model params)
-snakemake -j 50 \
+snakemake -j 1000 \
     --latency-wait 90 \
     --rerun-incomplete \
     --keep-incomplete \
@@ -91,12 +98,15 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s workflows/Snakefile \
+    -s Snakefile_predict_all_cells-004.smk \
+    --rerun-triggers mtime \
     --until all 
 
-# NOTE: Have adjusted to run originalk model to test
+# NOTE: Have adjusted to run original model to test
 # Add the following to overwrite with optimum params
 # --config optimise_run_params=False sparsity_l1__activity=0.01 sparsity_l1__bias=0.0001 sparsity_l1__kernel=0.0001 sparsity_l2__activity=0.0001 sparsity_l2__bias=0.01 sparsity_l2__kernel=0.01 \
 
 
-# bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake.sh 
+# bsub -M 2000 -a "memlimit=True" -R "select[mem>2000] rusage[mem=2000] span[hosts=1]" -o sm_logs/snakemake_master-%J-output.log -e sm_logs/snakemake_master-%J-error.log -q oversubscribed -J "snakemake_master" < submit_snakemake_predict_cells-004.sh 
+
+

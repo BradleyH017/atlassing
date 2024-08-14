@@ -81,7 +81,7 @@ snakemake -j 50 \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
     -s Snakefile_cluster_within_lineage-002.smk \
     --until all \
-    --dag | dot -Tpng > dag_cluster_within.png
+    --dag --rerun-triggers mtime | dot -Tpng > dag_cluster_within.png
 
 # Execute script (updating config params to use optimum model params)
 snakemake -j 50 \
@@ -98,6 +98,7 @@ snakemake -j 50 \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
     -s Snakefile_cluster_within_lineage-002.smk \
+    --rerun-triggers mtime \
     --until all 
 
 # NOTE: Have adjusted to run original model to test
