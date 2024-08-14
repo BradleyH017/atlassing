@@ -10,23 +10,23 @@ tissue:
 discard_other_inflams: "no" # Remove non CD inflammtation samples. NO - already done
 all_blood_immune: "no" # Treat all the blood data as immune if using?
 min_nUMI: 500 # Minimum nUMI
-relative_grouping: "input" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage"
+relative_grouping: "tissue" # For mad computation, what is the grouping we want to use? seperate by "," if >1, e.g "tissue,sum_majority_lineage". NOTE: If applying specific absolute thresholds (e.g for MT%), this needs to be the group used there, else these relative thresholds will be ignored
 relative_nMAD_threshold: 2.5 # Threshold of nMad
 nMad_directionality: "bi" # Can be bi|uni. unidirectional medians cells only removed for nMads above or below the median. bidirectional medians cells removed for nMads exceeding threshold in either direction
-threshold_method: None # Whether to use relative thresholds and in which direction. Can be "specific" to be specific to the relative_grouping, "outer" to apply the outer window of the relative groupings, or None to not apply at all.  
+threshold_method: "None" # Whether to use relative thresholds and in which direction. Can be "specific" to be specific to the relative_grouping, "outer" to apply the outer window of the relative groupings, or None to not apply at all.  
 min_nGene: 250 # Min nGene
 MT_thresh_gut: 50 # MT thresh for gut samples (rectum + TI)
 MT_thresh_blood: 20 # MT thresh for blood
 use_MT_thresh_blood_gut_immune: "no" # Use the absolute MT threshold for blood on the gut immune cells? 
 min_median_nCount_per_samp_blood: 0 # Exclude samples with median nCount lower than this value (blood). Samples with low medians for these metrics tend to integrate badly. If want to ignor this, set to very high number, e.g 60k
 min_median_nCount_per_samp_gut: 0 # Same but gut
-min_median_nGene_per_samp_blood: 1000 # Exclude samples with median nGene than this value (blood)
-min_median_nGene_per_samp_gut: 1000 # Same but gut
-max_ncells_per_sample: 18000 # Maximum number of cells that can originate from a single sample. If don't want to use these, set to ridiculously high number like 1000000
-min_ncells_per_sample: 500 # Minimum number of cells that can originate from a single sample. If don't want to use, set to 0
+min_median_nGene_per_samp_blood: 0 # Exclude samples with median nGene than this value (blood)
+min_median_nGene_per_samp_gut: 0 # Same but gut
+max_ncells_per_sample: 100000 # Maximum number of cells that can originate from a single sample. If don't want to use these, set to ridiculously high number like 1000000
+min_ncells_per_sample: 0 # Minimum number of cells that can originate from a single sample. If don't want to use, set to 0
 use_abs_per_samp: "yes" # Use these absolute metrics
 filt_cells_pre_samples: "yes" # Filter the cells based on the above metrics BEFORE filtering the samples. NOTE: This will drastically alter the distirbution of QC metrics and therefore sample choice
-plot_per_samp_qc: "no" # Plot the distribution of QC parameters across samples (e.g within tissue) - Takes up LOTS of memory if lots of samples
+plot_per_samp_qc: "yes" # Plot the distribution of QC parameters across samples (e.g within tissue) - Takes up LOTS of memory if lots of samples
 filt_blood_keras: "no" # Filter blood for keras probability? Some cells annotated as non-immune
 n_variable_genes: 5000 # Number of variable genes for PCA calculation
 hvgs_within: "samp_tissue" # How to calculate HVGs? If don't want to use, set to None
@@ -52,7 +52,7 @@ pref_matrix: "scVI" # Can leave empty if benching
 use_bbknn: True
 nn_choice: "Manual" # Can be 'Manual' to use pre-defined NN parameter provided by 'nn' parameter, 'bbknn' to use the nn selected by bbknn or 'array' to run an array test over 'nn_values' parameter 
 nn_values: [15, 30, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
-nn: 30
+nn: 15
 
 # What to plot on the initial UMAP post clustering? Check these w/ respect to embedding
 col_by: "experiment_id,tissue,sum_majority_lineage,category__machine,label__machine,sum_Immune,sum_Epithelial,sum_Mesenchymal,log10_total_counts,total_counts_nMAD,log10_n_genes_by_counts,n_genes_by_counts_nMAD,MT_perc_nMads,total_counts_gene_group__ribo_rna,log1p_total_counts_gene_group__ribo_rna,pct_counts_gene_group__mito_transcript,EPCAM,KRT8,KRT18,CDH5,COL1A1,COL1A2,COL6A2,VWF,PTPRC,CD3D,CD3G,CD3E,CD79A,CD79B,CD14,FCGR3A,CD68,CD83,CSF1R,FCER1G"
@@ -74,7 +74,7 @@ sparsity_l2__kernel: 0.01
 sparsity_l2__bias: 0.01
 
 # Clustering and validation options
-clustering_resolutions: [0.01, 0.025, 0.05, 0.1, 0.25] # , 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over? [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+clustering_resolutions: [0.01, 0.02, 0.03, 0.04, 0.05] # , 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0] # What are the range of clustering resolutions to iterate over? [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 MCC_thresh: 0.75 # What is the threshold of Matthews correlation coefficient at which all clusters are deemed reproducible? The optimum cluster resolution that will be taken forward will be the greatest at which MCC of all clusters exceeds this value
 
 # Celltypist options:
