@@ -50,11 +50,11 @@ rule qc_raw:
         pref_matrix=config["pref_matrix"],
         calc_hvgs_together=config["calc_hvgs_together"]
     resources:
-        mem=1200000, # all = 850000
+        mem=1500000, # all = 850000
         queue='teramem', # all = teramem
-        mem_mb=1200000,
-        mem_mib=1200000,
-        disk_mb=1200000,
+        mem_mb=1500000,
+        mem_mib=1500000,
+        disk_mb=1500000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
@@ -291,11 +291,11 @@ else:
         conda:
             "scvi-env_reserve"
         resources:
-            mem=120000, # All =300000
+            mem=150000, # All =300000
             queue='normal',
-            mem_mb=120000,
-            mem_mib=120000,
-            disk_mb=120000,
+            mem_mb=150000,
+            mem_mib=150000,
+            disk_mb=150000,
             tmpdir="tmp",
             threads=2
         shell:
