@@ -34,4 +34,4 @@ Options for this workflow are stored in `configs/config_re_embed_after_within_li
 If keras autoannotation models are being used, then round 4 can be executed by running `workflows/Snakefile_predict_all_cells-004.smk`.
 
 ### Options
-Defining options here, specificied in `configs/config_predict_all_cells.yaml' are the anndata object to predict all cells from (`original_input_round1`) and the threshold (probability_threshold).
+Defining options here, specificied in `configs/config_predict_all_cells.yaml` are the anndata object to predict all cells from (`original_input_round1`) and the threshold (probability_threshold).
