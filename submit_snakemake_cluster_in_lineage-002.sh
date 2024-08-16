@@ -37,7 +37,7 @@
 # profile_name = sanger-brad2
 
 # Define some params
-config_var=config_cluster_within_lineage.yaml # Using the within lineage config (for round 2 analysis)
+config_var=configs/config_cluster_within_lineage.yaml # Using the within lineage config (for round 2 analysis)
 worfklow_prefix="multi-tissue_"
 group="team152"
 workdir=${PWD}
@@ -79,9 +79,9 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile_cluster_within_lineage-002.smk \
+    -s workflows/Snakefile_cluster_within_lineage-002.smk \
     --until all \
-    --dag --rerun-triggers mtime | dot -Tpng > dag_cluster_within.png
+    --dag --rerun-triggers mtime | dot -Tpng > dags/dag_cluster_within.png
 
 # Execute script (updating config params to use optimum model params)
 snakemake -j 50 \
@@ -97,7 +97,7 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile_cluster_within_lineage-002.smk \
+    -s workflows/Snakefile_cluster_within_lineage-002.smk \
     --rerun-triggers mtime \
     --until all 
 
