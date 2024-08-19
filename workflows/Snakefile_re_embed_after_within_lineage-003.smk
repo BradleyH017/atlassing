@@ -1,22 +1,10 @@
 # Define which round of the analysis this is - will alter config and original input file
-round = 3 
-if round == 1:
-    configfile: "config.yaml" # round1
-    input0 = expand("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/results/tissues_combined/input/adata_raw_input_{tissue}.h5ad", tissue=config["tissue"])
-else:
-    configfile: "config_re_embed_after_within_lineage.yaml" # round 3 (post within lineage cluster QC)
-    input0 = expand("results_round2/{tissue}/objects/adata_grouped_post_cluster_QC.h5ad", tissue=config["tissue"])
+configfile: "configs/config_re_embed_after_within_lineage.yaml" # round 3 (post within lineage cluster QC)
+input0 = expand("results_round2/{tissue}/objects/adata_grouped_post_cluster_QC.h5ad", tissue=config["tissue"])
 
 rule all:
     input:
-        #expand("results/{tissue}/tables/summary_nn_array.txt", tissue=config["tissue"]), expand("results/{tissue}/tables/0_nn_bbknn.txt", tissue=config["tissue"])
-        expand("results/{tissue}/tables/lineage_model/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", tissue=config["tissue"]),expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/clustering_array/leiden_0/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])#, expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_decision_matrix.csv", tissue=config["tissue"])
-        #, expand("results/{tissue}/objects/keras_annot_not_subset.h5ad", tissue=config["tissue"])
-        #expand("results/{tissue}/objects/keras_annot_not_subset.h5ad", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"])
-        #expand("results/{tissue}/tables/annotation/CellTypist/CellTypist_anno_conf.csv", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_raw_predicted_celltypes_filtered.h5ad", tissue=config["tissue"])
-        
+        expand("results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl", tissue=config["tissue"]), expand("results/{tissue}/tables/lineage_model/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", tissue=config["tissue"]),expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])        
 
 # Define memory increment function
 def increment_memory(base_memory):
