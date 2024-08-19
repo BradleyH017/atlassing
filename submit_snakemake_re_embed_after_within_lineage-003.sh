@@ -37,7 +37,7 @@
 # profile_name = sanger-brad2
 
 # Define some params
-config_var=config_re_embed_after_within_lineage.yaml # Using the within lineage config (for round 2 analysis)
+config_var=configs/config_re_embed_after_within_lineage.yaml # Using the within lineage config (for round 2 analysis)
 worfklow_prefix="multi-tissue_"
 group="team152"
 workdir=${PWD}
@@ -79,10 +79,10 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile_re_embed_after_within_lineage-003.smk \
+    -s workflows/Snakefile_re_embed_after_within_lineage-003.smk \
     --until all \
     --rerun-triggers mtime \
-    --dag | dot -Tpng > dag_re_embed.png
+    --dag | dot -Tpng > dags/dag_re_embed.png
 
 # Execute script (updating config params to use optimum model params)
 snakemake -j 50 \
@@ -98,7 +98,7 @@ snakemake -j 50 \
     --use-singularity \
     --singularity-args "-B /lustre -B /software" \
     --cluster " mkdir -p 'sm_logs/cluster/${worfklow_prefix}_{rule}'; bsub -q {resources.queue} -R 'rusage[mem={resources.mem_mb}] select[mem>{resources.mem_mb}] span[hosts=1]' -M {resources.mem_mb} -n {resources.threads} -J '${worfklow_prefix}_{rule}.{wildcards}' -G ${group} -o 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-out' -e 'sm_logs/cluster/${worfklow_prefix}_{rule}/{rule}.{wildcards}.%J-err'" \
-    -s Snakefile_re_embed_after_within_lineage-003.smk \
+    -s workflows/Snakefile_re_embed_after_within_lineage-003.smk \
     --rerun-triggers mtime \
     --until all 
 
