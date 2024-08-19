@@ -10,8 +10,8 @@ import pandas as pd
 import os
 
 # Define lineages, desired resolutions and clusters to chuck per lineage
-lins_res = {"all_Epithelial": 1.1, "all_Mesenchymal": 0.7, "all_Myeloid": 0.7, "all_B": 0.6, "all_T": 1.0, "Platelet+RBC": np.nan, "Mast": np.nan}
-chuck = {"all_Epithelial": ["6", "27"], "all_Mesenchymal": [None], "all_Myeloid": [None], "all_B": ["14", "13"], "all_T": [None]}
+lins_res = {"all_Epithelial": 0.9, "all_Mesenchymal": 1.0, "all_Myeloid": 0.7, "all_B": 0.8, "all_T": 1.1, "Platelet+RBC": np.nan, "Mast": np.nan}
+chuck = {"all_Epithelial": ["11", "33", "34"], "all_Mesenchymal": ["15"], "all_Myeloid": ["6", "13", "18"], "all_B": ["14", "15"], "all_T": ["17", "18", "23", "25"]}
 
 # Load in the combined output from round1
 adata = sc.read_h5ad("results_round1/all/objects/adata_manual_lineage_clean.h5ad")
