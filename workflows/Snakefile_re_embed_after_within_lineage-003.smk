@@ -54,7 +54,9 @@ rule qc_raw:
         remove_problem_genes=config["remove_problem_genes"],
         per_samp_relative_threshold=config["per_samp_relative_threshold"],
         sample_level_grouping=config["sample_level_grouping"],
-        cols_sample_relative_filter=config["cols_sample_relative_filter"]
+        cols_sample_relative_filter=config["cols_sample_relative_filter"],
+        pref_matrix=config["pref_matrix"],
+        calc_hvgs_together=config["calc_hvgs_together"]
     resources:
         mem=850000, # all = 850000
         queue='teramem', # all = teramem
@@ -103,7 +105,9 @@ rule qc_raw:
         --remove_problem_genes {params.remove_problem_genes} \
         --per_samp_relative_threshold {params.per_samp_relative_threshold} \
         --sample_level_grouping {params.sample_level_grouping} \
-        --cols_sample_relative_filter {params.cols_sample_relative_filter}
+        --cols_sample_relative_filter {params.cols_sample_relative_filter} \
+        --pref_matrix {params.pref_matrix} \
+        --calc_hvgs_together {params.calc_hvgs_together}
         """
 
 # NOTE: Using the output of the above rule will mean using only HVGs
@@ -577,13 +581,13 @@ rule make_celltypist_model:
     output:
         "results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl"
     resources:
-        mem=500000,
-        queue='normal',
-        mem_mb=500000,
-        mem_mib=500000,
-        disk_mb=500000,
+        mem=1000000,
+        queue='teramem',
+        mem_mb=1000000,
+        mem_mib=1000000,
+        disk_mb=1000000,
         tmpdir="tmp",
-        threads=30
+        threads=40
     conda:
         "scvi-env"
     shell:
