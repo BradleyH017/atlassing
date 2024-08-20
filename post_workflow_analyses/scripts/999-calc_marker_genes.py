@@ -123,6 +123,14 @@ def parse_options():
         )
     
     parser.add_argument(
+            '-em', '--external_marker_sets',
+            action='store',
+            dest='em',
+            required=False,
+            help=''
+        )
+    
+    parser.add_argument(
             '-b', '--baseout',
             action='store',
             dest='baseout',
@@ -148,6 +156,8 @@ def main():
     min_fold_change = inherited_options.min_fold_change
     compare_annots = inherited_options.compare_annots
     compare_annots = compare_annots.split(",")
+    external_marker_sets = inherited_options.external_marker_sets
+    external_marker_sets = external_marker_sets.split(",")
     baseout = inherited_options.baseout
     
     # Testing:
@@ -163,6 +173,7 @@ def main():
     # min_fold_change = 1.5
     # baseout = "results_round2"
     # compare_annots = ["Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:predicted_labels","Azimuth:predicted.celltype.l1", "Azimuth:predicted.celltype.l2", "Azimuth:predicted.celltype.l3", "Celltypist:cluster-ti-cd_healthy-freeze005_clustered_final:predicted_labels"]
+    # external_markers = "external_markers/helmsley_23.txt"
     
     # Load in the input file
     print("~~~~~~~~~ Loading object ~~~~~~~~~")
@@ -223,7 +234,7 @@ def main():
     sc.pl.rank_genes_groups_dotplot(adata, save="_top4.png", key="rank_genes_groups", n_genes=5, gene_symbols="gene_symbols")
     if filter:
         print("~~~~~~~~~ & filtered version ~~~~~~~~~")
-        sc.pl.rank_genes_groups_dotplot(adata, save="_filtered_top4.png", key=key, n_genes=5, gene_symbols="gene_symbols")
+        sc.pl.rank_genes_groups_dotplot(adata, layer = "log1_cp10k", save="_filtered_top4.png", key=key, n_genes=5, gene_symbols="gene_symbols")
     
     ############## 2. Comparing leiden against other annotations ###########
     # Summarise the top hits per gene
@@ -311,8 +322,24 @@ def main():
                 height=9
         )
     
-     ############## 2. Comparing against Helmsley gut markers ###########
-     
+    ############## 2. Comparing against Helmsley gut markers ###########
+    for e in external_marker_sets:
+        print(f"Comparing markers to {e}")
+        external = pd.read_csv(external_markers, sep = "\t")
+        external = external.loc[:, ~external.columns.str.contains('^Unnamed')]
+        external = external[~external['Lineage'].isna()]
+        external = external[~external['Celltype markers'].isna()]
+        external_dict = dict()
+        for index, row in external.iterrows():
+            label = row['Cell label (abbreviation) - suggestion']
+            markers = row['Celltype markers'].split(', ')  # Split the markers by ', ' and create a list
+            markers = np.intersect1d(markers, adata.var['gene_symbols'])
+            if len(markers) > 0:
+                external_dict[label] = markers
+        # Plot these
+        sc.pl.dotplot(adata, external_dict, layer = "log1p_cp10k", groupby='leiden', gene_symbols="gene_symbols", save="_Helmsley_marker.png")
+
+
     
 
 # Execute
