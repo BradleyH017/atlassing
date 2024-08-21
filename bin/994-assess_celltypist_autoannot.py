@@ -10,6 +10,10 @@ import scanpy as sc
 import celltypist
 import argparse
 import os
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
 def main():
@@ -72,7 +76,46 @@ def main():
 
     # Perform dotplot
     sc.settings.figdir=outdir
-    celltypist.dotplot(predictions, use_as_reference = 'leiden', use_as_prediction = 'predicted_labels', filter_prediction=0.01, save=f"_predicted_labels_vs_leiden_autoannot.png")
+    celltypist.dotplot(predictions, use_as_reference = 'leiden', use_as_prediction = 'predicted_labels', filter_prediction=0.01, save=f"_predicted_labels_vs_leiden_autoannot_filt_prediction_0.01.png")
+    celltypist.dotplot(predictions, use_as_reference = 'leiden', use_as_prediction = 'predicted_labels', filter_prediction=0, save=f"_predicted_labels_vs_leiden_autoannot.png")
+
+    # Summarise for each cell-type, the proportion of correctly assigned cells
+    def calc_proportion_and_next_best(group):
+        match_proportion = (group['leiden'] == group['predicted_labels']).mean()
+        non_matching = group[group['leiden'] != group['predicted_labels']]
+        if len(non_matching) > 0:
+            next_best = non_matching['predicted_labels'].mode()[0]
+            next_best_prop = (non_matching['predicted_labels'] == next_best).mean()
+        else:
+            next_best = None
+            next_best_prop = None
+        return pd.Series({
+            'proportion': match_proportion,
+            'next_best': next_best,
+            'next_best_prop': next_best_prop
+        })
+
+    # Group by 'leiden' and apply the function
+    pred_prop = ct_adata.obs.groupby('leiden').apply(calc_proportion_and_next_best).reset_index()
+    pred_prop['manual_lineage'] = pred_prop['leiden'].apply(lambda x: x.split('_')[0] if '_' in x else None)
+
+    # Save
+    pred_prop.to_csv(f"{outdir}/original_autoannot_accuracy.txt", index=False, sep = "\t")
+    
+    # Plot distribution of the next best, colored by the manual lineage
+    lins = np.unique(pred_prop['manual_lineage'].astype(str))
+    plt.figure(figsize=(8, 6))
+    fig,ax = plt.subplots(figsize=(8,6))
+    for l in lins:
+        print(l)
+        data = pred_prop.loc[pred_prop['manual_lineage'] == l, "proportion"].values
+        sns.distplot(data, hist=False, rug=True, label=l)
+
+    plt.legend()
+    plt.xlabel("Proportion of correct annotations per cluster")
+    plt.title(f"No absolute cut off")
+    plt.savefig(f"{outdir}/celltypist_accuracy_distribution.png", bbox_inches='tight')
+    plt.clf()
 
     # Save the celltypist output
     ct_adata.write_h5ad(f"{outdir}/celltypist_prediction.h5ad")
