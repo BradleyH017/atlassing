@@ -123,9 +123,17 @@ def parse_options():
         )
     
     parser.add_argument(
-            '-em', '--external_marker_sets',
+            '-ems', '--external_marker_sets',
             action='store',
-            dest='em',
+            dest='external_marker_sets',
+            required=False,
+            help=''
+        )
+    
+    parser.add_argument(
+            '-emsn', '--external_marker_set_names',
+            action='store',
+            dest='external_marker_set_names',
             required=False,
             help=''
         )
@@ -158,6 +166,8 @@ def main():
     compare_annots = compare_annots.split(",")
     external_marker_sets = inherited_options.external_marker_sets
     external_marker_sets = external_marker_sets.split(",")
+    external_marker_set_names = inherited_options.external_marker_set_names
+    external_marker_set_names = external_marker_set_names.split(",")
     baseout = inherited_options.baseout
     
     # Testing:
@@ -174,6 +184,7 @@ def main():
     # baseout = "results_round2"
     # compare_annots = ["Celltypist:megagut_celltypist_lowerGI+lym_adult_mar24:predicted_labels","Azimuth:predicted.celltype.l1", "Azimuth:predicted.celltype.l2", "Azimuth:predicted.celltype.l3", "Celltypist:cluster-ti-cd_healthy-freeze005_clustered_final:predicted_labels"]
     # external_markers = "external_markers/helmsley_23.txt"
+    # external_marker_set_names = "helmsley_23"
     
     # Load in the input file
     print("~~~~~~~~~ Loading object ~~~~~~~~~")
@@ -208,7 +219,7 @@ def main():
     group_temp = []
     for group in np.unique(adata.obs[cluster_column]):
         group_temp.append(pd.DataFrame({"gene_names": marker_genes['names'][group], "logfoldchanges": marker_genes['logfoldchanges'][group], "pvals": marker_genes['pvals'][group], "pvals_adj": marker_genes["pvals_adj"][group], cluster_column: group}))
-    
+
     marker_all = pd.concat(group_temp)
     marker_all.dropna(subset=['gene_names'], inplace=True)
     conv = adata.var[["gene_symbols"]].reset_index()
@@ -227,14 +238,21 @@ def main():
     rcParams['figure.figsize'] = 4,4
     rcParams['axes.grid'] = True
     print("Plotting panel")
+    # Plot
     sc.pl.rank_genes_groups(adata, save="_panel_unfiltered.png", key="rank_genes_groups", gene_symbols="gene_symbols")
     
     # Dotplot (filtered and unfiltered)
     print("~~~~~~~ Plotting dotplot ~~~~~~~~~")
-    sc.pl.rank_genes_groups_dotplot(adata, save="_top4.png", key="rank_genes_groups", n_genes=5, gene_symbols="gene_symbols")
+    # Make sure symbols are unique
+    adata.var['ENS'] = adata.var_names.copy()
+    adata.var_names = list(adata.var['gene_symbols'])
+    adata.var_names_make_unique()
+    adata.var['gene_symbols_unique'] = adata.var_names.copy()
+    adata.var.set_index("ENS", inplace=True)
+    sc.pl.rank_genes_groups_dotplot(adata, save="_top4.png", key="rank_genes_groups", n_genes=5, gene_symbols="gene_symbols_unique")
     if filter:
         print("~~~~~~~~~ & filtered version ~~~~~~~~~")
-        sc.pl.rank_genes_groups_dotplot(adata, layer = "log1_cp10k", save="_filtered_top4.png", key=key, n_genes=5, gene_symbols="gene_symbols")
+        sc.pl.rank_genes_groups_dotplot(adata, layer = "log1p_cp10k", save="_filtered_top4.png", key=key, n_genes=5, gene_symbols="gene_symbols_unique")
     
     ############## 2. Comparing leiden against other annotations ###########
     # Summarise the top hits per gene
@@ -247,6 +265,7 @@ def main():
     conf_score_cols = [x.replace("predicted_labels", "conf_score") for x in compare_annots]
     conf_score_cols = [x + ".score" if x.startswith("Azimuth") else x for x in conf_score_cols]
     df_cells_all = adata.obs[["leiden"] + compare_annots + conf_score_cols]
+    df_cells_all['leiden'] = df_cells_all['leiden'].str.replace(f"{subset_value}_", '', regex=False)
     for i, annot in enumerate(compare_annots):
         print(f"Calculating concordance between leiden and {annot}")
         # Sometimes get erros if predicted as na. Remove these
@@ -323,9 +342,9 @@ def main():
         )
     
     ############## 2. Comparing against Helmsley gut markers ###########
-    for e in external_marker_sets:
-        print(f"Comparing markers to {e}")
-        external = pd.read_csv(external_markers, sep = "\t")
+    for i, e in enumerate(external_marker_sets):
+        print(f"~~~~~~~~~ Plotting markers from {e} ~~~~~~~~~")
+        external = pd.read_csv(e, sep = "\t")
         external = external.loc[:, ~external.columns.str.contains('^Unnamed')]
         external = external[~external['Lineage'].isna()]
         external = external[~external['Celltype markers'].isna()]
@@ -337,7 +356,7 @@ def main():
             if len(markers) > 0:
                 external_dict[label] = markers
         # Plot these
-        sc.pl.dotplot(adata, external_dict, layer = "log1p_cp10k", groupby='leiden', gene_symbols="gene_symbols", save="_Helmsley_marker.png")
+        sc.pl.dotplot(adata, external_dict, layer = "log1p_cp10k", groupby='leiden', gene_symbols="gene_symbols_unique", save=f"_{external_marker_set_names[i]}.png")
 
 
     
