@@ -4,7 +4,7 @@ input0 = expand("results_round2/{tissue}/objects/adata_grouped_post_cluster_QC.h
 
 rule all:
     input:
-        expand("results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl", tissue=config["tissue"]), expand("results/{tissue}/tables/lineage_model/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", tissue=config["tissue"]),expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])        
+        expand("results/{tissue}/objects/celltypist_prediction.h5ad", tissue=config["tissue"]), expand("results/{tissue}/tables/lineage_model/base-model_report.tsv.gz", tissue=config["tissue"]), expand("results/{tissue}/objects/adata_PCAd_batched_umap.h5ad", tissue=config["tissue"]),expand("results/{tissue}/tables/sample_list.txt", tissue=config["tissue"])        
 
 # Define memory increment function
 def increment_memory(base_memory):
@@ -23,23 +23,13 @@ rule qc_raw:
         discard_other_inflams=config["discard_other_inflams"], 
         all_blood_immune=config["all_blood_immune"],
         min_nUMI=config["min_nUMI"],
-        use_absolute_nUMI=config["use_absolute_nUMI"],
-        use_relative_mad=config["use_relative_mad"],
-        lineage_column=config["lineage_column"],
         relative_grouping=config["relative_grouping"],
         relative_nMAD_threshold=config["relative_nMAD_threshold"],
-        filter_sequentially=config["filter_sequentially"],
         nMad_directionality=config["nMad_directionality"],
-        plot_within=config["plot_within"],
-        relative_nUMI_log=config["relative_nUMI_log"],
+        threshold_method=config["threshold_method"],
         min_nGene=config["min_nGene"],
-        use_absolute_nGene=config["use_absolute_nGene"],
-        relative_nGene_log=config["relative_nGene_log"],
         MT_thresh_gut=config["MT_thresh_gut"],
         MT_thresh_blood=config["MT_thresh_blood"],
-        use_absolute_MT=config["use_absolute_MT"],
-        min_MT=config["min_MT"],
-        absolute_max_MT=config["absolute_max_MT"],
         use_MT_thresh_blood_gut_immune=config["use_MT_thresh_blood_gut_immune"],
         min_median_nCount_per_samp_blood=config["min_median_nCount_per_samp_blood"],
         min_median_nCount_per_samp_gut=config["min_median_nCount_per_samp_gut"],
@@ -49,8 +39,10 @@ rule qc_raw:
         min_ncells_per_sample=config["min_ncells_per_sample"],
         use_abs_per_samp=config["use_abs_per_samp"],
         filt_cells_pre_samples=config["filt_cells_pre_samples"],
+        plot_per_samp_qc=config["plot_per_samp_qc"],
         filt_blood_keras=config["filt_blood_keras"],
         n_variable_genes=config["n_variable_genes"],
+        hvgs_within=config["hvgs_within"],
         remove_problem_genes=config["remove_problem_genes"],
         per_samp_relative_threshold=config["per_samp_relative_threshold"],
         sample_level_grouping=config["sample_level_grouping"],
@@ -58,39 +50,30 @@ rule qc_raw:
         pref_matrix=config["pref_matrix"],
         calc_hvgs_together=config["calc_hvgs_together"]
     resources:
-        mem=850000, # all = 850000
+        mem=1300000, # all = 850000
         queue='teramem', # all = teramem
-        mem_mb=850000,
-        mem_mib=850000,
-        disk_mb=850000,
+        mem_mb=1300000,
+        mem_mib=1300000,
+        disk_mb=1300000,
         tmpdir="tmp",
         threads=8 # all = 8
     conda:
         "scvi-env"
     shell:
         r"""
-        python  bin/001-raw_QC_sm.py \
+        python bin/001-raw_QC_update.py \
         --input_file {input} \
         --tissue {wildcards.tissue} \
         --discard_other_inflams {params.discard_other_inflams} \
         --all_blood_immune {params.all_blood_immune} \
         --min_nUMI {params.min_nUMI} \
-        --use_absolute_nUMI {params.use_absolute_nUMI} \
-        --use_relative_mad {params.use_relative_mad} \
-        --filter_sequentially {params.filter_sequentially} \
         --nMad_directionality {params.nMad_directionality} \
-        --plot_within {params.plot_within} \
-        --lineage_column {params.lineage_column} \
-        --relative_grouping {params.relative_grouping} --relative_nMAD_threshold {params.relative_nMAD_threshold} \
-        --relative_nUMI_log {params.relative_nUMI_log} \
+        --threshold_method {params.threshold_method} \
+        --relative_grouping {params.relative_grouping} \
+        --relative_nMAD_threshold {params.relative_nMAD_threshold} \
         --min_nGene {params.min_nGene} \
-        --use_absolute_nGene {params.use_absolute_nGene} \
-        --relative_nGene_log {params.relative_nGene_log} \
         --MT_thresh_gut {params.MT_thresh_gut} \
         --MT_thresh_blood {params.MT_thresh_blood} \
-        --use_absolute_MT {params.use_absolute_MT} \
-        --absolute_max_MT {params.absolute_max_MT} \
-        --min_MT {params.min_MT} \
         --use_MT_thresh_blood_gut_immune {params.use_MT_thresh_blood_gut_immune} \
         --min_median_nCount_per_samp_blood {params.min_median_nCount_per_samp_blood} \
         --min_median_nCount_per_samp_gut {params.min_median_nCount_per_samp_gut} \
@@ -100,8 +83,10 @@ rule qc_raw:
         --min_ncells_per_sample {params.min_ncells_per_sample} \
         --use_abs_per_samp {params.use_abs_per_samp} \
         --filt_cells_pre_samples {params.filt_cells_pre_samples} \
+        --plot_per_samp_qc {params.plot_per_samp_qc} \
         --filt_blood_keras {params.filt_blood_keras} \
         --n_variable_genes {params.n_variable_genes} \
+        --hvgs_within {params.hvgs_within} \
         --remove_problem_genes {params.remove_problem_genes} \
         --per_samp_relative_threshold {params.per_samp_relative_threshold} \
         --sample_level_grouping {params.sample_level_grouping} \
@@ -581,11 +566,11 @@ rule make_celltypist_model:
     output:
         "results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl"
     resources:
-        mem=1000000,
+        mem=1400000,
         queue='teramem',
-        mem_mb=1000000,
-        mem_mib=1000000,
-        disk_mb=1000000,
+        mem_mb=1400000,
+        mem_mib=1400000,
+        disk_mb=1400000,
         tmpdir="tmp",
         threads=40
     conda:
@@ -599,6 +584,31 @@ rule make_celltypist_model:
             --gene_symbols
         """
 
+
+
+rule assess_celltypist_model:
+    input:
+        input0,
+        "results/{tissue}/objects/leiden-adata_grouped_post_cluster_QC.pkl"
+    output:
+        "results/{tissue}/objects/celltypist_prediction.h5ad"
+    resources:
+        mem=800000,
+        queue='teramem',
+        mem_mb=800000,
+        mem_mib=800000,
+        disk_mb=800000,
+        tmpdir="tmp",
+        threads=40
+    conda:
+        "scvi-env"
+    shell:
+        r"""
+        python bin/994-assess_celltypist_autoannot.py \
+            --h5_anndata {input[0]} \
+            --outdir results/{wildcards.tissue}/objects \
+            --model {input[1]}
+        """
 
 
 rule save_sample_list:
