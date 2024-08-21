@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import os
 import argparse
+from anndata.experimental import read_elem
+from h5py import File
 print("Loaded libraries")
 
 def parse_options():    
@@ -53,11 +55,12 @@ def main():
     output_file = inherited_options.output_file
     print("parsed args")
     
-    # Load in the data
-    adata = sc.read_h5ad(h5ad)
+    # Load in the data (obs only)
+    f2 = File(h5ad, 'r')
+    obs = read_elem(f2['obs'])
     
     # In a for loop, divide by sample and save to the output file
-    groups = np.unique(adata.obs[samp_col])
+    groups = np.unique(obs[samp_col])
     
     # Save a list of samples
     with open(f"{output_file}sample_list.txt", 'w') as file:
