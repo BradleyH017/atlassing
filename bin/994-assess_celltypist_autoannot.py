@@ -43,7 +43,7 @@ def main():
         '-cc', '--compare_column',
         action='store',
         dest='compare_column',
-        required=True,
+        required=False,
         help='column to compare annotation to'
     )
     
@@ -81,7 +81,7 @@ def main():
     adata.var_names = list(adata.var['gene_symbols'])
     adata.var_names_make_unique()
     
-    # Run the model (majority voting)
+    # Run the model
     predictions = celltypist.annotate(adata, model = celltypist_model, majority_voting = False)
     ct_adata = predictions.to_adata()
 
