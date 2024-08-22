@@ -599,7 +599,7 @@ rule assess_celltypist_model:
         mem_mib=800000,
         disk_mb=800000,
         tmpdir="tmp",
-        threads=40
+        threads=2
     conda:
         "scvi-env"
     shell:
@@ -607,7 +607,8 @@ rule assess_celltypist_model:
         python bin/994-assess_celltypist_autoannot.py \
             --h5_anndata {input[0]} \
             --outdir results/{wildcards.tissue}/objects \
-            --model {input[1]}
+            --celltypist_model {input[1]} \
+            --compare_column "leiden"
         """
 
 
@@ -617,10 +618,10 @@ rule save_sample_list:
     conda:
         "scvi-env"
     resources:
-            mem=300000,
+            mem=100000,
             queue='normal',
-            mem_mb=300000,
-            mem_mib=300000,
+            mem_mb=100000,
+            mem_mib=100000,
             tmpdir="tmp",
             threads=2
     params:
