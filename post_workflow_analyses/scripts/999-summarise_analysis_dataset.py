@@ -9,6 +9,7 @@ import os
 import scanpy as sc
 from matplotlib.patches import Wedge, Patch
 from adjustText import adjust_text
+from bokeh.palettes import Category10_10  
 
 
 # Define outdir
@@ -52,10 +53,9 @@ df_grouped['log10_nCells'] = np.log10(df_grouped['nCells'])
 df_proportions = obs.groupby(['predicted_labels', 'tissue']).size().reset_index(name='count')
 df_proportions['proportion'] = df_proportions.groupby('predicted_labels')['count'].transform(lambda x: x / x.sum())
 
-# Get the colormap used by Scanpy's `sc.pl.umap`
-# Assuming that `obs` has `tissue` as a categorical variable with its palette
-sc.pl.umap(obs, color='tissue', show=False)  # This forces scanpy to load the colors
-tissue_colors = dict(zip(obs['tissue'].cat.categories, obs.uns['tissue_colors']))
+# Use Bokeh's Category10 palette for tissues
+tissue_types = obs['tissue'].cat.categories
+tissue_colors = dict(zip(tissue_types, Category10_10[:len(tissue_types)]))  # Map tissues to Category10 colors
 
 # Function to generate pie chart markers for scatter plot
 def pie_marker(proportions, n_slices=10):
@@ -89,10 +89,10 @@ for i, row in df_grouped.iterrows():
     markers, sizes = pie_marker(proportions)
     # Coordinates for the scatter point
     x = row['log10_nCells']
-    y = row['nSamples']    
+    y = row['nSamples']
     # Plot each slice of the pie as a separate scatter point
     for marker, size, tissue in zip(markers, sizes, tissues):
-        color = tissue_colors[tissue]  # Use Scanpy's UMAP color for the tissue
+        color = tissue_colors[tissue]  # Use the Bokeh Category10 color for the tissue
         ax.scatter(x, y, marker=marker, s=size ** 2 * 150, facecolor=color, edgecolor='black')
     # Add the text label but store it for adjustment later
     text = ax.text(x, y, row['predicted_labels'], fontsize=9, ha='center', va='center')
@@ -102,7 +102,7 @@ for i, row in df_grouped.iterrows():
 ax.set_xlabel('Log10(nCells)')
 ax.set_ylabel('Number of contributing samples')
 
-# Create legend for tissue colors using Scanpy's tissue colors
+# Create legend for tissue colors using Bokeh's Category10 colors
 legend_elements = [Patch(facecolor=color, edgecolor='black', label=tissue) for tissue, color in tissue_colors.items()]
 ax.legend(handles=legend_elements, title="Tissues", loc="upper right", bbox_to_anchor=(1.2, 1))
 
@@ -113,3 +113,56 @@ plt.title('Contribution of cells, samples, and tissues to each cell-type')
 plt.tight_layout()
 plt.savefig(f"{outdir}/prop_tissues_per_cluster.png", bbox_inches='tight')
 plt.show()
+
+###### 3. Plot distribution of max contribution of a single tissue ######
+max_idx = df_proportions.groupby('predicted_labels')['proportion'].idxmax()
+df_max = df_proportions.loc[max_idx].reset_index(drop=True)
+df_max['manual_lineage'] = df_max["predicted_labels"].apply(lambda x: x.split('_')[0] if '_' in x else x)
+lins = np.unique(df_max['manual_lineage'])
+perc20 = df_max['proportion'].quantile(0.2)
+plt.figure(figsize=(8, 6))
+fig,ax = plt.subplots(figsize=(8,6))
+for t in lins:
+    print(t)
+    data = df_max.loc[df_max['manual_lineage'] == t, "proportion"].values
+    sns.distplot(data, hist=False, rug=True, label=t)
+
+plt.axvline(x = perc20, color = 'black', linestyle = '--', alpha = 0.5)
+ax.set_xlim([0,1.0])
+plt.legend()
+plt.xlabel("Maximum contribution by single tissue")
+plt.title(f"Exclusivity of clusters to a single tissue")
+plt.savefig(f"{outdir}/max_prop_single_tissue.png", bbox_inches='tight')
+plt.clf()
+
+
+###### 4. Compare predicted cell proportion vs high qc cell proportion ######
+hqc = "results_round3/combined/objects/adata_PCAd.h5ad"
+f2 = File(hqc, 'r')
+hqc_obs = read_elem(f2['obs'])
+
+pred_props = pd.DataFrame(obs['predicted_labels'].value_counts(normalize=True)).reset_index(names="leiden")
+pred_props.rename(columns={"proportion": "prediction_proportion"}, inplace=True)
+hqc_props = pd.DataFrame(hqc_obs['leiden'].value_counts(normalize=True)).reset_index(names="leiden")
+hqc_props.rename(columns={"proportion": "high_qc_proportion"}, inplace=True)
+prop_plt = pred_props.merge(hqc_props, on="leiden", how="left")
+prop_plt['manual_lineage'] = prop_plt["leiden"].apply(lambda x: x.split('_')[0] if '_' in x else x)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+for lineage in prop_plt['manual_lineage'].unique():
+    subset = prop_plt[prop_plt['manual_lineage'] == lineage]
+    ax.scatter(subset['high_qc_proportion'], subset['prediction_proportion'],
+               label=lineage)
+
+ax.plot([0, 1], [0, 1], ls='--', color='black', label='x = y')
+ax.set_xlim(0, 0.3)
+ax.set_ylim(0, 0.3)
+ax.set_xlabel('High QC Proportion')
+ax.set_ylabel('Prediction Proportion')
+plt.legend()
+ax.set_title('Concordance of high QC and predicted labels')
+plt.savefig(f"{outdir}/highqc_vs_predicted_proportions.png", bbox_inches='tight')
+plt.clf()
+
+# Have a look at the biggest changers
+prop_plt['pred_over_highqc'] = prop_plt['prediction_proportion'] / prop_plt['high_qc_proportion']
