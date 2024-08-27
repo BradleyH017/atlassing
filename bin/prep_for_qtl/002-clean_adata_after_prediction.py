@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Bradley Harris'
-__date__ = '2024-05-20'
+__date__ = '2024-08-7'
 __version__ = '0.0.1'
 
 import scanpy as sc
@@ -9,20 +9,30 @@ import pandas as pd
 import numpy as np
 
 
-# Define adata (complete, annotated), columns to threshold and filter
-h5 = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/tissues_combined/results/combined/objects/keras_full_annot_not_subset.h5ad"
-cols_to_threshold = ["predicted_celltype_probability", "round1__predicted_celltype_probability"]
-threshold = 0.5
+# Define adata (complete, annotated), columns to threshold and filter values
+h5 = "/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_prediction.h5ad"
+filters = dict({"conf_score": 0.5, "pct_counts_gene_group__mito_transcript": 50, "log_n_genes_by_counts": np.log10(250), "log_total_counts": np.log10(500)})
+over_under = {"conf_score": "over", "pct_counts_gene_group__mito_transcript": "under", "log_n_genes_by_counts": "over", "log_total_counts": "over"}
 
 # Load in the anndata object
 adata = sc.read_h5ad(h5)
+adata.obs['log_n_genes_by_counts'] = np.log10(adata.obs['n_genes_by_counts'])
+adata.obs['log_total_counts'] = np.log10(adata.obs['total_counts'])
+
 
 # Filter 
 print(f"Original adata shape: {adata.shape}")
-for c in cols_to_threshold:
-    adata = adata[adata.obs[c] > threshold]
-    print(f"After filter for {c}, adata shape: {adata.shape}")
+for col, value in filters.items():
+    print(f"col: {col}, value: {value}, over_under: {over_under[col]}")
+    if over_under[col] == "under":
+        adata = adata[adata.obs[col] < value]
+    if over_under[col] == "over":
+        adata = adata[adata.obs[col] > value]
+    #
+    print(f"After filter for {col}, adata shape: {adata.shape}")
 
+# Save a filtered verion
+adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
 
 # Adjust the genotype column so that it matches the vcf in as many cases as possible (got these from prep_for_qtl/001)
 # To see the vcf sample identifiers, look at this:
