@@ -37,7 +37,24 @@ for col, value in filters.items():
     #
     print(f"After filter for {col}, adata shape: {adata.shape}")
 
-# Save a filtered verion
+# Merge with the categories
+annots = pd.read_csv("temp/2024-08-28_provisional_annot_cats.csv")
+
+# Bind
+annots.rename(columns={"leiden": "predicted_labels", "Category": "predicted_category"}, inplace=True)
+adata.obs.reset_index(inplace=True)
+adata.obs = adata.obs.merge(annots, on="predicted_labels", how="left")
+adata.obs.set_index("cell", inplace=True)
+
+# Add unnatotated
+adata.obs['unannotated'] = "unannotated"
+
+# Bind each of these to tissue and save to a new column
+for c in ["predicted_labels", "predicted_category", "unannotated"]:
+    print(c)
+    adata.obs[f"{c}_tissue"] = adata.obs[c].astype(str) + "_" + adata.obs['tissue'].astype(str)
+
+# Save
 adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
 
 # Divide by tissue
