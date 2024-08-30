@@ -277,7 +277,108 @@ for l in lins:
     plt.savefig(f"temp/Distribution_of_conf_score_across_{l}_clusters.png", bbox_inches='tight')
     plt.clf()
     
+
+###### What if we just apply a threshold of MT% < 60
+obs_filt = obs[(obs['pct_counts_gene_group__mito_transcript'] < 60)]
+pred_freq = pd.DataFrame(obs['predicted_labels'].value_counts()).reset_index(names="leiden")
+pred_freq.rename(columns={"count":"predicted_freq"},inplace=True)
+pred_freq_filt = pd.DataFrame(obs_filt['predicted_labels'].value_counts()).reset_index(names="leiden")
+pred_freq_filt.rename(columns={"count":"predicted_filt_freq"},inplace=True)
+freq_plt = pred_freq.merge(pred_freq_filt, how="left", on="leiden")
+freq_plt['prop_after_filt'] = freq_plt['predicted_filt_freq'] / freq_plt['predicted_freq']
+freq_plt['manual_lineage'] = freq_plt["leiden"].apply(lambda x: x.split('_')[0] if '_' in x else x)
+for l in lins:
+    temp = freq_plt[freq_plt['manual_lineage'] == l]
+    plt.bar(temp['leiden'], temp['prop_after_filt'])
+    plt.xlabel('Cluster')
+    plt.ylabel('Proportion of predicted cells kept after filtering')
+    plt.title('Effect of first round filtration on the predicted cell-type proportions')
+    plt.xticks(rotation=45, ha='right')
+    plt.savefig(f"temp/Prop_predicted_{l}_after_filtration_mt_only.png", bbox_inches='tight')
+    plt.clf()
+
+pred_props_filt = pd.DataFrame(obs_filt['predicted_labels'].value_counts(normalize=True)).reset_index(names="leiden")
+pred_props_filt.rename(columns={"proportion": "prediction_proportion_filtered"}, inplace=True)
+prop_plt = prop_plt.merge(pred_props_filt, on="leiden", how="left")
+prop_plt['filt_over_pred'] = prop_plt['prediction_proportion_filtered'] / prop_plt['prediction_proportion']
+prop_plt['filt_pred_over_hqc'] = prop_plt['prediction_proportion_filtered'] / prop_plt['high_qc_proportion']
+axmax = max([max(prop_plt['high_qc_proportion']), max(prop_plt['prediction_proportion_filtered'])])*1.1
+fig, ax = plt.subplots(figsize=(8, 6))
+rho, p_value = stats.pearsonr(prop_plt['high_qc_proportion'], prop_plt['prediction_proportion_filtered'])
+for lineage in prop_plt['manual_lineage'].unique():
+    subset = prop_plt[prop_plt['manual_lineage'] == lineage]
+    ax.scatter(subset['high_qc_proportion'], subset['prediction_proportion_filtered'],
+               label=lineage)
+
+
+ax.plot([0, 1], [0, 1], ls='--', color='black', label='x = y')
+#ax.axhline(y=rho, color='red', linestyle='--', label=f'rho = {rho:.2f}\np-value = {p_value:.2e}')
+x_vals = np.array(ax.get_xlim())
+y_vals = rho * x_vals 
+ax.plot(x_vals, y_vals, '--', color='red', label=f'rho = {rho:.2f}\np-value = {p_value:.2e}')
+ax.set_xlim(0, axmax)
+ax.set_ylim(0, axmax)
+ax.set_xlabel('High QC Proportion')
+ax.set_ylabel('Prediction Proportion after filtering')
+plt.legend()
+ax.set_title('Concordance of high QC and predicted labels after filtering')
+plt.savefig(f"{outdir}/highqc_vs_predicted_proportions_postfilt_mt_only.png", bbox_inches='tight')
+plt.clf()
+
+# Are the remaining cells of lower quality still? 
+epiobs_filt = obs_filt[obs_filt['manual_lineage'] == "Epithelial"]
+cols = ["pct_counts_gene_group__mito_transcript", "log_n_genes_by_counts", "log_total_counts"]
+clusters = np.unique(epiobs_filt['predicted_labels'])
+problem = ["Epithelial_6", "Epithelial_8"]
+for c in cols:
+    plt.figure(figsize=(8, 6))
+    fig,ax = plt.subplots(figsize=(8,6))
+    for k in clusters:
+        print(k)
+        data = epiobs_filt.loc[epiobs_filt['predicted_labels'] == k, c].values
+        if k in problem:
+            sns.distplot(data, hist=False, rug=True, label=k)
+        else:
+            sns.distplot(data, hist=False, rug=True, kde_kws={'color': 'orange'})
+    #
+    plt.legend()
+    plt.xlabel(c)
+    plt.title(f"Distribution of {c} across clusters")
+    plt.savefig(f"temp/Distribution_of_{c}_across_epithelial_clusters_mt_filt_only.png", bbox_inches='tight')
+    plt.clf()
     
+# Do this for all lineages:
+for l in lins:
+    print(l)
+    epiobs_filt = obs_filt[obs_filt['manual_lineage'] == l]
+    cols = ["pct_counts_gene_group__mito_transcript", "log_n_genes_by_counts", "log_total_counts"]
+    clusters = np.unique(epiobs_filt['predicted_labels'])
+    problem = ["Epithelial_6", "Epithelial_8"]
+    for c in cols:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        for k in clusters:
+            print(k)
+            data = epiobs_filt.loc[epiobs_filt['predicted_labels'] == k, c].values
+            if k in problem:
+                sns.distplot(data, hist=False, rug=True, label=k)
+            else:
+                sns.distplot(data, hist=False, rug=True, kde_kws={'color': 'orange'})
+        #
+        plt.legend()
+        plt.xlabel(c)
+        plt.title(f"Distribution of {c} across clusters")
+        plt.savefig(f"temp/Distribution_of_{c}_across_{l}_clusters_mt_filt_only.png", bbox_inches='tight')
+        plt.clf()
+    
+# Find median MT% per cluster
+for k in clusters:
+    res = np.median(epiobs_filt.loc[epiobs_filt['predicted_labels'] == k, "pct_counts_gene_group__mito_transcript"].values)
+    print(f"{k}: {res}")
+    
+    
+######### What if we filter solely on nGenes (this is essentially the important the)
+
 ######## 6. Find the relationship between QC, CellTypist confidence #########
 # As we increase celltypist confidence score, how many cells remaining set are in the lower quality set?
 thresh = np.arange(0.5, 1.01, 0.02)
@@ -317,6 +418,8 @@ ax.legend()
 plt.savefig(f"temp/Conf_score_vs_cellQC.png", bbox_inches='tight')
 plt.clf()
 
+# Plot eQTLable
+# TO DO: COmpare this to the set in the round2 high QC set
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.plot(thresh_all['conf_score'], thresh_all['n-eQTLable_clusters'], label='Number of eQTL testable clusters', marker='o', color='darkred')
 ax.plot(thresh_all['conf_score'], thresh_all['med_eQTLable_samps_per_cluster'], label='Median eQTL samples per cluster', marker='o', color='green')
@@ -331,3 +434,51 @@ handles.append(plt.Line2D([0], [0], color='black', linestyle='--', label='High Q
 ax.legend(handles=handles)
 plt.savefig(f"temp/Conf_score_vs_eQTL_testing.png", bbox_inches='tight')
 plt.clf()
+
+######## 7. Update pie plot #########
+df_grouped = obs_filt.groupby('predicted_labels').agg(
+    nCells=('predicted_labels', 'size'),
+    nSamples=('sanger_sample_id', 'nunique')
+).reset_index()
+df_grouped['log10_nCells'] = np.log10(df_grouped['nCells'])
+df_proportions = obs_filt.groupby(['predicted_labels', 'tissue']).size().reset_index(name='count')
+df_proportions['proportion'] = df_proportions.groupby('predicted_labels')['count'].transform(lambda x: x / x.sum())
+tissue_types = obs_filt['tissue'].cat.categories
+tissue_colors = dict(zip(tissue_types, Category10_10[:len(tissue_types)]))  # Map tissues to Category10 colors
+
+# Set up the plot
+fig, ax = plt.subplots(figsize=(10, 6))
+texts = []
+for i, row in df_grouped.iterrows():
+    # Get the proportions for this predicted_label
+    label_proportions = df_proportions[df_proportions['predicted_labels'] == row['predicted_labels']]
+    proportions = label_proportions['proportion'].values
+    tissues = label_proportions['tissue'].values
+    # Get the pie chart markers and sizes
+    markers, sizes = pie_marker(proportions)
+    # Coordinates for the scatter point
+    x = row['log10_nCells']
+    y = row['nSamples']
+    # Plot each slice of the pie as a separate scatter point
+    for marker, size, tissue in zip(markers, sizes, tissues):
+        color = tissue_colors[tissue]  # Use the Bokeh Category10 color for the tissue
+        ax.scatter(x, y, marker=marker, s=size ** 2 * 150, facecolor=color, edgecolor='black')
+    # Add the text label but store it for adjustment later
+    text = ax.text(x, y, row['predicted_labels'], fontsize=9, ha='center', va='center')
+    texts.append(text)
+
+# Set labels and titles
+ax.set_xlabel('Log10(nCells)')
+ax.set_ylabel('Number of contributing samples')
+
+# Create legend for tissue colors using Bokeh's Category10 colors
+legend_elements = [Patch(facecolor=color, edgecolor='black', label=tissue) for tissue, color in tissue_colors.items()]
+ax.legend(handles=legend_elements, title="Tissues", loc="upper right", bbox_to_anchor=(1.2, 1))
+
+# Repel the text labels using adjustText
+adjust_text(texts, ax=ax, expand_text=(1.05, 1.2), expand_points=(1.2, 1.5), force_points=0.3)
+
+plt.title('Contribution of cells, samples, and tissues to each cell-type')
+plt.tight_layout()
+plt.savefig(f"{outdir}/prop_tissues_per_cluster_filtered.png", bbox_inches='tight')
+plt.show()
