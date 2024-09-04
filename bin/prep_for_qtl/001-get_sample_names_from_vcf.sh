@@ -71,5 +71,43 @@ vcftools --gzvcf ${vcf_filt} --relatedness2
 # Make and plot grm (wgcna conda)
 Rscript ${repo_dir}/plot_grm.r
 
-# Take europeans from 1kg, compute PCA for these, project our data into it
+####### Take europeans from 1kg, compute PCA for these, project our data into it
+# Define dirs
+module load HGI/softpack/users/bh18/bcftools/1.0
+popref=/lustre/scratch126/humgen/projects/sc-eqtl-ibd/data/genotypes/march_2024/1000g_projected_popref.txt
+workdir=/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/proc_data/genotypes/Aug2024_ashg/1kg_b38_work
+kg_dir=/lustre/scratch125/humgen/resources/1000g/release/20201028
+mkdir -p $workdir
+
+# Get europeans
+grep "EUR" $popref | awk '{print $1}' > ${workdir}/european.txt
+
+# check 1kg samp names
+chr1_file=CCDG_14151_B01_GRM_WGS_2020-08-05_chr1.filtered.shapeit2-duohmm-phased.vcf.gz
+bcftools query -l ${kg_dir}/${chr1_file} > ${workdir}/1kg_b38_samples.txt
+
+# In interest of time/effort/mem, just use chr1
+bcftools view -S ${workdir}/european.txt -Oz -o ${workdir}/chr1_eur.vcf.gz ${kg_dir}/${chr1_file} --force-samples # Filter for old genotype IDs for samples with expression
+mkdir -p ${workdir}/plink_genotypes
+plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --make-pgen --allow-extra-chr 0 --chr 1-22 XY --output-chr chrM --snps-only --rm-dup exclude-all --hwe 0.0000001 --out ${workdir}/plink_genotypes/plink_genotypes
+# Rename vars from 1kg
+grep -n "##" ${workdir}/plink_genotypes/plink_genotypes.pvar | tail -n 1  | awk '{print $1}' # 93 lines of header (+1 for columns)
+awk 'BEGIN {OFS="\t"} {if (NR > 94) $3=$1":"$2"_"$4"_"$5; print}' ${workdir}/plink_genotypes/plink_genotypes.pvar > temp.txt
+awk 'BEGIN {OFS="\t"} {gsub(/^chr/, "", $3); print}' temp.txt > temp2.txt && mv temp2.txt ${workdir}/plink_genotypes/plink_genotypes.pvar # Overwrite
+rm temp.txt
+# Continue with pca
+#plink2 --freq counts --pfile ${workdir}/plink_genotypes/plink_genotypes --out ${workdir}/tmp_gt_plink_freq
+#plink2 --pca 5 --read-freq ${workdir}/tmp_gt_plink_freq.acount  --pfile  ${workdir}/plink_genotypes/plink_genotypes --out ${workdir}/gtpca_plink
+# using gcta
+module load HGI/softpack/groups/team152/wes-v1/1
+mkdir -p ${workdir}/plink_genotypes_bed
+plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --make-bed --out ${workdir}/plink_genotypes_bed/plink_genotypes
+gcta64 --bfile ${workdir}/plink_genotypes_bed/plink_genotypes --make-grm --out ${workdir}/plink_genotypes_bed/grm
+gcta64 --grm ${workdir}/plink_genotypes_bed/grm --pca 20  --out ${workdir}/gtpca_gcta
+
+
+# Project our genotypes into this space
+awk 'BEGIN {OFS="\t"} {if (NR > 1) $1="chr"$1; print}' ${workdir}/tmp_gt_plink_freq.acount > tmp.txt && mv tmp.txt ${workdir}/tmp_gt_plink_freq.acount
+plink2 --pfile ${workdir}/../pca/plink_genotypes/plink_genotypes --score ${workdir}/gtpca_plink.eigenvec 2 5 header-read --read-freq ${workdir}/tmp_gt_plink_freq.acount --out ${workdir}/projected_samples
+
 
