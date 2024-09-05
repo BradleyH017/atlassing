@@ -63,6 +63,28 @@ adata.var.set_index("ENS", inplace=True)
 # Save
 adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
 
+# Save a version downsampled to 5k cells for each cluster (best conf score)
+predicted_labels = adata.obs['predicted_labels']
+conf_score = adata.obs['conf_score']
+selected_indices = []
+for label in predicted_labels.unique():
+    print(label)
+    label_indices = adata.obs[predicted_labels == label].index
+    label_cells = adata[label_indices]
+    if label_cells.shape[0] > 5000:
+        print(">5k cells - selecting")
+        top_cells = label_cells.obs.sort_values(by='conf_score', ascending=False).head(5000).index
+        selected_indices.extend(top_cells)
+    else:
+        selected_indices.extend(label_indices)
+
+ds = adata[selected_indices].copy()
+ds.shape
+
+# Save this
+ds.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_downsampled.h5ad")
+
+
 # Divide by tissue
 tissues = np.unique(adata.obs['tissue'])
 for t in tissues:
