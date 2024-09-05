@@ -54,6 +54,12 @@ for c in ["predicted_labels", "predicted_category", "unannotated"]:
     print(c)
     adata.obs[f"{c}_tissue"] = adata.obs[c].astype(str) + "_" + adata.obs['tissue'].astype(str)
 
+# First step actually uses the log1p_cp10k expression matrix, but under a different name. So rename this and save lots of mem
+adata.layers['cp10k'] = adata.layers.pop('log1p_cp10k')
+
+# Make sure .var index is "ENS" (replaced during prediction)
+adata.var.set_index("ENS", inplace=True)
+
 # Save
 adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
 
