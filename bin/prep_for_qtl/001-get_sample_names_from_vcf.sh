@@ -86,28 +86,65 @@ grep "EUR" $popref | awk '{print $1}' > ${workdir}/european.txt
 chr1_file=CCDG_14151_B01_GRM_WGS_2020-08-05_chr1.filtered.shapeit2-duohmm-phased.vcf.gz
 bcftools query -l ${kg_dir}/${chr1_file} > ${workdir}/1kg_b38_samples.txt
 
-# In interest of time/effort/mem, just use chr1
-bcftools view -S ${workdir}/european.txt -Oz -o ${workdir}/chr1_eur.vcf.gz ${kg_dir}/${chr1_file} --force-samples # Filter for old genotype IDs for samples with expression
+# Subset samples from each chr
+for c in {1..22}; do
+    echo $c
+    bcftools view -S ${workdir}/european.txt -Oz -o ${workdir}/1kg_chr${c}_eur.vcf.gz ${kg_dir}/CCDG_14151_B01_GRM_WGS_2020-08-05_chr${c}.filtered.shapeit2-duohmm-phased.vcf.gz --force-samples
+    bcftools index ${workdir}/1kg_chr${c}_eur.vcf.gz
+done
+
+# Concatonate
+bcftools concat ${workdir}/1kg_chr${c}_eur.vcf.gz -o ${workdir}/1kg_eur_merged.vcf.gz -Oz
 mkdir -p ${workdir}/plink_genotypes
-plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --make-pgen --allow-extra-chr 0 --chr 1-22 XY --output-chr chrM --snps-only --rm-dup exclude-all --hwe 0.0000001 --out ${workdir}/plink_genotypes/plink_genotypes
-# Rename vars from 1kg
-grep -n "##" ${workdir}/plink_genotypes/plink_genotypes.pvar | tail -n 1  | awk '{print $1}' # 93 lines of header (+1 for columns)
-awk 'BEGIN {OFS="\t"} {if (NR > 94) $3=$1":"$2"_"$4"_"$5; print}' ${workdir}/plink_genotypes/plink_genotypes.pvar > temp.txt
-awk 'BEGIN {OFS="\t"} {gsub(/^chr/, "", $3); print}' temp.txt > temp2.txt && mv temp2.txt ${workdir}/plink_genotypes/plink_genotypes.pvar # Overwrite
-rm temp.txt
-# Continue with pca
-#plink2 --freq counts --pfile ${workdir}/plink_genotypes/plink_genotypes --out ${workdir}/tmp_gt_plink_freq
-#plink2 --pca 5 --read-freq ${workdir}/tmp_gt_plink_freq.acount  --pfile  ${workdir}/plink_genotypes/plink_genotypes --out ${workdir}/gtpca_plink
-# using gcta
+
+# Before making plink file, make sure we only use the intersection of variants from both datasets to compute embedding
+# So find the variants on chromosome 1 in our data
+vcf_filt=${workdir}/../pca/CCF_OTAR-plates_12345_NOT_imputed_allchr-no_rsid_expr_filt.vcf.gz # name of file containing our own genotypes, filtrered for those with expression
+module load HGI/softpack/groups/team152/genetics_tools/1
+tabix -p vcf $vcf_filt
+mkdir -p ${workdir}/plink_genotypes_query
+zcat $vcf_filt | grep -n "##" | tail -n 1  | awk '{print $1}' # 33 lines of header (+1 for columns) # Find how much header
+zcat $vcf_filt | awk 'BEGIN {OFS="\t"} {if (NR > 34) $3=$1":"$2":"$4":"$5; print}' > ${workdir}/query_rename.vcf # rename var
+bcftools query -f '%ID\n' ${workdir}/query_rename.vcf > ${workdir}/query_vars.txt # Vars from query
+# Vars from ref
+bcftools query -f '%ID\n' ${workdir}/1kg_eur_merged.vcf.gz > ${workdir}/ref_vars.txt 
+# Intersection
+sort ${workdir}/ref_vars.txt -o ${workdir}/ref_vars_sorted.txt
+sort ${workdir}/query_vars.txt -o ${workdir}/query_vars_sorted.txt
+comm -12 ${workdir}/query_vars_sorted.txt ${workdir}/ref_vars_sorted.txt  > ${workdir}/intersection_vars.txt
+plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes/plink_genotypes
+
+# HERE: USE PLINK TO DO THIS
+
+# Get GRM, PCA and snp loadings using gcta
 module load HGI/softpack/groups/team152/wes-v1/1
-mkdir -p ${workdir}/plink_genotypes_bed
-plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --make-bed --out ${workdir}/plink_genotypes_bed/plink_genotypes
-gcta64 --bfile ${workdir}/plink_genotypes_bed/plink_genotypes --make-grm --out ${workdir}/plink_genotypes_bed/grm
-gcta64 --grm ${workdir}/plink_genotypes_bed/grm --pca 20  --out ${workdir}/gtpca_gcta
+gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --make-grm --out ${workdir}/plink_genotypes/grm
+gcta64 --grm ${workdir}/plink_genotypes/grm --pca 20  --out ${workdir}/gtpca_gcta
+gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --pc-loading ${workdir}/gtpca_gcta --out gtpca_gcta # Get loadings
+
+# OR using plink
+plink2 --bfile ${workdir}/plink_genotypes/plink_genotypes --freq counts --pca allele-wts --out ${workdir}/gtpcs_plink
+plink2 --freq counts --bfile plink_genotypes/plink_genotypes --out ${workdir}/ref_gt_plink_freq
+
+# Convert the input samples to bedfile, extracting these variants
+mkdir -p ${workdir}/plink_genotypes_query
+plink2 --vcf query_chr1_rename.vcf 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes_query/plink_genotypes
+
+# Project using plink
+plink2 --bfile ${workdir}/plink_genotypes_query/plink_genotypes \
+    --read-freq ${workdir}/ref_gt_plink_freq.acount \
+    --score ${workdir}/gtpcs_plink.eigenvec.allele 2 5 \
+    --score-col-nums 6-15 \
+    --out query_in_ref_plink
 
 
-# Project our genotypes into this space
-awk 'BEGIN {OFS="\t"} {if (NR > 1) $1="chr"$1; print}' ${workdir}/tmp_gt_plink_freq.acount > tmp.txt && mv tmp.txt ${workdir}/tmp_gt_plink_freq.acount
-plink2 --pfile ${workdir}/../pca/plink_genotypes/plink_genotypes --score ${workdir}/gtpca_plink.eigenvec 2 5 header-read --read-freq ${workdir}/tmp_gt_plink_freq.acount --out ${workdir}/projected_samples
 
+# Using GCTA
+#gcta64 --bfile ${workdir}/plink_genotypes_query/plink_genotypes --project-loading gtpca_gcta 20 --out TAR_pca20 > projection.out
+
+# Get the 1kG subpop
+cd ${workdir} && wget https://1000genomes.s3.us-east-1.amazonaws.com/release/20130502/integrated_call_samples_v3.20130502.ALL.panel
+
+# plot 
+Rscript 
 
