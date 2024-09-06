@@ -94,7 +94,7 @@ for c in {1..22}; do
 done
 
 # Concatonate
-bcftools concat ${workdir}/1kg_chr${c}_eur.vcf.gz -o ${workdir}/1kg_eur_merged.vcf.gz -Oz
+bcftools concat ${workdir}/1kg_chr*_eur.vcf.gz -o ${workdir}/1kg_eur_merged.vcf.gz -Oz
 mkdir -p ${workdir}/plink_genotypes
 
 # Before making plink file, make sure we only use the intersection of variants from both datasets to compute embedding
@@ -112,28 +112,29 @@ bcftools query -f '%ID\n' ${workdir}/1kg_eur_merged.vcf.gz > ${workdir}/ref_vars
 sort ${workdir}/ref_vars.txt -o ${workdir}/ref_vars_sorted.txt
 sort ${workdir}/query_vars.txt -o ${workdir}/query_vars_sorted.txt
 comm -12 ${workdir}/query_vars_sorted.txt ${workdir}/ref_vars_sorted.txt  > ${workdir}/intersection_vars.txt
-plink2 --vcf ${workdir}/chr1_eur.vcf.gz 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes/plink_genotypes
-
-# HERE: USE PLINK TO DO THIS
+plink2 --vcf ${workdir}/1kg_eur_merged.vcf.gz 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes/plink_genotypes
 
 # Get GRM, PCA and snp loadings using gcta
-module load HGI/softpack/groups/team152/wes-v1/1
-gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --make-grm --out ${workdir}/plink_genotypes/grm
-gcta64 --grm ${workdir}/plink_genotypes/grm --pca 20  --out ${workdir}/gtpca_gcta
-gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --pc-loading ${workdir}/gtpca_gcta --out gtpca_gcta # Get loadings
+#module load HGI/softpack/groups/team152/wes-v1/1
+#gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --make-grm --out ${workdir}/plink_genotypes/grm
+#gcta64 --bfile ${workdir}/plink_genotypes/plink_genotypes --pc-loading ${workdir}/gtpca_gcta --out gtpca_gcta # Get loadings
+#gcta64 --grm ${workdir}/plink_genotypes/grm --pca 20  --out ${workdir}/gtpca_gcta
 
 # OR using plink
-plink2 --bfile ${workdir}/plink_genotypes/plink_genotypes --freq counts --pca allele-wts --out ${workdir}/gtpcs_plink
 plink2 --freq counts --bfile plink_genotypes/plink_genotypes --out ${workdir}/ref_gt_plink_freq
+plink2 --pca 10 --read-freq ${workdir}/ref_gt_plink_freq.acount  --bfile  plink_genotypes/plink_genotypes --out gtpca_plink
+plink2 --bfile plink_genotypes/plink_genotypes --freq counts --pca allele-wts --out ${workdir}/ref_gt_plink_freq
 
 # Convert the input samples to bedfile, extracting these variants
 mkdir -p ${workdir}/plink_genotypes_query
-plink2 --vcf query_chr1_rename.vcf 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes_query/plink_genotypes
+plink2 --vcf ${workdir}/query_rename.vcf 'dosage=DS' --extract ${workdir}/intersection_vars.txt --make-bed --out ${workdir}/plink_genotypes_query/plink_genotypes
+
+# HERE
 
 # Project using plink
 plink2 --bfile ${workdir}/plink_genotypes_query/plink_genotypes \
     --read-freq ${workdir}/ref_gt_plink_freq.acount \
-    --score ${workdir}/gtpcs_plink.eigenvec.allele 2 5 \
+    --score ${workdir}/ref_gt_plink_freq.eigenvec.allele 2 5 \
     --score-col-nums 6-15 \
     --out query_in_ref_plink
 
