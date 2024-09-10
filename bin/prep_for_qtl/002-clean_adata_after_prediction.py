@@ -63,6 +63,13 @@ adata.var.set_index("ENS", inplace=True)
 # Save
 adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
 
+# Exclude samples with 'Missing' genotypes. As there is > 1 sample with this annotation they may skew the PCA calculation after psuedobulking
+sample_geno = adata.obs[["samp_tissue", "Genotyping_ID"]].reset_index(drop=True).drop_duplicates()
+nomiss = adata[adata.obs['Genotyping_ID'] != "Missing"]
+nomiss = nomiss[nomiss.obs['Genotyping_ID'].astype(str) != "nan"]
+nomiss.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_nomiss.h5ad")
+
+
 # Save a version downsampled to 5k cells for each cluster (best conf score)
 predicted_labels = adata.obs['predicted_labels']
 conf_score = adata.obs['conf_score']
