@@ -60,16 +60,68 @@ for c in cats:
     print(c)
     #adata_subset = adata[adata.obs['Category'] == c].copy() 
     sc.pl.umap(adata[adata.obs['Category'] == c], color="Label_1", cmap='Set1', frameon=False, title=None, legend_fontsize=10, save=f'_within_Category_{c}.png', show=False)
-
+    # Also plot with the correct colour for this subset
+    sc.pl.umap(adata, color=c, frameon=False, palette=color_map, title=None, legend_fontsize=10, save=f'_overall_{c}_legend_off.png', show=False)
 
 # Plot for some specific categories / cell-states (grey out the rest)
-level = ["tissue", "Category", "Label_1", "Category", "Label_1"]
-annot = ["Rectum", "Colonocyte", "Colonocyte (1)", "T", "CD8 tissue resident memory (1)"]
-tissue = ["Rectum", "Rectum", "Rectum", "TI", "TI"]
-cols = ["#E07B28", "#E07B28", "#E07B28", "#D640A1", "#D640A1"]
+level = ["tissue", "Category", "Label_1", "Category", "Label_1", "tissue", "Label_1", "Category"]
+annot = ["Rectum", "Colonocyte", "Colonocyte (1)", "T", "CD8 tissue resident memory (1)", "TI", "Intermediate monocyte SOD2+", "Myeloid"]
+tissue = ["Rectum", "Rectum", "Rectum", "TI", "TI", "TI", "all", "all"]
+cols = ["#E07B28", "#E07B28", "#E07B28", "#D640A1", "#D640A1", "#117733", "#AA4499", "#AA4499"]
 for i, l in enumerate(level):
-    adata.obs['plot'] = (adata.obs[level[i]] == annot[i]) & (adata.obs.tissue == tissue[i])
+    if tissue[i] == "all":
+        adata.obs['plot'] = (adata.obs[level[i]] == annot[i])
+    else:
+        adata.obs['plot'] = (adata.obs[level[i]] == annot[i]) & (adata.obs.tissue == tissue[i])
+    #
     adata.obs['plot'] = adata.obs['plot'].replace({False: "No", True: "Yes"})
     fname = f"{tissue[i]}-{level[i]}-{annot[i]}"
     temp_cols_map = dict({"Yes": cols[i], "No": "#D3D3D3"})
     sc.pl.umap(adata, color="plot", frameon=False, palette = temp_cols_map, title=None, legend_fontsize=10, save=f'_{fname}.png', show=False)
+
+
+############# SCRAP
+# Explore metadata
+obs = adata.obs.copy()
+ncells_per_sample = 10
+min_perc_single_tissue = 0.25
+minsamples = 40
+
+# For each cluster, calculate the number of samples with > x cells and the overall proportion of cells coming from each tissue
+# Percentage single tissue
+perc_tissue = obs.groupby("leiden")["tissue"].value_counts(normalize=True).reset_index()
+perc_tissue['leiden_tissue'] = perc_tissue['leiden'].astype(str) + "_" + perc_tissue['tissue'].astype(str)
+
+# NSamples with gt nCells per sample
+results = []
+for (leiden, tissue), group in obs.groupby(['leiden', 'tissue']):
+    samp_tissue_counts = group['samp_tissue'].value_counts()
+    count_meeting_criteria = (samp_tissue_counts >= ncells_per_sample).sum()
+    # Append the results
+    results.append({
+        'leiden': leiden,
+        'tissue': tissue,
+        'nsamp_gt_min_ncells': count_meeting_criteria
+    })
+
+nsamples = pd.DataFrame(results)
+nsamples['leiden_tissue'] = nsamples['leiden'].astype(str) + "_" + nsamples['tissue'].astype(str)
+
+# Combine
+sumstats = nsamples.merge(perc_tissue[["leiden_tissue", "proportion"]], how="left", on="leiden_tissue")
+sumstats['testable'] = (sumstats['proportion'] > min_perc_single_tissue) & (sumstats['nsamp_gt_min_ncells'] > minsamples)
+
+# Summarise the testable comparisons
+testmeta = []
+for leiden, group in sumstats.groupby('leiden'):
+    testable = group[group['testable']]
+    ntissues = testable.shape[0]
+    tissues = ",".join(testable['tissue'])
+    testmeta.append({
+        'leiden': leiden,
+        'ntissues': ntissues,
+        'testable_tissues': tissues
+    })
+
+testmeta = pd.DataFrame(testmeta)
+testmeta.to_csv("results_round3/combined/tables/DE_test_clusters.csv", index = False)
