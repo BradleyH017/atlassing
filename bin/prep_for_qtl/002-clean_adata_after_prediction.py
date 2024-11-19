@@ -69,6 +69,10 @@ nomiss = adata[adata.obs['Genotyping_ID'] != "Missing"]
 nomiss = nomiss[nomiss.obs['Genotyping_ID'].astype(str) != "nan"]
 nomiss.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_nomiss.h5ad")
 
+# Also save the obs as a dataframe (useful in summary of qtl results later)
+obs = pd.DataFrame(nomiss.obs)
+obs.to_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/tables/celltypist_0.5_ngene_ncount_mt_filt_nomiss_obs.csv")
+
 
 # Save a version downsampled to 5k cells for each cluster (best conf score)
 predicted_labels = adata.obs['predicted_labels']
