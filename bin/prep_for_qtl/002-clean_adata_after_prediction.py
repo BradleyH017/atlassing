@@ -70,8 +70,17 @@ nomiss = nomiss[nomiss.obs['Genotyping_ID'].astype(str) != "nan"]
 nomiss.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_nomiss.h5ad")
 
 # Also save the obs as a dataframe (useful in summary of qtl results later)
-obs = pd.DataFrame(nomiss.obs)
-obs.to_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/tables/celltypist_0.5_ngene_ncount_mt_filt_nomiss_obs.csv")
+cols = ["predicted_labels_tissue", "predicted_category_tissue", "unannotated_tissue"]
+mean_ncells_list = []
+for c in cols:
+    print(c)
+    grouped = nomiss.obs.groupby([c, "samp_tissue"]).size().reset_index(name="row_count")
+    mean_ncells_c = grouped.groupby([c]).row_count.mean().reset_index(name="mean_row_count")
+    mean_ncells_c.rename(columns={c: "leiden_tissue", 'mean_row_count': 'mean_ncells_per_sample'}, inplace=True)
+    mean_ncells_list.append(mean_ncells_c)
+
+mean_ncells = pd.concat(mean_ncells_list)
+mean_ncells.to_csv("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/tables/celltypist_0.5_ngene_ncount_mt_filt_nomiss-ncells_per_sample.csv")
 
 
 # Save a version downsampled to 5k cells for each cluster (best conf score)
