@@ -70,13 +70,17 @@ nomiss = nomiss[nomiss.obs['Genotyping_ID'].astype(str) != "nan"]
 nomiss.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_nomiss.h5ad")
 
 # Also save the obs as a dataframe (useful in summary of qtl results later)
-cols = ["predicted_labels_tissue", "predicted_category_tissue", "unannotated_tissue"]
+cols = ["predicted_labels_tissue", "predicted_category_tissue", "unannotated_tissue", "predicted_labels", "predicted_category", "unannotated"]
 mean_ncells_list = []
 for c in cols:
     print(c)
     grouped = nomiss.obs.groupby([c, "samp_tissue"]).size().reset_index(name="row_count")
     mean_ncells_c = grouped.groupby([c]).row_count.mean().reset_index(name="mean_row_count")
     mean_ncells_c.rename(columns={c: "leiden_tissue", 'mean_row_count': 'mean_ncells_per_sample'}, inplace=True)
+    # Add "_ct" suffix to "leiden_tissue" column values if "tissue" is not in c
+    if "tissue" not in c:
+        mean_ncells_c["leiden_tissue"] = mean_ncells_c["leiden_tissue"].astype(str) + "_ct"
+    #
     mean_ncells_list.append(mean_ncells_c)
 
 mean_ncells = pd.concat(mean_ncells_list)
