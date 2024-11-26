@@ -35,7 +35,6 @@ adata.obs.set_index("cell", inplace=True)
 # Define map
 color_map = dict(zip(colours['Category'], colours['Colour code']))
 
-
 # Make overall plots:
 overall_plot = ["tissue", "Category", "Label_1", "disease_status"]
 adata.obs['tissue'].replace('r', 'Rectum', inplace=True)
@@ -120,7 +119,43 @@ for tissue, group in tissue_groups:
     plt.savefig(f"results_round3/combined/figures/category_proportions_{tissue}.png", bbox_inches='tight')
     plt.clf()
 
+# Plot the number of cells from each tissue contributing to each cluster
+col="leiden"
+proportion_df = adata.obs.groupby([col, 'tissue']).size().reset_index(name='count')
+proportion_df['proportion'] = proportion_df.groupby(col)['count'].transform(lambda x: x / x.sum())
+pivot_df = proportion_df.pivot(index=col, columns="tissue", values='proportion').fillna(0)
+color_mapping = {"r": "#E07B28", "blood": "#BB5566", "ti": "#117733"}
+fig, ax = plt.subplots(figsize=(30, 10))
+bottom = np.zeros(len(pivot_df))
 
+for idx, category in enumerate(pivot_df.columns):
+    ax.bar(pivot_df.index, pivot_df[category], bottom=bottom, color=color_mapping.get(category, "#000000"), label=category)
+    bottom += pivot_df[category].fillna(0).values
+
+ax.tick_params(axis='x', rotation=45)
+ax.set_xlim([pivot_df.index.min(), pivot_df.index.max()])
+ax.legend(title=col, bbox_to_anchor=(1.05, 1), loc='upper left')
+ax.set_title('Relative Proportions of Tissue by Cluster (cell number)')
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Proportion')
+plt.savefig(f"results_round3/combined/figures/tissue__across_clusters.png", bbox_inches='tight')
+plt.clf()
+
+# Rather, save this as a table. 
+# Cells
+proportion_df = adata.obs.groupby([col, 'tissue']).size().reset_index(name='cell_count')
+proportion_df['cell_proportion'] = proportion_df.groupby(col)['cell_count'].transform(lambda x: x / x.sum())
+pivot_df = proportion_df.pivot(index=col, columns="tissue", values='cell_proportion').fillna(0)
+pivot_df.columns = pivot_df.columns.astype(str) + "_cell_prop"
+# Samples
+grouped = adata.obs.groupby([col, 'tissue', 'samp_tissue']).size().reset_index(name='sample_count')
+filtered_group = grouped[grouped['sample_count'] > 5]
+proportion_df_sample = filtered_group.groupby([col, 'tissue']).size().reset_index(name='sample_count')
+proportion_df_sample['sample_proportion'] = proportion_df_sample.groupby(col)['sample_count'].transform(lambda x: x / x.sum())
+pivot_df_sample = proportion_df_sample.pivot(index=col, columns="tissue", values='sample_proportion').fillna(0)
+pivot_df_sample.columns = pivot_df_sample.columns.astype(str) + "_sample_prop"
+merged_df = pivot_df_sample.join(pivot_df, on="leiden", how="inner")
+merged_df.to_csv("results_round3/combined/tables/cell_sample_prop_per_leiden.csv")
 
 ############# SCRAP
 # Explore metadata
