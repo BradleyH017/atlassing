@@ -67,6 +67,14 @@ def parse_options():
         )
     
     parser.add_argument(
+            '-tv', '--target_values',
+            action='store',
+            dest='target_values',
+            required=False,
+            help=''
+        )
+    
+    parser.add_argument(
             '-cc', '--cluster_column',
             action='store',
             dest='cluster_column',
@@ -156,6 +164,7 @@ def main():
     tissue = inherited_options.tissue
     subset = inherited_options.subset
     subset_value = inherited_options.subset_value
+    target_values = inherited_options.target_values
     cluster_column = inherited_options.cluster_column
     method = inherited_options.method
     filter = inherited_options.filter
@@ -175,6 +184,7 @@ def main():
     # tissue = "combined"
     # subset = "manual_lineage"
     # subset_value = "Mesenchymal"
+    # target_values = "Mesenchymal_2,Mesenchymal_8,Mesenchymal_16"
     # cluster_column = "leiden"
     # method = "wilcoxon"
     # filter = "True"
@@ -191,11 +201,25 @@ def main():
     adata = sc.read_h5ad(input_file)
     print(f"adata shape: {adata.shape}")
     
+    # Map leiden to category
+    annots = pd.read_csv("temp/2024-08-28_provisional_annot_cats.csv")
+    adata.obs.reset_index(inplace=True)
+    adata.obs = adata.obs.merge(annots[["leiden", "Category"]], on="leiden", how="left")
+    adata.obs.set_index("cell", inplace=True)
+
+    
     # Subset if desired
     if subset is not None:
         print("~~~~~~~~~ Subsetting ~~~~~~~~~")
         adata = adata[adata.obs[subset] == subset_value]
     
+    # Also for targetted sets if desired
+    if target_values is not None:
+        print("~~~~~~~~~ Subsetting for targets ~~~~~~~~~")
+        adata = adata[adata.obs[cluster_column].isin(target_values.split(","))]
+        # Adjust value of subset to make sure new directory is made
+        subset_value = subset_value + "_TARGET_" + target_values.replace(",", "-")
+        
     ############## 1. Marker gene analysis ###########
     # Calculate markers
     print("~~~~~~~~~ Calculating marker genes ~~~~~~~~~")
@@ -239,7 +263,8 @@ def main():
     rcParams['axes.grid'] = True
     print("Plotting panel")
     # Plot
-    sc.pl.rank_genes_groups(adata, save="_panel_unfiltered.png", key="rank_genes_groups", gene_symbols="gene_symbols")
+    sc.pl.rank_genes_groups(adata, save="_panel_unfiltered.png", key="rank_genes_groups", gene_symbols="gene_symbols", sharey=False)
+    #sc.pl.rank_genes_groups(adata, save="_panel_filtered.png", key="rank_genes_groups_filtered", gene_symbols="gene_symbols", sharey=False)
     
     # Dotplot (filtered and unfiltered)
     print("~~~~~~~ Plotting dotplot ~~~~~~~~~")
@@ -255,7 +280,19 @@ def main():
         sc.pl.rank_genes_groups_dotplot(adata, layer = "log1p_cp10k", save="_filtered_top4.png", key=key, n_genes=5, gene_symbols="gene_symbols_unique")
     
     ############## 2. Comparing leiden against other annotations ###########
-    # Summarise the top hits per gene
+    # Replace the TI cluster numbers with annotations
+    if "Celltypist:cluster-ti-cd_healthy-freeze005_clustered_final:predicted_labels" in compare_annots:
+        oldcol="Celltypist:cluster-ti-cd_healthy-freeze005_clustered_final"
+        newcol="TI_atlas_annotation_fr5"
+        ti_annotation = pd.read_csv("external_markers/ti_atlas_cluster_labels.csv")
+        ti_annotation.rename(columns={"cluster": f"{oldcol}:predicted_labels", "manual_annotation": f"{newcol}:predicted_labels"}, inplace=True)
+        adata.obs.reset_index(inplace=True)
+        ti_annotation[f"{oldcol}:predicted_labels"] = ti_annotation[f"{oldcol}:predicted_labels"].astype(str)
+        adata.obs = adata.obs.merge(ti_annotation[[f"{oldcol}:predicted_labels", f"{newcol}:predicted_labels"]], on=f"{oldcol}:predicted_labels", how="left") # Append the proper annotation
+        adata.obs.set_index("cell", inplace=True)
+        compare_annots = [f"{newcol}:predicted_labels" if col == f"{oldcol}:predicted_labels" else col for col in compare_annots] # Replace the compare_annots value so that we compare against this annotation instead
+        adata.obs.rename(columns={f"{oldcol}:conf_score": f"{newcol}:conf_score"}, inplace=True )# Rename the cols
+
     # Group by 'leiden' and apply the custom function to each annot_col
     result = adata.obs.groupby('leiden')[compare_annots].agg(lambda x: most_and_second_most_frequent(x))
     result.to_csv(f"{outdir}/top_votes_other_annotations.csv")
@@ -267,7 +304,7 @@ def main():
     df_cells_all = adata.obs[["leiden"] + compare_annots + conf_score_cols]
     df_cells_all['leiden'] = df_cells_all['leiden'].str.replace(f"{subset_value}_", '', regex=False)
     for i, annot in enumerate(compare_annots):
-        print(f"Calculating concordance between leiden and {annot}")
+        print(f"-------- Calculating concordance between leiden and {annot} ---------")
         # Sometimes get erros if predicted as na. Remove these
         df_cells = df_cells_all[~df_cells_all[conf_score_cols[i]].isna()]
         df_cells[annot] = df_cells[annot].astype('category')
@@ -279,12 +316,12 @@ def main():
         df_cells[conf_score_cols[i]] = df_cells[conf_score_cols[i]].astype(float)
         temp = []
         for l in np.unique(df_cells['leiden']):
-            for g in np.unique(df_cells[annot]):
+            for g in np.unique(df_cells[annot].astype(str)):
                 dat = df_cells.loc[(df_cells[annot] == g) & (df_cells["leiden"] == l), conf_score_cols[i]]
                 val = dat.sum()/len(dat)
                 to_add = pd.DataFrame({"leiden":[l], annot:[g], conf_score_cols[i]: val})
                 temp.append(to_add)
-        df3 = pd.concat(temp)
+            df3 = pd.concat(temp)
         #df3 = df_cells.groupby(["leiden", annot]).mean(conf_score_cols[i]).reset_index()
         #df3.columns.values[1] = conf_score_cols[i]
         df_plt = pd.merge(df_plt, df3, on=["leiden", annot])
