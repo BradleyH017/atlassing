@@ -18,9 +18,13 @@ from scipy import stats
 outdir="other_paper_figs"
 
 # Load in obs only
-f="results/combined/objects/celltypist_prediction_conf_gt_0.5.h5ad"
+f="results/combined/objects/celltypist_prediction.h5ad" # All data
 f2 = File(f, 'r')
 obs = read_elem(f2['obs'])
+
+# Make copy, subset for confidence 
+reserve = obs.copy()
+obs = obs[obs['conf_score'] > 0.5] # gt 0.5
 
 ######## 1. Plot distirbution of cells per sample, for each tissue x disease #########
 td = np.unique(obs['tissue_disease'])
@@ -174,6 +178,40 @@ plt.clf()
 # Have a look at the biggest changers
 prop_plt['pred_over_highqc'] = prop_plt['prediction_proportion'] / prop_plt['high_qc_proportion']
 
+# Also have a look at the overall accuracy
+manauto = obs.loc[obs.index.isin(hqc_obs.index), 'predicted_labels'].reset_index().merge(hqc_obs[['leiden']].reset_index(), on='cell')
+total = manauto.shape[0]
+overall = (manauto['predicted_labels'] == manauto['leiden']).sum()/total #0.97
+acc_per_leiden = manauto.groupby('leiden').apply(
+    lambda x: (x['predicted_labels'] == x['leiden']).sum() / len(x)
+)
+min_acc_per_leiden = acc_per_leiden.min() # 80
+acc_per_leiden.median() # 97.8
+
+# Have a look at the celltypes with lower accuracy
+lowacc = acc_per_leiden[acc_per_leiden < 0.9]
+lowacc_leiden = lowacc.index
+from collections import Counter
+non_matching = manauto[manauto['predicted_labels'] != manauto['leiden']]
+
+def calculate_next_best(group):
+    # Most common 'predicted_labels' among mismatched rows
+    most_common = group['predicted_labels'].value_counts().idxmax()
+    # Proportion of this value among all mismatches
+    proportion = group['predicted_labels'].value_counts(normalize=True).iloc[0]
+    return pd.Series({'next_best_predicted': most_common, 'next_best_predicted_miss_prop': proportion})
+
+results = (
+    non_matching[non_matching['leiden'].isin(lowacc.index)]
+    .groupby('leiden')
+    .apply(calculate_next_best)
+)
+
+lowacc = lowacc.to_frame()
+lowacc = lowacc.join(results)
+lowacc.reset_index(inplace=True)
+lowacc.rename(columns={0: 'accuracy'}, inplace=True)
+lowacc.to_csv("temp/low_accuracy_autoannot_and_nextbest.csv")
 
 ######## 5. Are the over-estimated clusters associated with cells/sample of lower quality? #########
 # Look at the distribution of QC metrics in these clusters compared to other epithelial
@@ -183,7 +221,7 @@ obs['manual_lineage'] = obs["predicted_labels"].apply(lambda x: x.split('_')[0] 
 epiobs = obs[obs['manual_lineage'] == "Epithelial"]
 cols = ["pct_counts_gene_group__mito_transcript", "log_n_genes_by_counts", "log_total_counts"]
 clusters = np.unique(epiobs['predicted_labels'])
-problem = ["Epithelial_6", "Epithelial_8"]
+problem = ["Epithelial_6", "Epithelial_21"]
 for c in cols:
     plt.figure(figsize=(8, 6))
     fig,ax = plt.subplots(figsize=(8,6))
@@ -200,6 +238,29 @@ for c in cols:
     plt.title(f"Distribution of {c} across clusters")
     plt.savefig(f"temp/Distribution_of_{c}_across_epithelial_clusters.png", bbox_inches='tight')
     plt.clf()
+
+
+epiobs = obs[obs['manual_lineage'] == "Myeloid"]
+cols = ["pct_counts_gene_group__mito_transcript", "log_n_genes_by_counts", "log_total_counts"]
+clusters = np.unique(epiobs['predicted_labels'])
+problem = ["Myeloid_2"]
+for c in cols:
+    plt.figure(figsize=(8, 6))
+    fig,ax = plt.subplots(figsize=(8,6))
+    for k in clusters:
+        print(k)
+        data = epiobs.loc[epiobs['predicted_labels'] == k, c].values
+        if k in problem:
+            sns.distplot(data, hist=False, rug=True, label=k)
+        else:
+            sns.distplot(data, hist=False, rug=True, kde_kws={'color': 'orange'})
+    #
+    plt.legend()
+    plt.xlabel(c)
+    plt.title(f"Distribution of {c} across clusters")
+    plt.savefig(f"temp/Distribution_of_{c}_across_myeloid_clusters.png", bbox_inches='tight')
+    plt.clf()
+
 
 # If we subset cells for those that pass the initial filtering, how do the contribution of cells to these clusters change? 
 obs_filt = obs[(obs['pct_counts_gene_group__mito_transcript'] < 50) & (obs['log_n_genes_by_counts'] > np.log10(250)) & (obs['log_total_counts'] > np.log10(500))]
@@ -377,7 +438,77 @@ for k in clusters:
     print(f"{k}: {res}")
     
     
-######### What if we filter solely on nGenes (this is essentially the important the)
+######### Addition of a small filter for nGenes and MT% ?
+obs_filt = obs[(obs['pct_counts_gene_group__mito_transcript'] < 60) & (obs['log_n_genes_by_counts'] > np.log10(100))]
+pred_freq = pd.DataFrame(obs['predicted_labels'].value_counts()).reset_index(names="leiden")
+pred_freq.rename(columns={"count":"predicted_freq"},inplace=True)
+pred_freq_filt = pd.DataFrame(obs_filt['predicted_labels'].value_counts()).reset_index(names="leiden")
+pred_freq_filt.rename(columns={"count":"predicted_filt_freq"},inplace=True)
+freq_plt = pred_freq.merge(pred_freq_filt, how="left", on="leiden")
+freq_plt['prop_after_filt'] = freq_plt['predicted_filt_freq'] / freq_plt['predicted_freq']
+freq_plt['manual_lineage'] = freq_plt["leiden"].apply(lambda x: x.split('_')[0] if '_' in x else x)
+for l in lins:
+    temp = freq_plt[freq_plt['manual_lineage'] == l]
+    plt.bar(temp['leiden'], temp['prop_after_filt'])
+    plt.xlabel('Cluster')
+    plt.ylabel('Proportion of predicted cells kept after filtering')
+    plt.title('Effect of first round filtration on the predicted cell-type proportions')
+    plt.xticks(rotation=45, ha='right')
+    plt.savefig(f"temp/Prop_predicted_{l}_after_filtration_mt_ngene.png", bbox_inches='tight')
+    plt.clf()
+
+pred_props_filt = pd.DataFrame(obs_filt['predicted_labels'].value_counts(normalize=True)).reset_index(names="leiden")
+pred_props_filt.rename(columns={"proportion": "prediction_proportion_filtered"}, inplace=True)
+prop_plt = prop_plt.merge(pred_props_filt, on="leiden", how="left")
+prop_plt['filt_over_pred'] = prop_plt['prediction_proportion_filtered'] / prop_plt['prediction_proportion']
+prop_plt['filt_pred_over_hqc'] = prop_plt['prediction_proportion_filtered'] / prop_plt['high_qc_proportion']
+axmax = max([max(prop_plt['high_qc_proportion']), max(prop_plt['prediction_proportion_filtered'])])*1.1
+fig, ax = plt.subplots(figsize=(8, 6))
+rho, p_value = stats.pearsonr(prop_plt['high_qc_proportion'], prop_plt['prediction_proportion_filtered'])
+for lineage in prop_plt['manual_lineage'].unique():
+    subset = prop_plt[prop_plt['manual_lineage'] == lineage]
+    ax.scatter(subset['high_qc_proportion'], subset['prediction_proportion_filtered'],
+               label=lineage)
+
+
+ax.plot([0, 1], [0, 1], ls='--', color='black', label='x = y')
+#ax.axhline(y=rho, color='red', linestyle='--', label=f'rho = {rho:.2f}\np-value = {p_value:.2e}')
+x_vals = np.array(ax.get_xlim())
+y_vals = rho * x_vals 
+ax.plot(x_vals, y_vals, '--', color='red', label=f'rho = {rho:.2f}\np-value = {p_value:.2e}')
+ax.set_xlim(0, axmax)
+ax.set_ylim(0, axmax)
+ax.set_xlabel('High QC Proportion')
+ax.set_ylabel('Prediction Proportion after filtering')
+plt.legend()
+ax.set_title('Concordance of high QC and predicted labels after filtering')
+plt.savefig(f"{outdir}/highqc_vs_predicted_proportions_postfilt_mt_ngene.png", bbox_inches='tight')
+plt.clf()
+    
+# Do this for all lineages:
+for l in lins:
+    print(l)
+    epiobs_filt = obs_filt[obs_filt['manual_lineage'] == l]
+    cols = ["pct_counts_gene_group__mito_transcript", "log_n_genes_by_counts", "log_total_counts"]
+    clusters = np.unique(epiobs_filt['predicted_labels'])
+    problem = ["Epithelial_6", "Epithelial_8"]
+    for c in cols:
+        plt.figure(figsize=(8, 6))
+        fig,ax = plt.subplots(figsize=(8,6))
+        for k in clusters:
+            print(k)
+            data = epiobs_filt.loc[epiobs_filt['predicted_labels'] == k, c].values
+            if k in problem:
+                sns.distplot(data, hist=False, rug=True, label=k)
+            else:
+                sns.distplot(data, hist=False, rug=True, kde_kws={'color': 'orange'})
+        #
+        plt.legend()
+        plt.xlabel(c)
+        plt.title(f"Distribution of {c} across clusters")
+        plt.savefig(f"temp/Distribution_of_{c}_across_{l}_clusters_mt_ngene.png", bbox_inches='tight')
+        plt.clf()
+    
 
 ######## 6. Find the relationship between QC, CellTypist confidence #########
 # As we increase celltypist confidence score, how many cells remaining set are in the lower quality set?
