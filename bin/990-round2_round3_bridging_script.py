@@ -13,7 +13,7 @@ chuck_additional = True # Decide whether to chuck the additional chuck clusters 
 # Define lineages, desired resolutions and clusters to chuck per lineage
 lins_res = {"all_Epithelial": 0.9, "all_Mesenchymal": 1.0, "all_Myeloid": 0.7, "all_B": 0.8, "all_T": 1.1, "Platelet+RBC": np.nan, "Mast": np.nan}
 chuck = {"all_Epithelial": ["11", "33", "34"], "all_Mesenchymal": ["15"], "all_Myeloid": ["6", "13", "18"], "all_B": ["14", "15"], "all_T": ["17", "18", "23", "25"]} # Removed on the basis of outlying QC or a maximum contribution by single sample > 40% 
-additional_chuck = {"all_Epithelial": ["8"], "all_Mesenchymal": ["10"], "all_B": ["7"], "all_Myeloid": ["12", "9", "5", "15"], "all_T": ["14"]} 
+additional_chuck = {"all_Epithelial": ["8", "30", "21"], "all_Mesenchymal": ["8", "10", "12"], "all_B": ["7", "9", "11"], "all_Myeloid": ["12", "9", "5", "15"], "all_T": ["14", "22", "11"]} 
 # Additional were removed on the basis of marker gene expression (either not sufficient for given lineage, or cross-lineage).
 # Myeloid 5 looked like bin for low quality DC cells and Myeloid 15 had outlying QC
 
