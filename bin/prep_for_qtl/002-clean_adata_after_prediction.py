@@ -38,7 +38,7 @@ for col, value in filters.items():
     print(f"After filter for {col}, adata shape: {adata.shape}")
 
 # Merge with the categories
-annots = pd.read_csv("temp/2024-08-28_provisional_annot_cats.csv")
+annots = pd.read_csv("temp/2024-12-13_annot_cats.csv")
 
 # Bind
 annots.rename(columns={"leiden": "predicted_labels", "Category": "predicted_category"}, inplace=True)
@@ -49,16 +49,26 @@ adata.obs.set_index("cell", inplace=True)
 # Add unnatotated
 adata.obs['unannotated'] = "unannotated"
 
+# Replace platelet
+adata.obs['predicted_labels'] = adata.obs['predicted_labels'].replace('Platelet+RBC', 'Platelet')
+
 # Bind each of these to tissue and save to a new column
 for c in ["predicted_labels", "predicted_category", "unannotated"]:
     print(c)
     adata.obs[f"{c}_tissue"] = adata.obs[c].astype(str) + "_" + adata.obs['tissue'].astype(str)
+    adata.obs[c] = adata.obs[c].astype(str) + "_ct" # Add _ct suffix also - to specify analysis will be performed across tissue
 
 # First step actually uses the log1p_cp10k expression matrix, but under a different name. So rename this and save lots of mem
-adata.layers['cp10k'] = adata.layers.pop('log1p_cp10k')
+# adata.layers['cp10k'] = adata.layers.pop('log1p_cp10k')
 
 # Make sure .var index is "ENS" (replaced during prediction)
 adata.var.set_index("ENS", inplace=True)
+
+# Remove all the keras columns from the obs
+adata.obs = adata.obs.loc[:, ~adata.obs.columns.str.contains('Keras')]
+adata.obs = adata.obs.loc[:, ~adata.obs.columns.str.contains('JAMBOREE_NOTES')]
+adata.obs = adata.obs.loc[:, ~adata.obs.columns.str.contains('Unnamed: 9')]
+
 
 # Save
 adata.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt.h5ad")
@@ -110,7 +120,7 @@ ds.write_h5ad("/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_a
 
 
 # Divide by tissue
-tissues = np.unique(adata.obs['tissue'])
+tissues = np.unique(nomiss.obs['tissue'])
 for t in tissues:
     print(t)
-    adata[adata.obs['tissue'] == t].write_h5ad(f"/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_{t}.h5ad")
+    nomiss[nomiss.obs['tissue'] == t].write_h5ad(f"/lustre/scratch126/humgen/projects/sc-eqtl-ibd/analysis/bradley_analysis/scripts/scRNAseq/Atlassing/results/combined/objects/celltypist_0.5_ngene_ncount_mt_filt_nomiss_{t}.h5ad")
